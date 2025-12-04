@@ -2,45 +2,338 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unser Produktivitäts-Garten</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Unser Garten</title>
     
-    <!-- 1. Styles laden (Tailwind CSS) -->
+    <!-- Tailwind CSS für das Design -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            animation: {
-              'bounce-short': 'bounce 1s infinite',
-              'slide-up': 'slideUp 0.3s ease-out forwards'
-            },
-            keyframes: {
-              slideUp: {
-                '0%': { transform: 'translateY(100%)' },
-                '100%': { transform: 'translateY(0)' },
-              }
-            }
-          }
-        }
-      }
-    </script>
-
-    <!-- 2. Babel laden (Damit der Browser React/JSX versteht) -->
+    
+    <!-- Babel: Übersetzt React direkt im Browser (Damit es ohne Build läuft) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { font-family: -apple-system, sans-serif; touch-action: manipulation; }
+        /* Verhindert "Pull-to-Refresh" auf Mobile, damit es sich wie eine App anfühlt */
+        body { overscroll-behavior-y: contain; }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 text-gray-900 select-none">
+    
+    <!-- Hier wird die App reingeladen -->
     <div id="root"></div>
 
-    <!-- 3. Deine App-Logik laden -->
-    <!-- WICHTIG: data-type="module" erlaubt uns moderne Imports -->
-    <script type="text/babel" data-type="module" src="./game.jsx"></script>
+    <!-- DER GESAMTE CODE -->
+    <script type="text/babel" data-type="module">
+        // 1. IMPORTS direkt aus dem Web (schnell & modern)
+        import React, { useState, useEffect } from 'https://esm.sh/react@18.2.0';
+        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+        import { 
+            Sprout, Droplet, CheckSquare, ShoppingBag, Users, Gem, Coins, 
+            Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle 
+        } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
+
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { 
+            getAuth, signInAnonymously, onAuthStateChanged 
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { 
+            getFirestore, collection, doc, setDoc, addDoc, getDoc, 
+            onSnapshot, updateDoc, increment, arrayUnion, serverTimestamp, 
+            runTransaction, query, orderBy, limit 
+        } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // --- 2. CONFIG (HIER DEINE DATEN REIN!) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
+            authDomain: "duobloom-a9b7b.firebaseapp.com",
+            projectId: "duobloom-a9b7b",
+            storageBucket: "duobloom-a9b7b.firebasestorage.app",
+            messagingSenderId: "118209789780",
+            appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
+            measurementId: "G-Z0W0LK6D88"
+          };
+
+        // --- 3. FEHLER-BEHANDLUNG ---
+        // Fängt weiße Bildschirme ab und zeigt den echten Fehler
+        class ErrorBoundary extends React.Component {
+            constructor(props) { super(props); this.state = { hasError: false, error: '' }; }
+            static getDerivedStateFromError(error) { return { hasError: true, error: error.toString() }; }
+            render() {
+                if (this.state.hasError) return (
+                    <div className="p-8 text-red-800 bg-red-50 h-screen flex flex-col items-center justify-center">
+                        <AlertTriangle size={48} className="mb-4"/>
+                        <h1 className="font-bold mb-2">Ein Fehler ist aufgetreten</h1>
+                        <pre className="text-xs bg-white p-4 border rounded max-w-full overflow-auto">{this.state.error}</pre>
+                        <button onClick={()=>window.location.reload()} className="mt-4 bg-red-600 text-white px-4 py-2 rounded">Neu laden</button>
+                    </div>
+                );
+                return this.props.children;
+            }
+        }
+
+        // --- 4. SPIEL LOGIK ---
+        
+        // Init Firebase sicherheitshalber im Try-Block
+        let app, auth, db;
+        try {
+            if(firebaseConfig.apiKey !== "HIER_EINFÜGEN") {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+            }
+        } catch(e) { console.error(e); }
+
+        const ITEMS = {
+            'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icon: '🥕', stages: 3, sellPrice: 15, sellCurrency: 'gems' },
+            'seed_flower': { id: 'seed_flower', name: 'Rose', type: 'plant', cost: 150, icon: '🌹', stages: 4, sellPrice: 30, sellCurrency: 'gems' },
+            'seed_tree': { id: 'seed_tree', name: 'Baum', type: 'plant', cost: 500, icon: '🌳', stages: 5, sellPrice: 100, sellCurrency: 'gems' }
+        };
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [roomId, setRoomId] = useState(localStorage.getItem('gid')); // gid = garden id
+            const [room, setRoom] = useState(null);
+            const [userData, setUserData] = useState(null);
+            const [tab, setTab] = useState('garden');
+            const [loading, setLoading] = useState(false);
+
+            // Prüfen ob Config da ist
+            if(firebaseConfig.apiKey === "HIER_EINFÜGEN") {
+                return <div className="h-screen flex items-center justify-center text-center p-4"><b>WICHTIG:</b><br/>Du musst die index.html bearbeiten und<br/>deine Firebase Config einfügen!</div>;
+            }
+
+            // Auth
+            useEffect(() => {
+                const unsub = onAuthStateChanged(auth, (u) => {
+                    if(u) setUser(u);
+                    else signInAnonymously(auth);
+                });
+                return unsub;
+            }, []);
+
+            // User Daten laden
+            useEffect(() => {
+                if(!user) return;
+                const ref = doc(db, 'users', user.uid);
+                getDoc(ref).then(s => !s.exists() && setDoc(ref, { coins: 100, gems: 0, inventory: {} }));
+                return onSnapshot(ref, s => setUserData(s.data()));
+            }, [user]);
+
+            // Raum laden
+            useEffect(() => {
+                if(!roomId) return;
+                setLoading(true);
+                const unsub = onSnapshot(doc(db, 'rooms', `r_${roomId}`), (s) => {
+                    setLoading(false);
+                    if(s.exists()) { setRoom(s.data()); localStorage.setItem('gid', roomId); }
+                    else { setRoomId(null); } // Raum existiert nicht mehr
+                });
+                return unsub;
+            }, [roomId]);
+
+            const createRoom = async (name) => {
+                if(!name) return;
+                const id = Math.random().toString(36).substr(2,6).toUpperCase();
+                const grid = {};
+                for(let i=0; i<16; i++) grid[i] = null;
+                await setDoc(doc(db, 'rooms', `r_${id}`), {
+                    id, name, grid, expansion: 4, day: 0,
+                    owner: user.uid
+                });
+                setRoomId(id);
+            };
+
+            const joinRoom = (id) => setRoomId(id.trim().toUpperCase());
+
+            if(!user) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-green-600"/></div>;
+
+            if(!roomId) return (
+                <div className="min-h-screen bg-green-50 p-6 flex flex-col justify-center items-center text-center">
+                    <Sprout size={60} className="text-green-600 mb-4"/>
+                    <h1 className="text-2xl font-bold mb-8">Dein Garten</h1>
+                    
+                    <div className="bg-white p-6 rounded-xl shadow w-full max-w-sm space-y-4">
+                        <input id="n" placeholder="Name deines Gartens" className="w-full p-3 border rounded"/>
+                        <button onClick={()=>createRoom(document.getElementById('n').value)} className="w-full bg-green-600 text-white p-3 rounded font-bold">Erstellen</button>
+                        <div className="divider text-gray-400 text-sm">- ODER -</div>
+                        <input id="c" placeholder="Raum Code" className="w-full p-3 border rounded"/>
+                        <button onClick={()=>joinRoom(document.getElementById('c').value)} className="w-full bg-blue-500 text-white p-3 rounded font-bold">Beitreten</button>
+                    </div>
+                </div>
+            );
+
+            if(!room) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin"/> Lade Raum...</div>;
+
+            return (
+                <div className="h-screen flex flex-col bg-gray-50 max-w-md mx-auto shadow-2xl overflow-hidden relative">
+                    {/* Header */}
+                    <div className="bg-white p-3 shadow-sm z-10 flex justify-between items-center">
+                        <div>
+                            <h2 className="font-bold">{room.name}</h2>
+                            <div className="flex gap-2 text-xs mt-1">
+                                <span className="bg-yellow-100 text-yellow-800 px-2 rounded-full flex items-center"><Coins size={10} className="mr-1"/>{userData?.coins||0}</span>
+                                <span className="bg-purple-100 text-purple-800 px-2 rounded-full flex items-center"><Gem size={10} className="mr-1"/>{userData?.gems||0}</span>
+                            </div>
+                        </div>
+                        <button onClick={()=>{setRoomId(null); localStorage.removeItem('gid')}} className="p-2 bg-gray-100 rounded-full"><X size={16}/></button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 overflow-hidden relative">
+                        {tab === 'garden' && <Garden room={room} user={user} data={userData} />}
+                        {tab === 'tasks' && <Tasks rid={roomId} uid={user.uid} />}
+                        {tab === 'shop' && <Shop uid={user.uid} coins={userData?.coins||0} />}
+                    </div>
+
+                    {/* Nav */}
+                    <div className="bg-white border-t p-2 flex justify-around">
+                        <Btn i={Sprout} l="Garten" a={tab==='garden'} set={()=>setTab('garden')}/>
+                        <Btn i={CheckSquare} l="Tasks" a={tab==='tasks'} set={()=>setTab('tasks')}/>
+                        <Btn i={ShoppingBag} l="Shop" a={tab==='shop'} set={()=>setTab('shop')}/>
+                    </div>
+                </div>
+            );
+        };
+
+        const Btn = ({i:I, l, a, set}) => (
+            <button onClick={set} className={`flex flex-col items-center w-16 ${a?'text-green-600':'text-gray-400'}`}>
+                <I size={24} strokeWidth={a?2.5:2}/>
+                <span className="text-[10px] font-bold mt-1">{l}</span>
+            </button>
+        );
+
+        // --- SUB VIEWS ---
+        
+        const Garden = ({ room, user, data }) => {
+            const [sel, setSel] = useState(null);
+            const size = room.expansion || 4;
+            
+            const plant = async (id) => {
+                if((data.inventory?.[id]||0) <= 0) return;
+                await runTransaction(db, async(t)=>{
+                    t.update(doc(db,'users',user.uid), {[`inventory.${id}`]: increment(-1)});
+                    t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}`]: {type:id, stage:0, water:0, lastWater:-1}});
+                });
+                setSel(null);
+            };
+
+            const action = async (idx, cell) => {
+                const item = ITEMS[cell.type];
+                if(cell.stage < item.stages) {
+                    // Gießen
+                    if(cell.lastWater === room.day) { alert("Heute schon gegossen!"); return; }
+                    await updateDoc(doc(db,'rooms',`r_${room.id}`), {
+                        [`grid.${idx}.water`]: increment(1),
+                        [`grid.${idx}.lastWater`]: room.day,
+                        [`grid.${idx}.stage`]: increment(1)
+                    });
+                } else {
+                    // Ernten
+                    await runTransaction(db, async(t)=>{
+                        t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${idx}`]: null});
+                        t.update(doc(db,'users',user.uid), {[item.sellCurrency]: increment(item.sellPrice)});
+                    });
+                }
+            };
+
+            return (
+                <div className="h-full bg-green-50 overflow-y-auto pb-20 flex flex-col">
+                    <div className="p-2 flex justify-between items-center bg-yellow-50 text-xs text-yellow-800">
+                        <span>Tag: {room.day}</span>
+                        <button onClick={()=>updateDoc(doc(db,'rooms',`r_${room.id}`), {day: increment(1)})} className="bg-yellow-200 px-2 py-1 rounded flex gap-1"><Clock size={12}/> Tag+</button>
+                    </div>
+                    
+                    <div className="flex-1 flex items-center justify-center p-4">
+                        <div className="grid gap-1 bg-stone-300 p-2 rounded-xl border-4 border-stone-400 shadow-inner" 
+                             style={{gridTemplateColumns:`repeat(${size}, 1fr)`, width: '100%', maxWidth:'350px', aspectRatio:'1'}}>
+                            {Array.from({length:size*size}).map((_,i)=>{
+                                const c = room.grid?.[i];
+                                return (
+                                    <div key={i} onClick={()=>!c && setSel(i)} 
+                                         className={`bg-[#8B5E3C] rounded flex items-center justify-center relative overflow-hidden ${sel===i?'ring-4 ring-green-400 z-10':''}`}>
+                                        {c ? (
+                                            <div onClick={(e)=>{e.stopPropagation(); action(i,c)}} className="w-full h-full flex items-center justify-center text-3xl active:scale-90 transition-transform">
+                                                {c.stage===0 ? '🌱' : ITEMS[c.type].icon}
+                                                {c.stage >= ITEMS[c.type].stages && <div className="absolute inset-0 bg-yellow-500/30 animate-pulse"/>}
+                                            </div>
+                                        ) : <span className="opacity-10 text-[8px]">{i}</span>}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Inventory Drawer */}
+                    {sel !== null && (
+                        <div className="absolute bottom-0 w-full bg-white p-4 rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] animate-slide-up">
+                            <div className="flex justify-between mb-2 font-bold"><span>Samen wählen</span><X onClick={()=>setSel(null)}/></div>
+                            <div className="flex gap-2 overflow-x-auto pb-2">
+                                {Object.keys(data?.inventory||{}).map(k => (data.inventory[k]>0) && (
+                                    <button key={k} onClick={()=>plant(k)} className="bg-green-50 p-3 rounded-xl min-w-[80px] flex flex-col items-center border border-green-100">
+                                        <span className="text-2xl">{ITEMS[k].icon}</span>
+                                        <span className="text-xs mt-1 font-bold">x{data.inventory[k]}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const Tasks = ({rid, uid}) => {
+            const [list, setList] = useState([]);
+            const [txt, setTxt] = useState('');
+            useEffect(()=>onSnapshot(query(collection(db,'rooms',`r_${rid}`,'tasks'), orderBy('at','desc'), limit(20)), s=>setList(s.docs.map(d=>({id:d.id,...d.data()})))), [rid]);
+            
+            const add = async () => {
+                if(!txt) return;
+                await addDoc(collection(db,'rooms',`r_${rid}`,'tasks'), {txt, done:false, rew:10, at:serverTimestamp()});
+                setTxt('');
+            };
+
+            return (
+                <div className="h-full bg-gray-50 p-4 flex flex-col">
+                    <div className="flex gap-2 mb-4">
+                        <input value={txt} onChange={e=>setTxt(e.target.value)} className="flex-1 p-2 border rounded shadow-sm" placeholder="Neue Aufgabe..."/>
+                        <button onClick={add} className="bg-green-600 text-white p-2 rounded shadow-sm"><ArrowRight/></button>
+                    </div>
+                    <div className="space-y-2 overflow-y-auto pb-20">
+                        {list.map(t=>(
+                            <div key={t.id} className={`p-3 rounded-lg flex justify-between items-center bg-white shadow-sm ${t.done?'opacity-50':''}`}>
+                                <div>{t.txt} <span className="text-xs text-yellow-600 font-bold">+{t.rew}</span></div>
+                                <button disabled={t.done} onClick={()=>!t.done && runTransaction(db,async(tr)=>{
+                                    tr.update(doc(db,'rooms',`r_${rid}`,'tasks',t.id),{done:true});
+                                    tr.update(doc(db,'users',uid),{coins:increment(t.rew)});
+                                })}><CheckSquare className={t.done?'text-green-600':'text-gray-300'}/></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )
+        };
+
+        const Shop = ({uid, coins}) => (
+            <div className="p-4 grid gap-3 overflow-y-auto h-full pb-20 bg-gray-50">
+                {Object.values(ITEMS).map(i=>(
+                    <div key={i.id} className="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            <span className="text-3xl">{i.icon}</span>
+                            <div><div className="font-bold">{i.name}</div><div className="text-xs text-gray-500">{i.cost} Münzen</div></div>
+                        </div>
+                        <button onClick={() => coins >= i.cost && updateDoc(doc(db,'users',uid),{coins:increment(-i.cost), [`inventory.${i.id}`]:increment(1)})} 
+                                className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold active:bg-green-700">
+                            Kaufen
+                        </button>
+                    </div>
+                ))}
+            </div>
+        );
+
+        // --- START ---
+        const root = createRoot(document.getElementById('root'));
+        root.render(<ErrorBoundary><App /></ErrorBoundary>);
+    </script>
 </body>
 </html>
 
