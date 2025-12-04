@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DuoBloom</title>
+    
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Garden","display":"standalone","background_color":"#1a1c23","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/628/628283.png","sizes":"512x512","type":"image/png"}]}'>
+    <meta name="theme-color" content="#1a1c23">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { background-color: #1a1c23; color: #e2e8f0; font-family: 'Nunito', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
+        .glass-panel { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); border-radius: 24px; }
+        .btn-action { background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); border: 1px solid rgba(255,255,255,0.1); transition: transform 0.1s; }
+        .btn-action:active { transform: scale(0.95); }
+        
+        /* Grid Animation */
+        .plot { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }
+        .plot:active { transform: scale(0.95); }
+        .plant-emoji { font-size: 2rem; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.3)); animation: grow 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        
+        @keyframes grow { from { transform: scale(0) translateY(20px); } to { transform: scale(1) translateY(0); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        
+        .currency-badge { background: rgba(0,0,0,0.4); border-radius: 99px; padding: 4px 12px; border: 1px solid rgba(255,255,255,0.1); font-weight: 800; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "00000000000",
+            appId: "1:00000000000:web:000000000000"
+        };
+
+        let app, auth, db;
+        try {
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
+                app = firebase.initializeApp(firebaseConfig);
+                auth = firebase.auth();
+                db = firebase.firestore();
+            }
+        } catch (e) { console.error(e); }
+
+        const { useState, useEffect } = React;
+
+        // --- GAME DATA ---
+        const PLANTS = {
+            'seed_flower': { name: 'Sonnenblume', emoji: '🌻', cost: 50, sell: 2, growthTime: 10000, icon: '🌱' }, // 10 sekunden testzeit
+            'seed_tree': { name: 'Eiche', emoji: '🌳', cost: 150, sell: 5, growthTime: 20000, icon: '🌰' },
+            'seed_carrot': { name: 'Karotte', emoji: '🥕', cost: 20, sell: 1, growthTime: 5000, icon: '🌾' },
+        };
+
+        // --- COMPONENTS ---
+
+        function Navbar({ coins, gems, user }) {
+            return (
+                <div className="fixed top-0 left-0 w-full h-20 z-50 flex justify-between items-center px-6 bg-gradient-to-b from-[#1a1c23] to-transparent pointer-events-none">
+                    <div className="flex gap-2 pointer-events-auto">
+                        <div className="currency-badge text-yellow-400"><i className="fa-solid fa-coins"></i> {coins}</div>
+                        <div className="currency-badge text-purple-400"><i className="fa-regular fa-gem"></i> {gems}</div>
+                    </div>
+                    {user && <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-white/20 pointer-events-auto" />}
+                </div>
+            );
+        }
+
+        function GardenGrid({ garden, onPlotClick, unlockedPlots }) {
+            return (
+                <div className="grid grid-cols-3 gap-3 p-4 mt-16 mb-24 max-w-md mx-auto">
+                    {[...Array(9)].map((_, i) => {
+                        const isLocked = i >= unlockedPlots;
+                        const plot = garden[i];
+                        
+                        return (
+                            <div key={i} 
+                                 onClick={() => !isLocked && onPlotClick(i)}
+                                 className={`plot aspect-square rounded-2xl flex items-center justify-center relative 
+                                            ${isLocked ? 'bg-slate-800/50 border-2 border-dashed border-slate-700 cursor-not-allowed' : 'bg-slate-800 border-b-4 border-slate-900 cursor-pointer active:border-b-0 active:translate-y-1'}`}>
+                                
+                                {isLocked ? (
+                                    <i className="fa-solid fa-lock text-slate-600 text-2xl"></i>
+                                ) : plot ? (
+                                    <div className="text-center">
+                                        <div className="plant-emoji" style={{animation: plot.ready ? 'float 2s infinite ease-in-out' : ''}}>
+                                            {plot.ready ? PLANTS[plot.type].emoji : PLANTS[plot.type].icon}
+                                        </div>
+                                        {plot.ready && <div className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg animate-bounce">Ready!</div>}
+                                        {!plot.ready && <div className="w-8 h-1 bg-slate-700 rounded-full mt-2 mx-auto overflow-hidden"><div className="h-full bg-blue-500" style={{width: '50%'}}></div></div>}
+                                    </div>
+                                ) : (
+                                    <div className="text-slate-700 text-4xl opacity-20">+</div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        }
+
+        function TaskModal({ isOpen, onClose, addTask, tasks, completeTask }) {
+            const [text, setText] = useState("");
+            if(!isOpen) return null;
+            
+            return (
+                <div className="fixed inset-0 bg-black/80 z-[60] flex items-end sm:items-center justify-center animate-fade-in">
+                    <div className="glass-panel w-full max-w-md p-6 h-[80vh] flex flex-col relative bg-[#1e293b]">
+                        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 text-2xl"><i className="fa-solid fa-xmark"></i></button>
+                        <h2 className="text-2xl font-bold text-white mb-1">Aufgaben</h2>
+                        <p className="text-slate-400 text-sm mb-6">Erledige Aufgaben für Münzen 💰</p>
+                        
+                        <div className="flex gap-2 mb-6">
+                            <input value={text} onChange={e=>setText(e.target.value)} placeholder="Neue Aufgabe..." className="flex-1 bg-slate-900 rounded-xl px-4 py-3 text-white outline-none border border-slate-700 focus:border-green-500" />
+                            <button onClick={()=>{if(text) {addTask(text); setText('')}}} className="bg-green-500 w-12 rounded-xl text-white font-bold shadow-lg"><i className="fa-solid fa-plus"></i></button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto space-y-3">
+                            {tasks.map(t => (
+                                <div key={t.id} className="bg-slate-800/50 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                                    <span className="text-slate-200 font-medium">{t.title}</span>
+                                    <button onClick={()=>completeTask(t.id)} className="bg-slate-700 hover:bg-green-500 text-green-400 hover:text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors border border-green-500/30"><i className="fa-solid fa-check"></i></button>
+                                </div>
+                            ))}
+                            {tasks.length === 0 && <div className="text-center text-slate-600 mt-10">Alles erledigt! 🌱</div>}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function ShopModal({ isOpen, onClose, buySeed, coins }) {
+            if(!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black/80 z-[60] flex items-end sm:items-center justify-center">
+                    <div className="glass-panel w-full max-w-md p-6 h-[60vh] flex flex-col relative bg-[#1e293b]">
+                        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 text-2xl"><i className="fa-solid fa-xmark"></i></button>
+                        <h2 className="text-2xl font-bold text-white mb-1">Samen Shop</h2>
+                        <p className="text-slate-400 text-sm mb-6">Dein Kapital: <span className="text-yellow-400 font-bold">{coins} 💰</span></p>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                            {Object.entries(PLANTS).map(([id, plant]) => (
+                                <button key={id} onClick={()=>buySeed(id, plant.cost)} disabled={coins < plant.cost} className={`p-4 rounded-xl border flex flex-col items-center text-center transition-all ${coins < plant.cost ? 'bg-slate-800/50 border-slate-700 opacity-50' : 'bg-slate-700/50 border-slate-600 hover:bg-slate-600 hover:border-green-500'}`}>
+                                    <div className="text-4xl mb-2">{plant.icon}</div>
+                                    <div className="font-bold text-white">{plant.name}</div>
+                                    <div className="text-xs text-slate-400 mt-1">{plant.growthTime/1000}s Wachstumszeit</div>
+                                    <div className="mt-3 bg-slate-900 px-3 py-1 rounded-full text-yellow-400 text-xs font-bold">{plant.cost} 💰</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- MAIN GAME ---
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [userData, setUserData] = useState({ coins: 0, gems: 0, inventory: {}, unlockedPlots: 3 });
+            const [garden, setGarden] = useState({});
+            const [tasks, setTasks] = useState([]);
+            const [view, setView] = useState(null); // 'tasks', 'shop'
+            const [isConfigured, setIsConfigured] = useState(false);
+
+            useEffect(() => {
+                if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
+                    setIsConfigured(true);
+                    auth.onAuthStateChanged(async (u) => {
+                        setUser(u);
+                        if(u) {
+                            // Load User Data
+                            const userDoc = await db.collection('users').doc(u.uid).get();
+                            if(!userDoc.exists) {
+                                // Default Start
+                                await db.collection('users').doc(u.uid).set({ coins: 50, gems: 0, inventory: {}, unlockedPlots: 4 });
+                                await db.collection('tasks').add({ userId: u.uid, title: "Erstelle deinen ersten Task", reward: 50 });
+                            }
+                            // Listeners
+                            db.collection('users').doc(u.uid).onSnapshot(d => setUserData(d.data()));
+                            db.collection('gardens').doc(u.uid).onSnapshot(d => {
+                                const g = d.data() || {};
+                                // Check Growth Logic Here (Client Side)
+                                const now = Date.now();
+                                const newGarden = {...g};
+                                let changed = false;
+                                Object.keys(newGarden).forEach(k => {
+                                    const plot = newGarden[k];
+                                    if(!plot.ready && (now - plot.plantedAt > PLANTS[plot.type].growthTime)) {
+                                        newGarden[k] = {...plot, ready: true};
+                                        changed = true;
+                                    }
+                                });
+                                setGarden(newGarden);
+                                if(changed) db.collection('gardens').doc(u.uid).set(newGarden);
+                            });
+                            db.collection('tasks').where('userId', '==', u.uid).onSnapshot(s => setTasks(s.docs.map(d=>({id:d.id, ...d.data()}))));
+                        }
+                    });
+                }
+            }, []);
+
+            const handleTaskAdd = async (title) => {
+                await db.collection('tasks').add({ userId: user.uid, title, reward: 25, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            };
+
+            const handleTaskComplete = async (taskId) => {
+                const batch = db.batch();
+                batch.delete(db.collection('tasks').doc(taskId));
+                batch.update(db.collection('users').doc(user.uid), { coins: firebase.firestore.FieldValue.increment(25) });
+                await batch.commit();
+            };
+
+            const handleBuySeed = async (seedId, cost) => {
+                if(userData.coins < cost) return;
+                const batch = db.batch();
+                batch.update(db.collection('users').doc(user.uid), { 
+                    coins: firebase.firestore.FieldValue.increment(-cost),
+                    [`inventory.${seedId}`]: firebase.firestore.FieldValue.increment(1)
+                });
+                await batch.commit();
+                alert("Gekauft! Pflanze es jetzt an.");
+                setView(null);
+            };
+
+            const handlePlotClick = async (index) => {
+                const plot = garden[index];
+                
+                // 1. Harvest
+                if(plot && plot.ready) {
+                    const reward = PLANTS[plot.type].sell;
+                    const batch = db.batch();
+                    batch.update(db.collection('gardens').doc(user.uid), { [index]: firebase.firestore.FieldValue.delete() });
+                    batch.update(db.collection('users').doc(user.uid), { gems: firebase.firestore.FieldValue.increment(reward) });
+                    await batch.commit();
+                    return;
+                }
+
+                // 2. Water (Just a visual check for now in MVP)
+                if(plot && !plot.ready) {
+                    alert("Die Pflanze wächst noch... ⏳");
+                    return;
+                }
+
+                // 3. Plant (If empty)
+                if(!plot) {
+                    // Check inventory
+                    const seeds = Object.keys(userData.inventory || {}).filter(k => userData.inventory[k] > 0);
+                    if(seeds.length === 0) {
+                        alert("Du hast keine Samen! Erledige Tasks und kaufe welche im Shop.");
+                        return;
+                    }
+                    // Auto-pick first seed for MVP simplicity
+                    const seedToPlant = seeds[0];
+                    const batch = db.batch();
+                    batch.set(db.collection('gardens').doc(user.uid), {
+                        [index]: { type: seedToPlant, plantedAt: Date.now(), ready: false }
+                    }, { merge: true });
+                    batch.update(db.collection('users').doc(user.uid), {
+                        [`inventory.${seedToPlant}`]: firebase.firestore.FieldValue.increment(-1)
+                    });
+                    await batch.commit();
+                }
+            };
+
+            if (!isConfigured) return <div className="h-screen flex items-center justify-center text-white">Please Add Firebase Keys</div>;
+            if (!user) return <div className="h-screen flex items-center justify-center bg-[#1a1c23]"><button onClick={()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())} className="btn-action text-white px-8 py-4 rounded-2xl font-bold text-xl">Start Farming 🌱</button></div>;
+
+            return (
+                <div className="min-h-screen pb-20">
+                    <Navbar coins={userData.coins} gems={userData.gems} user={user} />
+                    
+                    <div className="text-center pt-24 px-6">
+                        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500 mb-2">Dein Garten</h1>
+                        <p className="text-slate-400 text-sm">Pflanze Samen, gieße sie und ernte Gems.</p>
+                    </div>
+
+                    <GardenGrid garden={garden} onPlotClick={handlePlotClick} unlockedPlots={userData.unlockedPlots} />
+
+                    {/* Bottom Bar */}
+                    <div className="fixed bottom-6 left-6 right-6 h-20 glass-panel flex items-center justify-around px-2 z-40">
+                        <button onClick={()=>setView('tasks')} className="flex flex-col items-center gap-1 text-slate-400 hover:text-white transition-colors">
+                            <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400"><i className="fa-solid fa-list-check"></i></div>
+                            <span className="text-xs font-bold">Tasks</span>
+                        </button>
+                        
+                        <button onClick={()=>setView('shop')} className="relative -top-8">
+                            <div className="w-16 h-16 bg-gradient-to-tr from-green-400 to-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg shadow-green-500/30 border-4 border-[#1a1c23]">
+                                <i className="fa-solid fa-shop"></i>
+                            </div>
+                        </button>
+
+                        <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white transition-colors" onClick={()=>alert("Kommt bald: Freunde einladen!")}>
+                            <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center text-purple-400"><i className="fa-solid fa-user-group"></i></div>
+                            <span className="text-xs font-bold">Friends</span>
+                        </button>
+                    </div>
+
+                    <TaskModal isOpen={view==='tasks'} onClose={()=>setView(null)} addTask={handleTaskAdd} tasks={tasks} completeTask={handleTaskComplete} />
+                    <ShopModal isOpen={view==='shop'} onClose={()=>setView(null)} buySeed={handleBuySeed} coins={userData.coins} />
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+
+        }
+
+        function GardenGrid({ garden, onPlotClick, unlockedPlots }) {
+            return (
+                <div className="grid grid-cols-3 gap-3 p-4 mt-16 mb-24 max-w-md mx-auto">
+                    {[...Array(9)].map((_, i) => {
+                        const isLocked = i >= unlockedPlots;
+                        const plot = garden[i];
+                        
+                        return (
+                            <div key={i} 
+                                 onClick={() => !isLocked && onPlotClick(i)}
+                                 className={`plot aspect-square rounded-2xl flex items-center justify-center relative 
+                                            ${isLocked ? 'bg-slate-800/50 border-2 border-dashed border-slate-700 cursor-not-allowed' : 'bg-slate-800 border-b-4 border-slate-900 cursor-pointer active:border-b-0 active:translate-y-1'}`}>
+                                
+                                {isLocked ? (
+                                    <i className="fa-solid fa-lock text-slate-600 text-2xl"></i>
+                                ) : plot ? (
+                                    <div className="text-center">
+                                        <div className="plant-emoji" style={{animation: plot.ready ? 'float 2s infinite ease-in-out' : ''}}>
+                                            {plot.ready ? PLANTS[plot.type].emoji : PLANTS[plot.type].icon}
+                                        </div>
+                                        {plot.ready && <div className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg animate-bounce">Ready!</div>}
+                                        {!plot.ready && <div className="w-8 h-1 bg-slate-700 rounded-full mt-2 mx-auto overflow-hidden"><div className="h-full bg-blue-500" style={{width: '50%'}}></div></div>}
+                                    </div>
+                                ) : (
+                                    <div className="text-slate-700 text-4xl opacity-20">+</div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        }
+
+        function TaskModal({ isOpen, onClose, addTask, tasks, completeTask }) {
+            const [text, setText] = useState("");
+            if(!isOpen) return null;
+            
+            return (
+                <div className="fixed inset-0 bg-black/80 z-[60] flex items-end sm:items-center justify-center animate-fade-in">
+                    <div className="glass-panel w-full max-w-md p-6 h-[80vh] flex flex-col relative bg-[#1e293b]">
+                        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 text-2xl"><i className="fa-solid fa-xmark"></i></button>
+                        <h2 className="text-2xl font-bold text-white mb-1">Aufgaben</h2>
+                        <p className="text-slate-400 text-sm mb-6">Erledige Aufgaben für Münzen 💰</p>
+                        
+                        <div className="flex gap-2 mb-6">
+                            <input value={text} onChange={e=>setText(e.target.value)} placeholder="Neue Aufgabe..." className="flex-1 bg-slate-900 rounded-xl px-4 py-3 text-white outline-none border border-slate-700 focus:border-green-500" />
+                            <button onClick={()=>{if(text) {addTask(text); setText('')}}} className="bg-green-500 w-12 rounded-xl text-white font-bold shadow-lg"><i className="fa-solid fa-plus"></i></button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto space-y-3">
+                            {tasks.map(t => (
+                                <div key={t.id} className="bg-slate-800/50 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                                    <span className="text-slate-200 font-medium">{t.title}</span>
+                                    <button onClick={()=>completeTask(t.id)} className="bg-slate-700 hover:bg-green-500 text-green-400 hover:text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors border border-green-500/30"><i className="fa-solid fa-check"></i></button>
+                                </div>
+                            ))}
+                            {tasks.length === 0 && <div className="text-center text-slate-600 mt-10">Alles erledigt! 🌱</div>}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function ShopModal({ isOpen, onClose, buySeed, coins }) {
+            if(!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-black/80 z-[60] flex items-end sm:items-center justify-center">
+                    <div className="glass-panel w-full max-w-md p-6 h-[60vh] flex flex-col relative bg-[#1e293b]">
+                        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 text-2xl"><i className="fa-solid fa-xmark"></i></button>
+                        <h2 className="text-2xl font-bold text-white mb-1">Samen Shop</h2>
+                        <p className="text-slate-400 text-sm mb-6">Dein Kapital: <span className="text-yellow-400 font-bold">{coins} 💰</span></p>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                            {Object.entries(PLANTS).map(([id, plant]) => (
+                                <button key={id} onClick={()=>buySeed(id, plant.cost)} disabled={coins < plant.cost} className={`p-4 rounded-xl border flex flex-col items-center text-center transition-all ${coins < plant.cost ? 'bg-slate-800/50 border-slate-700 opacity-50' : 'bg-slate-700/50 border-slate-600 hover:bg-slate-600 hover:border-green-500'}`}>
+                                    <div className="text-4xl mb-2">{plant.icon}</div>
+                                    <div className="font-bold text-white">{plant.name}</div>
+                                    <div className="text-xs text-slate-400 mt-1">{plant.growthTime/1000}s Wachstumszeit</div>
+                                    <div className="mt-3 bg-slate-900 px-3 py-1 rounded-full text-yellow-400 text-xs font-bold">{plant.cost} 💰</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- MAIN GAME ---
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [userData, setUserData] = useState({ coins: 0, gems: 0, inventory: {}, unlockedPlots: 3 });
+            const [garden, setGarden] = useState({});
+            const [tasks, setTasks] = useState([]);
+            const [view, setView] = useState(null); // 'tasks', 'shop'
+            const [isConfigured, setIsConfigured] = useState(false);
+
+            useEffect(() => {
+                if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
+                    setIsConfigured(true);
+                    auth.onAuthStateChanged(async (u) => {
+                        setUser(u);
+                        if(u) {
+                            // Load User Data
+                            const userDoc = await db.collection('users').doc(u.uid).get();
+                            if(!userDoc.exists) {
+                                // Default Start
+                                await db.collection('users').doc(u.uid).set({ coins: 50, gems: 0, inventory: {}, unlockedPlots: 4 });
+                                await db.collection('tasks').add({ userId: u.uid, title: "Erstelle deinen ersten Task", reward: 50 });
+                            }
+                            // Listeners
+                            db.collection('users').doc(u.uid).onSnapshot(d => setUserData(d.data()));
+                            db.collection('gardens').doc(u.uid).onSnapshot(d => {
+                                const g = d.data() || {};
+                                // Check Growth Logic Here (Client Side)
+                                const now = Date.now();
+                                const newGarden = {...g};
+                                let changed = false;
+                                Object.keys(newGarden).forEach(k => {
+                                    const plot = newGarden[k];
+                                    if(!plot.ready && (now - plot.plantedAt > PLANTS[plot.type].growthTime)) {
+                                        newGarden[k] = {...plot, ready: true};
+                                        changed = true;
+                                    }
+                                });
+                                setGarden(newGarden);
+                                if(changed) db.collection('gardens').doc(u.uid).set(newGarden);
+                            });
+                            db.collection('tasks').where('userId', '==', u.uid).onSnapshot(s => setTasks(s.docs.map(d=>({id:d.id, ...d.data()}))));
+                        }
+                    });
+                }
+            }, []);
+
+            const handleTaskAdd = async (title) => {
+                await db.collection('tasks').add({ userId: user.uid, title, reward: 25, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            };
+
+            const handleTaskComplete = async (taskId) => {
+                const batch = db.batch();
+                batch.delete(db.collection('tasks').doc(taskId));
+                batch.update(db.collection('users').doc(user.uid), { coins: firebase.firestore.FieldValue.increment(25) });
+                await batch.commit();
+            };
+
+            const handleBuySeed = async (seedId, cost) => {
+                if(userData.coins < cost) return;
+                const batch = db.batch();
+                batch.update(db.collection('users').doc(user.uid), { 
+                    coins: firebase.firestore.FieldValue.increment(-cost),
+                    [`inventory.${seedId}`]: firebase.firestore.FieldValue.increment(1)
+                });
+                await batch.commit();
+                alert("Gekauft! Pflanze es jetzt an.");
+                setView(null);
+            };
+
+            const handlePlotClick = async (index) => {
+                const plot = garden[index];
+                
+                // 1. Harvest
+                if(plot && plot.ready) {
+                    const reward = PLANTS[plot.type].sell;
+                    const batch = db.batch();
+                    batch.update(db.collection('gardens').doc(user.uid), { [index]: firebase.firestore.FieldValue.delete() });
+                    batch.update(db.collection('users').doc(user.uid), { gems: firebase.firestore.FieldValue.increment(reward) });
+                    await batch.commit();
+                    return;
+                }
+
+                // 2. Water (Just a visual check for now in MVP)
+                if(plot && !plot.ready) {
+                    alert("Die Pflanze wächst noch... ⏳");
+                    return;
+                }
+
+                // 3. Plant (If empty)
+                if(!plot) {
+                    // Check inventory
+                    const seeds = Object.keys(userData.inventory || {}).filter(k => userData.inventory[k] > 0);
+                    if(seeds.length === 0) {
+                        alert("Du hast keine Samen! Erledige Tasks und kaufe welche im Shop.");
+                        return;
+                    }
+                    // Auto-pick first seed for MVP simplicity
+                    const seedToPlant = seeds[0];
+                    const batch = db.batch();
+                    batch.set(db.collection('gardens').doc(user.uid), {
+                        [index]: { type: seedToPlant, plantedAt: Date.now(), ready: false }
+                    }, { merge: true });
+                    batch.update(db.collection('users').doc(user.uid), {
+                        [`inventory.${seedToPlant}`]: firebase.firestore.FieldValue.increment(-1)
+                    });
+                    await batch.commit();
+                }
+            };
+
+            if (!isConfigured) return <div className="h-screen flex items-center justify-center text-white">Please Add Firebase Keys</div>;
+            if (!user) return <div className="h-screen flex items-center justify-center bg-[#1a1c23]"><button onClick={()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())} className="btn-action text-white px-8 py-4 rounded-2xl font-bold text-xl">Start Farming 🌱</button></div>;
+
+            return (
+                <div className="min-h-screen pb-20">
+                    <Navbar coins={userData.coins} gems={userData.gems} user={user} />
+                    
+                    <div className="text-center pt-24 px-6">
+                        <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500 mb-2">Dein Garten</h1>
+                        <p className="text-slate-400 text-sm">Pflanze Samen, gieße sie und ernte Gems.</p>
+                    </div>
+
+                    <GardenGrid garden={garden} onPlotClick={handlePlotClick} unlockedPlots={userData.unlockedPlots} />
+
+                    {/* Bottom Bar */}
+                    <div className="fixed bottom-6 left-6 right-6 h-20 glass-panel flex items-center justify-around px-2 z-40">
+                        <button onClick={()=>setView('tasks')} className="flex flex-col items-center gap-1 text-slate-400 hover:text-white transition-colors">
+                            <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400"><i className="fa-solid fa-list-check"></i></div>
+                            <span className="text-xs font-bold">Tasks</span>
+                        </button>
+                        
+                        <button onClick={()=>setView('shop')} className="relative -top-8">
+                            <div className="w-16 h-16 bg-gradient-to-tr from-green-400 to-emerald-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg shadow-green-500/30 border-4 border-[#1a1c23]">
+                                <i className="fa-solid fa-shop"></i>
+                            </div>
+                        </button>
+
+                        <button className="flex flex-col items-center gap-1 text-slate-400 hover:text-white transition-colors" onClick={()=>alert("Kommt bald: Freunde einladen!")}>
+                            <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center text-purple-400"><i className="fa-solid fa-user-group"></i></div>
+                            <span className="text-xs font-bold">Friends</span>
+                        </button>
+                    </div>
+
+                    <TaskModal isOpen={view==='tasks'} onClose={()=>setView(null)} addTask={handleTaskAdd} tasks={tasks} completeTask={handleTaskComplete} />
+                    <ShopModal isOpen={view==='shop'} onClose={()=>setView(null)} buySeed={handleBuySeed} coins={userData.coins} />
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+
