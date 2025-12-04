@@ -20,13 +20,13 @@ import {
 
 // ACHTUNG: Ersetze das hier mit deinen Daten von der Firebase Konsole!
 const firebaseConfig = {
-    apiKey: "AIzaSyD-K8sn-fcIAnWU4gFwz_NUSv3DYSGhCFk",
-    authDomain: "duobloom-ea72d.firebaseapp.com",
-    projectId: "duobloom-ea72d",
-    storageBucket: "duobloom-ea72d.firebasestorage.app",
-    messagingSenderId: "429567576534",
-    appId: "1:429567576534:web:7499169a17ccc220f9fc77",
-    measurementId: "G-4CY2GCP4HJ"
+  apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
+  authDomain: "duobloom-a9b7b.firebaseapp.com",
+  projectId: "duobloom-a9b7b",
+  storageBucket: "duobloom-a9b7b.firebasestorage.app",
+  messagingSenderId: "118209789780",
+  appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
+  measurementId: "G-Z0W0LK6D88"
 };
 
 // App initialisieren
