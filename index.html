@@ -1,352 +1,797 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BabaForum</title>
+import React, { useState, useEffect, useMemo } from 'react';
+import { createRoot } from 'react-dom/client';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  onAuthStateChanged,
+  signInWithCustomToken
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  addDoc,
+  getDoc, 
+  onSnapshot, 
+  updateDoc, 
+  increment, 
+  arrayUnion,
+  serverTimestamp,
+  runTransaction,
+  query,
+  orderBy,
+  limit
+} from 'firebase/firestore';
+import { 
+  Sprout, 
+  Droplet, 
+  CheckSquare, 
+  ShoppingBag, 
+  Users, 
+  Gem, 
+  Coins, 
+  Shovel, 
+  ArrowRight,
+  Share2,
+  Heart,
+  Clock,
+  Menu,
+  X
+} from 'lucide-react';
+
+// --- GAME CONSTANTS ---
+
+const ITEMS = {
+  'seed_carrot': { 
+    id: 'seed_carrot', 
+    name: 'Carrot Seed', 
+    type: 'plant', 
+    cost: 50, 
+    currency: 'coins', 
+    icon: '🥕', 
+    stages: 3, 
+    sellPrice: 5, 
+    sellCurrency: 'gems',
+    waterInterval: 1 // simplified for demo
+  },
+  'seed_flower': { 
+    id: 'seed_flower', 
+    name: 'Rose Bush', 
+    type: 'plant', 
+    cost: 150, 
+    currency: 'coins', 
+    icon: '🌹', 
+    stages: 4, 
+    sellPrice: 15, 
+    sellCurrency: 'gems',
+    waterInterval: 1
+  },
+  'seed_tree': { 
+    id: 'seed_tree', 
+    name: 'Apple Tree', 
+    type: 'plant', 
+    cost: 500, 
+    currency: 'coins', 
+    icon: '🌳', 
+    stages: 5, 
+    sellPrice: 50, 
+    sellCurrency: 'gems',
+    waterInterval: 1
+  },
+  'deco_fence': {
+    id: 'deco_fence',
+    name: 'Wooden Fence',
+    type: 'decor',
+    cost: 200,
+    currency: 'coins',
+    icon: '🪵',
+    stages: 1, // Decor doesn't grow
+    sellPrice: 0,
+    sellCurrency: 'none'
+  }
+};
+
+const EXPANSION_COST = 50; // Gems
+const STARTING_COINS = 0;
+const FIRST_TASK_REWARD = 100;
+
+// --- FIREBASE SETUP ---
+
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+// --- COMPONENTS ---
+
+// 1. LOGIN / LOBBY
+const Lobby = ({ user, joinRoom, createRoom, loading }) => {
+  const [roomInput, setRoomInput] = useState('');
+  const [nameInput, setNameInput] = useState('');
+
+  return (
+    <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+        <div className="flex justify-center mb-4">
+          <div className="bg-green-100 p-4 rounded-full">
+            <Sprout size={48} className="text-green-600" />
+          </div>
+        </div>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Our Garden</h1>
+        <p className="text-gray-500 mb-8">Productivity meets Cozy Farming.</p>
+
+        <div className="space-y-4">
+          <div className="text-left">
+            <label className="text-xs font-bold text-gray-400 uppercase">Start a New Garden</label>
+            <input 
+              type="text" 
+              placeholder="Give your garden a name" 
+              className="w-full mt-1 p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+            />
+            <button 
+              onClick={() => createRoom(nameInput)}
+              disabled={loading || !nameInput.trim()}
+              className="w-full mt-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Creating...' : 'Create New Garden'}
+            </button>
+          </div>
+
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-gray-200"></div>
+            <span className="flex-shrink-0 mx-4 text-gray-400 text-sm">OR</span>
+            <div className="flex-grow border-t border-gray-200"></div>
+          </div>
+
+          <div className="text-left">
+            <label className="text-xs font-bold text-gray-400 uppercase">Join Existing</label>
+            <div className="flex gap-2 mt-1">
+              <input 
+                type="text" 
+                placeholder="Enter Room ID" 
+                className="flex-1 p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={roomInput}
+                onChange={(e) => setRoomInput(e.target.value)}
+              />
+              <button 
+                onClick={() => joinRoom(roomInput)}
+                disabled={loading || !roomInput.trim()}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-6 rounded-lg font-semibold transition-colors disabled:opacity-50"
+              >
+                Join
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 2. MAIN APP CONTAINER
+const App = () => {
+  const [user, setUser] = useState(null);
+  const [roomId, setRoomId] = useState(null);
+  const [roomData, setRoomData] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [activeTab, setActiveTab] = useState('garden'); // garden, tasks, shop, social
+  const [loading, setLoading] = useState(false);
+
+  // Auth Init
+  useEffect(() => {
+    const initAuth = async () => {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
+
+  // Listen to User Data (Inventory/Currency)
+  useEffect(() => {
+    if (!user) return;
+    const userRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile');
     
-    <link rel="manifest" href='data:application/manifest+json,{"name":"BabaForum","short_name":"BabaForum","start_url":".","display":"standalone","background_color":"#0f172a","theme_color":"#0f172a","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1041/1041916.png","sizes":"512x512","type":"image/png"}]}'>
-    <meta name="theme-color" content="#020617">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    // Create user profile if not exists
+    getDoc(userRef).then((snap) => {
+      if (!snap.exists()) {
+        setDoc(userRef, {
+          coins: STARTING_COINS,
+          gems: 0,
+          inventory: {}
+        });
+      }
+    });
 
-    <script>
-        window.onerror = function(msg, url, line) {
-            if (msg.includes("ResizeObserver")) return;
-            document.body.innerHTML = '<div style="color:red; padding:20px; background:black; font-family:monospace; z-index:10000; position:fixed; top:0; width:100%;"><h1>Error Detected</h1><p>'+msg+'</p><p>Line: '+line+'</p></div>';
-        };
-    </script>
+    const unsub = onSnapshot(userRef, (snap) => {
+      if (snap.exists()) setUserData(snap.data());
+    }, (err) => console.error("User listener error:", err));
 
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    return () => unsub();
+  }, [user]);
+
+  // Listen to Room Data (Garden Grid)
+  useEffect(() => {
+    if (!roomId) return;
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${roomId}`);
     
-    <style>
-        body { background-color: #020617; color: #e2e8f0; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
-        .bg-aurora { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; background: radial-gradient(circle at 15% 50%, rgba(79, 70, 229, 0.15), transparent 25%), radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.15), transparent 25%); filter: blur(40px); animation: auroraMove 20s ease infinite alternate; }
-        @keyframes auroraMove { 0% { transform: scale(1); } 100% { transform: scale(1.1); } }
-        .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(24px) saturate(180%); border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .glass-panel-solid { background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
-        .glass-input { background: rgba(2, 6, 23, 0.5) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; transition: all 0.2s; }
-        .glass-input:focus { border-color: #818cf8 !important; background: rgba(2, 6, 23, 0.8) !important; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15); outline: none; }
-        .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); box-shadow: 0 0 20px rgba(99, 102, 241, 0.4); border: 1px solid rgba(255,255,255,0.1); position: relative; overflow: hidden; }
-        .btn-primary:hover { box-shadow: 0 0 30px rgba(168, 85, 247, 0.6); transform: translateY(-1px); }
-        .btn-danger { background: rgba(239, 68, 68, 0.1); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
-        .btn-outline { border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; background: rgba(255,255,255,0.02); }
-        .btn-outline:hover { border-color: #818cf8; color: white; background: rgba(99, 102, 241, 0.1); }
-        .prose img { max-width: 100%; border-radius: 16px; margin: 16px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); cursor: zoom-in; }
-        .prose code { background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 6px; font-family: 'Fira Code', monospace; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.1); }
-        .prose blockquote { border-left: 4px solid #818cf8; padding-left: 1rem; font-style: italic; color: #94a3b8; margin: 1rem 0; }
-        .badge-base { font-weight: 700; letter-spacing: 0.05em; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
-        .badge-new { background: #334155; color: #e2e8f0; border: 1px solid #475569; }
-        .badge-member { background: #065f46; color: #6ee7b7; border: 1px solid #059669; }
-        .badge-regular { background: #1e40af; color: #93c5fd; border: 1px solid #2563eb; }
-        .badge-legend { background: linear-gradient(135deg, #b45309, #f59e0b); color: white; border: 1px solid #fcd34d; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
-        .category-chip { padding: 8px 18px; border-radius: 12px; font-size: 13px; font-weight: 600; transition: all 0.3s; cursor: pointer; border: 1px solid rgba(255,255,255,0.05); white-space: nowrap; backdrop-filter: blur(4px); }
-        .category-chip.active { background: #6366f1; color: white; border-color: #818cf8; box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
-        .category-chip:not(.active) { background: rgba(255,255,255,0.03); color: #94a3b8; }
-        .category-chip:not(.active):hover { background: rgba(255,255,255,0.08); color: white; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        .fade-in { animation: fadeIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
-    <div class="bg-aurora"></div>
+    const unsub = onSnapshot(roomRef, (snap) => {
+      if (snap.exists()) {
+        setRoomData(snap.data());
+      } else {
+        setRoomId(null); // Kicked out or invalid
+        alert("Room not found");
+      }
+    }, (err) => console.error("Room listener error:", err));
 
-    <script type="text/babel">
-        const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
-        const firebaseConfig = {
-            apiKey: "AIzaSyD-K8sn-fcIAnWU4gFwz_NUSv3DYSGhCFk",
-            authDomain: "duobloom-ea72d.firebaseapp.com",
-            projectId: "duobloom-ea72d",
-            storageBucket: "duobloom-ea72d.firebasestorage.app",
-            messagingSenderId: "429567576534",
-            appId: "1:429567576534:web:7499169a17ccc220f9fc77",
-            measurementId: "G-4CY2GCP4HJ"
-        };
+    return () => unsub();
+  }, [roomId]);
 
-        let app, auth, db;
-        try {
-            if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
-                app = firebase.initializeApp(firebaseConfig);
-                auth = firebase.auth();
-                db = firebase.firestore();
-            }
-        } catch (e) { console.error("Firebase Init Error:", e); }
+  const handleCreateRoom = async (name) => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${newRoomId}`);
+      
+      // Initial 4x4 Grid
+      const initialGrid = {};
+      for(let i=0; i<16; i++) initialGrid[i] = null;
 
-        const { useState, useEffect, useRef } = React;
+      await setDoc(roomRef, {
+        id: newRoomId,
+        name: name,
+        owner: user.uid,
+        members: [user.uid],
+        expansionLevel: 4, // 4x4
+        grid: initialGrid,
+        likes: 0,
+        createdAt: serverTimestamp(),
+        simulatedDay: 0 // For demo purposes to fast forward time
+      });
+      setRoomId(newRoomId);
+    } catch (e) {
+      console.error(e);
+      alert("Error creating room");
+    }
+    setLoading(false);
+  };
 
-        const getRank = (count) => {
-            const base = "badge-base text-[10px] px-2.5 py-1 rounded-lg uppercase";
-            if (count >= 100) return { label: "Legend", class: base + " badge-legend" };
-            if (count >= 50) return { label: "Regular", class: base + " badge-regular" };
-            if (count >= 10) return { label: "Member", class: base + " badge-member" };
-            return { label: "Newcomer", class: base + " badge-new" };
-        };
+  const handleJoinRoom = async (id) => {
+    if (!user) return;
+    setLoading(true);
+    const cleanId = id.trim().toUpperCase();
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${cleanId}`);
+    const snap = await getDoc(roomRef);
+    
+    if (snap.exists()) {
+      await updateDoc(roomRef, {
+        members: arrayUnion(user.uid)
+      });
+      setRoomId(cleanId);
+    } else {
+      alert("Room not found!");
+    }
+    setLoading(false);
+  };
 
-        const compressImage = (file) => {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 800; 
-                        const scaleSize = MAX_WIDTH / img.width;
-                        canvas.width = (scaleSize < 1) ? MAX_WIDTH : img.width;
-                        canvas.height = (scaleSize < 1) ? img.height * scaleSize : img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.7));
-                    }
-                }
+  if (!user) return <div className="h-screen flex items-center justify-center text-green-600 animate-pulse">Initializing...</div>;
+
+  if (!roomId) {
+    return <Lobby user={user} joinRoom={handleJoinRoom} createRoom={handleCreateRoom} loading={loading} />;
+  }
+
+  return (
+    <div className="max-w-md mx-auto h-screen bg-gray-50 flex flex-col relative shadow-2xl overflow-hidden">
+      {/* Top Bar */}
+      <div className="bg-white px-4 py-3 flex justify-between items-center shadow-sm z-10">
+        <div>
+          <h2 className="font-bold text-gray-800">{roomData?.name || 'Garden'}</h2>
+          <div className="flex gap-3 text-xs font-medium mt-1">
+            <span className="flex items-center text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
+              <Coins size={12} className="mr-1" /> {userData?.coins || 0}
+            </span>
+            <span className="flex items-center text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+              <Gem size={12} className="mr-1" /> {userData?.gems || 0}
+            </span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+           <button 
+            onClick={() => {
+              navigator.clipboard.writeText(roomId);
+              alert("Room ID copied: " + roomId);
+            }}
+            className="p-2 bg-gray-100 rounded-full text-gray-600 hover:bg-gray-200"
+          >
+            <Share2 size={18} />
+          </button>
+           <button 
+            onClick={() => setRoomId(null)}
+            className="p-2 bg-gray-100 rounded-full text-red-400 hover:bg-red-50"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-hidden relative">
+        {activeTab === 'garden' && <GardenView room={roomData} user={user} userData={userData} />}
+        {activeTab === 'tasks' && <TasksView roomId={roomId} user={user} />}
+        {activeTab === 'shop' && <ShopView user={user} userData={userData} />}
+        {activeTab === 'social' && <SocialView roomId={roomId} />}
+      </div>
+
+      {/* Bottom Nav */}
+      <div className="bg-white border-t border-gray-200 p-2 pb-6 flex justify-around items-center z-20">
+        <NavButton icon={Sprout} label="Garden" active={activeTab === 'garden'} onClick={() => setActiveTab('garden')} />
+        <NavButton icon={CheckSquare} label="Tasks" active={activeTab === 'tasks'} onClick={() => setActiveTab('tasks')} />
+        <NavButton icon={ShoppingBag} label="Shop" active={activeTab === 'shop'} onClick={() => setActiveTab('shop')} />
+        <NavButton icon={Users} label="Social" active={activeTab === 'social'} onClick={() => setActiveTab('social')} />
+      </div>
+    </div>
+  );
+};
+
+const NavButton = ({ icon: Icon, label, active, onClick }) => (
+  <button 
+    onClick={onClick}
+    className={`flex flex-col items-center justify-center w-16 transition-colors ${active ? 'text-green-600' : 'text-gray-400 hover:text-gray-600'}`}
+  >
+    <Icon size={24} strokeWidth={active ? 2.5 : 2} />
+    <span className="text-[10px] mt-1 font-medium">{label}</span>
+  </button>
+);
+
+// --- VIEWS ---
+
+// 3. GARDEN VIEW
+const GardenView = ({ room, user, userData }) => {
+  const [selectedCell, setSelectedCell] = useState(null);
+  
+  // Logic to simulate time passing for the demo
+  const simulateDay = async () => {
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${room.id}`);
+    await updateDoc(roomRef, {
+      simulatedDay: increment(1)
+    });
+  };
+
+  const handlePlant = async (itemId) => {
+    if (!selectedCell && selectedCell !== 0) return;
+    
+    // Check if user has item
+    const currentQty = userData.inventory?.[itemId] || 0;
+    if (currentQty <= 0) {
+      alert("You don't have this seed!");
+      return;
+    }
+
+    // Remove from inventory, Add to Grid
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${room.id}`);
+    const userRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile');
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        // Decrease Inventory
+        transaction.update(userRef, {
+          [`inventory.${itemId}`]: increment(-1)
+        });
+
+        // Update Grid
+        transaction.update(roomRef, {
+          [`grid.${selectedCell}`]: {
+            type: itemId,
+            plantedAtDay: room.simulatedDay || 0,
+            waterLevel: 0,
+            lastWateredDay: -1,
+            stage: 0,
+            plantedBy: user.uid
+          }
+        });
+      });
+      setSelectedCell(null);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to plant");
+    }
+  };
+
+  const handleWater = async (cellIndex, cellData) => {
+    if(cellData.lastWateredDay === room.simulatedDay) {
+      alert("Already watered today!");
+      return;
+    }
+
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${room.id}`);
+    
+    // Logic: If watered enough times, stage increases
+    const itemConfig = ITEMS[cellData.type];
+    let newStage = cellData.stage;
+    let newWaterLevel = cellData.waterLevel + 1;
+
+    // Simple growth logic: Every water grows it (for demo)
+    // Real logic would be: if (newWaterLevel % itemConfig.waterInterval === 0) newStage++;
+    newStage = Math.min(newStage + 1, itemConfig.stages);
+
+    await updateDoc(roomRef, {
+      [`grid.${cellIndex}.lastWateredDay`]: room.simulatedDay,
+      [`grid.${cellIndex}.waterLevel`]: newWaterLevel,
+      [`grid.${cellIndex}.stage`]: newStage
+    });
+  };
+
+  const handleHarvest = async (cellIndex, cellData) => {
+    const itemConfig = ITEMS[cellData.type];
+    if (cellData.stage < itemConfig.stages) return;
+
+    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${room.id}`);
+    const userRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile');
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        // Clear Grid
+        transaction.update(roomRef, {
+          [`grid.${cellIndex}`]: null
+        });
+
+        // Give Rewards (Gems)
+        if (itemConfig.sellPrice > 0) {
+            transaction.update(userRef, {
+            [itemConfig.sellCurrency]: increment(itemConfig.sellPrice)
             });
-        };
+        }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
-        const ensureUserProfile = async (user) => {
-            if(!user || !db) return;
-            const userRef = db.collection('users').doc(user.uid);
-            const doc = await userRef.get();
-            if (!doc.exists) {
-                await userRef.set({
-                    displayName: user.displayName,
-                    photoURL: user.photoURL,
-                    bio: "Just joined BabaForum!",
-                    followers: [], following: [], postCount: 0, guilds: [],
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+  const handleExpand = async () => {
+      if(userData.gems < EXPANSION_COST) {
+          alert("Not enough gems!");
+          return;
+      }
+      
+      const roomRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${room.id}`);
+      const userRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile');
+
+      try {
+        await runTransaction(db, async (transaction) => {
+             // 1. Deduct Gems
+            transaction.update(userRef, { gems: increment(-EXPANSION_COST) });
+            
+            // 2. Expand Grid (add new null cells)
+            // Current is expansionLevel^2. New is (expansionLevel+1)^2
+            const currentSize = room.expansionLevel * room.expansionLevel;
+            const newLevel = room.expansionLevel + 1;
+            const newSize = newLevel * newLevel;
+            
+            const updates = { expansionLevel: newLevel };
+            for(let i = currentSize; i < newSize; i++) {
+                updates[`grid.${i}`] = null;
             }
-        };
 
-        function SetupScreen() {
-            return (<div className="min-h-screen flex items-center justify-center p-4"><div className="glass-panel p-10 rounded-3xl text-center fade-in max-w-md border border-indigo-500/30 shadow-[0_0_50px_rgba(99,102,241,0.2)]"><div className="w-20 h-20 bg-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6 text-4xl shadow-lg"><i className="fa-solid fa-wrench text-white"></i></div><h1 className="text-3xl font-extrabold text-white mb-3">Setup Required</h1><p className="text-slate-400 mb-8 text-lg font-medium">Please configure your Firebase keys in the HTML file to launch the app.</p><button onClick={() => window.location.reload()} className="btn-primary text-white px-10 py-4 rounded-xl font-bold tracking-wide text-lg w-full">Reload App</button></div></div>);
-        }
+            transaction.update(roomRef, updates);
+        });
+      } catch(e) {
+          console.error(e);
+          alert("Expansion failed");
+      }
+  };
 
-        function MarkdownToolbar({ textareaRef, value, setValue }) {
-            const insert = (prefix, suffix) => {
-                const el = textareaRef.current;
-                if (!el) return;
-                const start = el.selectionStart;
-                const end = el.selectionEnd;
-                const text = el.value;
-                const before = text.substring(0, start);
-                const selected = text.substring(start, end);
-                const after = text.substring(end);
-                const newText = before + prefix + selected + suffix + after;
-                setValue(newText);
-                setTimeout(() => { el.focus(); el.setSelectionRange(start + prefix.length, end + prefix.length); }, 0);
-            };
-            return (<div className="flex gap-1 mb-3 overflow-x-auto pb-2 no-scrollbar border-b border-white/10"><button type="button" onClick={() => insert('**', '**')} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded transition-colors" title="Bold"><i className="fa-solid fa-bold"></i></button><button type="button" onClick={() => insert('*', '*')} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded transition-colors" title="Italic"><i className="fa-solid fa-italic"></i></button><button type="button" onClick={() => insert('`', '`')} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded transition-colors" title="Code"><i className="fa-solid fa-code"></i></button><button type="button" onClick={() => insert('\n> ', '')} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded transition-colors" title="Quote"><i className="fa-solid fa-quote-right"></i></button><button type="button" onClick={() => insert('[', '](url)')} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded transition-colors" title="Link"><i className="fa-solid fa-link"></i></button><button type="button" onClick={() => insert('\n- ', '')} className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded transition-colors" title="List"><i className="fa-solid fa-list"></i></button></div>);
-        }
+  // Grid Generation
+  const size = room?.expansionLevel || 4;
+  const gridStyle = {
+    gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
+  };
 
-        function Lightbox({ src, onClose }) {
-            return (<div className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center p-4 cursor-pointer fade-in backdrop-blur-sm" onClick={onClose}><img src={src} className="max-w-full max-h-full rounded-2xl shadow-2xl cursor-default" onClick={e => e.stopPropagation()} /><button className="absolute top-6 right-6 text-white/50 hover:text-white text-4xl transition-colors bg-white/10 rounded-full w-12 h-12 flex items-center justify-center hover:bg-red-500"><i className="fa-solid fa-xmark"></i></button></div>);
-        }
+  return (
+    <div className="h-full flex flex-col bg-green-50 overflow-y-auto">
+      {/* Simulation Controls */}
+      <div className="bg-yellow-50 p-2 flex justify-between items-center border-b border-yellow-100">
+        <span className="text-xs text-yellow-800 font-mono">Day: {room.simulatedDay || 0}</span>
+        <button 
+          onClick={simulateDay}
+          className="bg-yellow-200 hover:bg-yellow-300 text-yellow-800 text-xs px-2 py-1 rounded flex items-center"
+        >
+          <Clock size={12} className="mr-1" /> Skip Day (Debug)
+        </button>
+      </div>
 
-        function RichText({ content }) {
-            const [zoomImg, setZoomImg] = useState(null);
-            const handleClick = (e) => { if (e.target.tagName === 'IMG') setZoomImg(e.target.src); };
-            const getMarkdownText = () => {
-                if (!window.marked) return { __html: content };
-                const safeText = content.replace(/</g, "&lt;").replace(/>/g, "&gt;"); 
-                return { __html: marked.parse(safeText) };
-            };
-            return (<><div className="prose text-slate-300 text-[15px] leading-7" dangerouslySetInnerHTML={getMarkdownText()} onClick={handleClick} />{zoomImg && <Lightbox src={zoomImg} onClose={() => setZoomImg(null)} /></>);
-        }
-
-        function LikeButton({ user, docId, collection, likes, likedBy, authorId }) {
-            const [isLiked, setIsLiked] = useState(false);
-            const [count, setCount] = useState(likes || 0);
-            useEffect(() => { if (user && likedBy && likedBy.includes(user.uid)) setIsLiked(true); }, [user, likedBy]);
-            const handleLike = async (e) => {
-                e.stopPropagation(); if (!user) return alert("Please sign in to vote!");
-                const docRef = db.collection(collection).doc(docId); const newStatus = !isLiked;
-                setIsLiked(newStatus); setCount(prev => newStatus ? prev + 1 : prev - 1);
-                try {
-                    const batch = db.batch();
-                    batch.update(docRef, { likes: firebase.firestore.FieldValue.increment(newStatus ? 1 : -1), likedBy: newStatus ? firebase.firestore.FieldValue.arrayUnion(user.uid) : firebase.firestore.FieldValue.arrayRemove(user.uid) });
-                    if (newStatus && authorId && authorId !== user.uid) { batch.set(db.collection('notifications').doc(), { toUserId: authorId, fromName: user.displayName, message: "liked your post", createdAt: firebase.firestore.FieldValue.serverTimestamp(), read: false }); }
-                    await batch.commit();
-                } catch (error) { setIsLiked(!newStatus); setCount(prev => newStatus ? prev - 1 : prev + 1); }
-            };
-            return (<button onClick={handleLike} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all border ${isLiked ? 'text-pink-400 bg-pink-500/10 border-pink-500/30' : 'text-slate-400 hover:text-white border-transparent hover:bg-white/5'}`}><i className={`${isLiked ? 'fa-solid' : 'fa-regular'} fa-heart text-sm`}></i><span className="text-xs font-bold">{count > 0 ? count : ''}</span></button>);
-        }
-
-        function ImageUpload({ onUpload }) {
-            const [uploading, setUploading] = useState(false);
-            const handleFile = async (e) => {
-                const file = e.target.files[0]; if (!file) return; setUploading(true);
-                try { const b64 = await compressImage(file); onUpload(b64); } catch (e) { alert(e.message); } finally { setUploading(false); }
-            };
-            return (<label className="cursor-pointer text-slate-400 hover:text-indigo-400 flex items-center gap-2 text-sm font-semibold transition-colors py-2 px-4 rounded-lg hover:bg-indigo-500/10 border border-transparent hover:border-indigo-500/30 w-fit"><input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />{uploading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-regular fa-image text-lg"></i>} {uploading ? "Processing..." : "Add Image"}</label>);
-        }
-
-        function InstallButton() {
-            const [deferredPrompt, setDeferredPrompt] = useState(null);
-            const [isIOS, setIsIOS] = useState(false);
-            const [showIOSHelp, setShowIOSHelp] = useState(false);
-            useEffect(() => {
-                window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setDeferredPrompt(e); });
-                const isIosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-                if(isIosDevice && !window.navigator.standalone) setIsIOS(true);
-            }, []);
-            const handleInstall = async () => {
-                if (deferredPrompt) { deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if (outcome === 'accepted') setDeferredPrompt(null); }
-                else if (isIOS) { setShowIOSHelp(true); }
-                else { alert("To install: Tap your browser's Menu button (⋮) and select 'Add to Home Screen'."); }
-            };
-            return (<><button onClick={handleInstall} className="text-slate-400 hover:text-indigo-400 p-2 relative group transition-colors"><i className="fa-solid fa-download text-xl"></i></button>{showIOSHelp && (<div className="fixed inset-0 bg-black/90 z-[10000] flex items-center justify-center p-6" onClick={() => setShowIOSHelp(false)}><div className="glass-panel-solid p-6 rounded-2xl text-center max-w-sm border border-white/10" onClick={e => e.stopPropagation()}><h3 className="text-xl font-bold text-white mb-4">Install on iPhone</h3><p className="text-slate-300 mb-4">1. Tap the <i className="fa-solid fa-arrow-up-from-bracket mx-1"></i> <strong>Share</strong> button in your browser bar.</p><p className="text-slate-300 mb-6">2. Scroll down and tap <strong>Add to Home Screen</strong>.</p><button onClick={() => setShowIOSHelp(false)} className="btn-primary w-full py-3 rounded-xl font-bold">Got it</button></div></div>)}</>);
-        }
-
-        function Notifications({ user, onClose }) {
-            const [notes, setNotes] = useState([]);
-            useEffect(() => {
-                const unsub = db.collection('notifications').where('toUserId', '==', user.uid).orderBy('createdAt', 'desc').limit(20).onSnapshot(snap => setNotes(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-                return () => unsub();
-            }, [user]);
-            const markRead = (id) => db.collection('notifications').doc(id).update({ read: true });
-            return (<div className="absolute top-16 right-0 w-96 glass-panel-solid rounded-2xl shadow-2xl overflow-hidden z-50 fade-in"><div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20"><h3 className="font-bold text-white">Notifications</h3><button onClick={onClose} className="text-slate-400 hover:text-white"><i className="fa-solid fa-xmark"></i></button></div><div className="max-h-[400px] overflow-y-auto">{notes.length === 0 && <div className="p-8 text-center text-slate-500">No new notifications.</div>}{notes.map(n => (<div key={n.id} onClick={() => markRead(n.id)} className={`p-4 border-b border-white/5 cursor-pointer transition-colors flex gap-3 items-start ${n.read ? 'opacity-60 hover:opacity-100 hover:bg-white/5' : 'bg-indigo-500/10 hover:bg-indigo-500/20'}`}><div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0 border border-indigo-500/30"><i className="fa-solid fa-bell"></i></div><div><p className="text-slate-200 text-sm leading-snug"><span className="font-bold text-white">{n.fromName}</span> {n.message}</p><div className="text-xs text-slate-500 mt-2 font-mono">{n.createdAt ? new Date(n.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Just now'}</div></div></div>))}</div></div>);
-        }
-
-        function Navbar({ user, onViewChange, onOpenAdmin, setViewUserId }) {
-            const [showNotes, setShowNotes] = useState(false);
-            const [unreadCount, setUnreadCount] = useState(0);
-            const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-            const isAdmin = user && user.uid === ADMIN_UID;
-            useEffect(() => { if(!user) return; const unsub = db.collection('notifications').where('toUserId', '==', user.uid).where('read', '==', false).onSnapshot(snap => setUnreadCount(snap.size)); return () => unsub(); }, [user]);
-            const handleLogin = () => { if (!auth) return alert("Config Error"); auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => alert(e.message)); };
-            const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
+      <div className="flex-1 p-4 flex items-center justify-center">
+        <div className="w-full max-w-[350px] aspect-square bg-stone-200 p-2 rounded-xl shadow-inner border-4 border-stone-300" 
+             style={{ display: 'grid', gap: '4px', ...gridStyle }}>
+          
+          {Array.from({ length: size * size }).map((_, i) => {
+            const cell = room.grid?.[i];
+            const isSelected = selectedCell === i;
+            
             return (
-                <nav className="glass-panel sticky top-0 z-50 border-b-0 shadow-lg backdrop-blur-xl relative mb-6">
-                    <div className="max-w-6xl mx-auto px-4 h-20 flex items-center justify-between">
-                        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => { setMobileMenuOpen(false); onViewChange('home'); }}><div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300"><i className="fa-solid fa-cloud text-white text-xl"></i></div><span className="text-2xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-white via-indigo-100 to-indigo-200 tracking-tight group-hover:to-white transition-all">BabaForum</span></div>
-                        <div className="hidden md:flex items-center gap-6">
-                            <button onClick={()=>onViewChange('guilds')} className="text-slate-300 hover:text-white font-medium flex items-center gap-2 transition-colors"><i className="fa-solid fa-users-rectangle text-indigo-400"></i> Guilds</button>
-                            <InstallButton />
-                            {user ? (<>{isAdmin && <button onClick={onOpenAdmin} className="text-amber-400 hover:text-amber-300 transition-colors bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20"><i className="fa-solid fa-shield-halved"></i></button>}<div className="relative"><button onClick={() => setShowNotes(!showNotes)} className="text-slate-300 hover:text-white relative p-2 transition-colors"><i className="fa-regular fa-bell text-xl"></i>{unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-md">{unreadCount}</span>}</button>{showNotes && <Notifications user={user} onClose={() => setShowNotes(false)} />}</div><button onClick={() => { setViewUserId(user.uid); onViewChange('profile'); }} className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/20 hover:border-indigo-500 transition-all ring-4 ring-transparent hover:ring-indigo-500/20 shadow-lg"><img src={user.photoURL} className="w-full h-full object-cover"/></button><button onClick={() => auth.signOut()} className="text-slate-400 hover:text-red-400 p-2 transition-colors"><i className="fa-solid fa-right-from-bracket text-xl"></i></button></>) : <button onClick={handleLogin} className="btn-primary text-white px-6 py-2.5 rounded-xl font-bold text-sm tracking-wide shadow-lg hover:shadow-indigo-500/50">Sign In</button>}
-                        </div>
-                        <div className="md:hidden flex items-center gap-4">{user && (<div className="relative"><button onClick={() => setShowNotes(!showNotes)} className="text-slate-300 hover:text-white relative"><i className="fa-regular fa-bell text-xl"></i>{unreadCount > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900">{unreadCount}</span>}</button>{showNotes && <Notifications user={user} onClose={() => setShowNotes(false)} />}</div>)}<button onClick={toggleMobileMenu} className="text-slate-300 hover:text-white p-2 bg-white/5 rounded-lg"><i className={`fa-solid ${mobileMenuOpen ? 'fa-xmark' : 'fa-bars'} text-xl`}></i></button></div>
-                    </div>
-                    {mobileMenuOpen && (<div className="md:hidden absolute top-20 left-0 w-full glass-panel-solid border-b border-white/10 flex flex-col p-6 gap-4 fade-in z-40">{user ? (<><div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5" onClick={() => { setViewUserId(user.uid); onViewChange('profile'); setMobileMenuOpen(false); }}><img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-indigo-500"/><div><div className="font-bold text-white text-lg">{user.displayName}</div><div className="text-xs text-indigo-300 font-medium">View Profile</div></div></div><button onClick={()=>{onViewChange('guilds'); setMobileMenuOpen(false);}} className="p-4 bg-white/5 rounded-xl text-left text-slate-200 font-medium hover:bg-white/10 transition-colors flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center"><i className="fa-solid fa-users-rectangle text-indigo-400"></i></div> Browse Guilds</button>{isAdmin && <button onClick={()=>{onOpenAdmin(); setMobileMenuOpen(false);}} className="p-4 bg-white/5 rounded-xl text-left text-amber-400 font-medium hover:bg-white/10 transition-colors flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center"><i className="fa-solid fa-shield-halved"></i></div> Admin Panel</button>}<div className="flex gap-3 pt-2"><div className="flex-1 bg-white/5 rounded-xl flex items-center justify-center p-2"><InstallButton /></div><button onClick={() => {auth.signOut(); setMobileMenuOpen(false);}} className="flex-[2] p-3 bg-red-500/10 text-red-400 rounded-xl font-bold text-center hover:bg-red-500/20 transition-colors border border-red-500/20">Sign Out</button></div></>) : (<button onClick={() => {handleLogin(); setMobileMenuOpen(false);}} className="btn-primary w-full py-4 rounded-xl font-bold text-lg shadow-xl">Sign In with Google</button>)}</div>)}
-                </nav>
+              <div 
+                key={i}
+                onClick={() => !cell && setSelectedCell(i)}
+                className={`relative bg-[#8B5E3C] rounded-md shadow-sm flex items-center justify-center cursor-pointer transition-all hover:brightness-110 overflow-hidden
+                  ${isSelected ? 'ring-4 ring-green-400 z-10' : ''}
+                `}
+              >
+                 {/* Dirt Texture / Empty State */}
+                 {!cell && <div className="opacity-10 text-black text-[8px]">{i}</div>}
+
+                 {/* Plant State */}
+                 {cell && (
+                   <div className="flex flex-col items-center animate-bounce-short">
+                      <span className="text-2xl filter drop-shadow-md">
+                        {/* If stage 0, show seed packet or sprout */}
+                        {cell.stage === 0 ? '🌱' : ITEMS[cell.type].icon}
+                      </span>
+                      {/* Growth Bar */}
+                      {ITEMS[cell.type].stages > 1 && (
+                         <div className="w-8 h-1 bg-gray-700 mt-1 rounded-full overflow-hidden">
+                             <div 
+                                className="h-full bg-green-500" 
+                                style={{ width: `${(cell.stage / ITEMS[cell.type].stages) * 100}%` }} 
+                             />
+                         </div>
+                      )}
+                      
+                      {/* Actions Overlay */}
+                      <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 flex items-center justify-center gap-1 transition-opacity backdrop-blur-[1px]">
+                         {/* Water Button */}
+                         {cell.stage < ITEMS[cell.type].stages && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleWater(i, cell); }}
+                                className={`p-1.5 rounded-full ${cell.lastWateredDay === room.simulatedDay ? 'bg-gray-400' : 'bg-blue-500 text-white shadow-lg transform hover:scale-110'}`}
+                            >
+                                <Droplet size={14} />
+                            </button>
+                         )}
+                         {/* Harvest Button */}
+                         {cell.stage >= ITEMS[cell.type].stages && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleHarvest(i, cell); }}
+                                className="p-1.5 bg-yellow-500 text-white rounded-full shadow-lg transform hover:scale-110 animate-pulse"
+                            >
+                                <Shovel size={14} />
+                            </button>
+                         )}
+                      </div>
+                   </div>
+                 )}
+              </div>
             );
-        }
+          })}
+        </div>
+      </div>
+      
+      {/* Expansion Button */}
+      <div className="p-4 flex justify-center pb-20">
+          <button 
+            onClick={handleExpand}
+            className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold hover:shadow-xl transition-all"
+          >
+              <Gem size={16} /> Expand Land ({EXPANSION_COST})
+          </button>
+      </div>
 
-        function AdminDashboard({ onClose }) {
-            const [stats, setStats] = useState({ topics: 0, replies: 0 }); const [loading, setLoading] = useState(true); const [cleaning, setCleaning] = useState(false);
-            useEffect(() => { const f = async () => { const t = await db.collection('topics').get(); const r = await db.collection('replies').get(); setStats({ topics: t.size, replies: r.size }); setLoading(false); }; f(); }, []);
-            const recountUserPosts = async () => { if(!confirm("Recalculate counts?")) return; setCleaning(true); try { const ts = await db.collection('topics').get(); const uc = {}; ts.forEach(d => { const uid = d.data().authorId; if(uid) uc[uid] = (uc[uid] || 0) + 1; }); const us = await db.collection('users').get(); const b = db.batch(); us.forEach(d => { b.update(d.ref, { postCount: uc[d.id] || 0 }); }); await b.commit(); alert("Fixed!"); } catch(e) { alert(e.message); } setCleaning(false); };
-            const runCleanup = async () => { if(!confirm("Delete old?")) return; setCleaning(true); try { const d = new Date(); d.setFullYear(d.getFullYear()-1); const s = await db.collection('topics').where('createdAt', '<', d).limit(50).get(); const b = db.batch(); for(const doc of s.docs) { b.delete(doc.ref); const rs = await db.collection('replies').where('topicId','==',doc.id).get(); rs.forEach(r => b.delete(r.ref)); } await b.commit(); alert(`Pruned ${s.size}.`); } catch(e) { alert(e.message); } setCleaning(false); };
-            return (<div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[60] p-4 fade-in"><div className="glass-panel-solid p-8 rounded-3xl max-w-md w-full relative shadow-2xl border border-white/10"><button onClick={onClose} className="absolute top-5 right-5 text-slate-400 hover:text-white bg-white/5 p-2 rounded-full transition-colors"><i className="fa-solid fa-xmark text-lg"></i></button><h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-3"><i className="fa-solid fa-shield-halved text-amber-400"></i> Admin Panel</h2>{loading ? <div className="text-center py-10"><i className="fa-solid fa-spinner fa-spin text-3xl text-indigo-500"></i></div> : (<div className="space-y-8"><div className="grid grid-cols-2 gap-4"><div className="bg-white/5 p-6 rounded-2xl text-center border border-white/5"><div className="text-4xl font-extrabold text-white mb-1">{stats.topics}</div><div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Topics</div></div><div className="bg-white/5 p-6 rounded-2xl text-center border border-white/5"><div className="text-4xl font-extrabold text-white mb-1">{stats.replies}</div><div className="text-xs text-slate-400 font-bold uppercase tracking-wider">Replies</div></div></div><div className="border-t border-white/10 pt-8 space-y-4"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Database Maintenance</h3><button onClick={recountUserPosts} disabled={cleaning} className="w-full btn-primary py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg hover:shadow-indigo-500/25">{cleaning?<i className="fa-solid fa-spinner fa-spin"></i>:<i className="fa-solid fa-rotate"></i>} Fix User Counts</button><button onClick={runCleanup} disabled={cleaning} className="w-full btn-danger py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2">{cleaning?<i className="fa-solid fa-spinner fa-spin"></i>:<i className="fa-solid fa-calendar-xmark"></i>} Prune Old Topics</button></div></div>)}</div></div>);
-        }
+      {/* Inventory Modal / Drawer */}
+      {selectedCell !== null && (
+        <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl p-4 pb-24 z-20 animate-slide-up">
+           <div className="flex justify-between items-center mb-3">
+             <h3 className="font-bold text-gray-700">Select seed to plant</h3>
+             <button onClick={() => setSelectedCell(null)} className="text-gray-400"><X size={20}/></button>
+           </div>
+           <div className="grid grid-cols-4 gap-2">
+             {Object.keys(userData?.inventory || {}).map(itemId => {
+                const count = userData.inventory[itemId];
+                if(count <= 0) return null;
+                const item = ITEMS[itemId];
+                return (
+                  <button 
+                    key={itemId}
+                    onClick={() => handlePlant(itemId)}
+                    className="flex flex-col items-center p-2 bg-green-50 border border-green-100 rounded-lg hover:bg-green-100"
+                  >
+                    <span className="text-2xl mb-1">{item.icon}</span>
+                    <span className="text-xs font-medium text-gray-600 truncate w-full text-center">{item.name}</span>
+                    <span className="text-[10px] bg-green-200 text-green-800 px-1.5 rounded-full mt-1">x{count}</span>
+                  </button>
+                )
+             })}
+             {Object.keys(userData?.inventory || {}).length === 0 && (
+                 <div className="col-span-4 text-center py-4 text-gray-400 text-sm">
+                     You have no seeds! Visit the Shop.
+                 </div>
+             )}
+           </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
-        function CreateGuild({ user, onViewChange }) {
-            const [form, setForm] = useState({ name: '', description: '', icon: '' });
-            const handleSubmit = async (e) => { e.preventDefault(); await db.collection('guilds').add({ ...form, createdBy: user.uid, memberCount: 1, createdAt: firebase.firestore.FieldValue.serverTimestamp() }); const snap = await db.collection('guilds').where('name', '==', form.name).get(); if(!snap.empty) { const id = snap.docs[0].id; await db.collection('users').doc(user.uid).update({ guilds: firebase.firestore.FieldValue.arrayUnion(id) }); } onViewChange('guilds'); };
-            return (<div className="max-w-2xl mx-auto p-4 fade-in"><button onClick={()=>onViewChange('guilds')} className="text-slate-400 hover:text-white mb-6 flex items-center gap-2 font-medium transition-colors"><i className="fa-solid fa-arrow-left"></i> Back to Guilds</button><div className="glass-panel p-10 rounded-3xl shadow-xl"><div className="w-16 h-16 bg-indigo-500/20 rounded-2xl flex items-center justify-center mb-6 text-3xl"><i className="fa-solid fa-users-rectangle text-indigo-400"></i></div><h2 className="text-3xl font-extrabold text-white mb-8 tracking-tight">Create a Guild</h2><form onSubmit={handleSubmit} className="space-y-6"><div><label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Guild Name</label><input className="w-full glass-input rounded-xl p-4 text-white font-bold text-lg" placeholder="e.g. Tech Talk" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} required /></div><div><label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Icon</label><input className="w-full glass-input rounded-xl p-4 text-white font-bold text-lg" placeholder="Emoji (e.g. 🎮)" value={form.icon} onChange={e=>setForm({...form, icon:e.target.value})} required /></div><div><label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Description</label><textarea className="w-full glass-input rounded-xl p-4 text-white resize-none leading-relaxed" rows="3" placeholder="What is this community about?" value={form.description} onChange={e=>setForm({...form, description:e.target.value})} required /></div><button type="submit" className="w-full btn-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-indigo-500/30">Create Community</button></form></div></div>);
-        }
+// 4. TASKS VIEW
+const TasksView = ({ roomId, user }) => {
+  const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState('');
 
-        function GuildList({ user, onViewChange, setSelectedGuild }) {
-            const [guilds, setGuilds] = useState([]); const [myGuilds, setMyGuilds] = useState([]);
-            useEffect(() => { db.collection('guilds').orderBy('memberCount', 'desc').onSnapshot(s => setGuilds(s.docs.map(d=>({id:d.id,...d.data()})))); if(user) db.collection('users').doc(user.uid).onSnapshot(d => setMyGuilds(d.data()?.guilds || [])); }, [user]);
-            const toggleJoin = async (e, guildId) => { e.stopPropagation(); if(!user) return alert("Sign in!"); const isMember = myGuilds.includes(guildId); const batch = db.batch(); const uRef = db.collection('users').doc(user.uid); const gRef = db.collection('guilds').doc(guildId); if(isMember) { batch.update(uRef, { guilds: firebase.firestore.FieldValue.arrayRemove(guildId) }); batch.update(gRef, { memberCount: firebase.firestore.FieldValue.increment(-1) }); } else { batch.update(uRef, { guilds: firebase.firestore.FieldValue.arrayUnion(guildId) }); batch.update(gRef, { memberCount: firebase.firestore.FieldValue.increment(1) }); } await batch.commit(); };
-            const deleteGuild = async (e, guildId) => { e.stopPropagation(); if(!confirm("Delete guild?")) return; await db.collection('guilds').doc(guildId).delete(); }; const isAdmin = user && user.uid === ADMIN_UID;
-            return (<div className="max-w-5xl mx-auto p-6 fade-in space-y-8"><div className="flex flex-col md:flex-row justify-between items-center gap-4"><div><h2 className="text-3xl font-extrabold text-white tracking-tight">Explore Guilds</h2><p className="text-slate-400 mt-1">Join communities that interest you.</p></div>{user && <button onClick={()=>onViewChange('createGuild')} className="btn-primary text-white px-6 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2"><i className="fa-solid fa-plus"></i> Create Guild</button>}</div><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{guilds.map(g => (<div key={g.id} onClick={()=>{setSelectedGuild(g); onViewChange('home');}} className="glass-panel glass-hover p-6 rounded-2xl cursor-pointer bg-slate-900/40 hover:bg-slate-800/60 transition-all group border border-white/5"><div className="flex justify-between items-start mb-4"><div className="w-14 h-14 bg-slate-800/50 rounded-xl flex items-center justify-center text-3xl shadow-inner">{g.icon || '🛡️'}</div><div className="flex gap-2"><button onClick={(e)=>toggleJoin(e,g.id)} className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${myGuilds.includes(g.id) ? 'bg-slate-700/50 text-slate-400 border border-white/5' : 'btn-primary text-white shadow-md'}`}>{myGuilds.includes(g.id) ? 'Joined' : 'Join'}</button>{isAdmin && <button onClick={(e)=>deleteGuild(e,g.id)} className="text-slate-500 hover:text-red-400 p-2 rounded-lg transition-colors bg-slate-800/50 hover:bg-red-500/10"><i className="fa-solid fa-trash"></i></button>}</div></div><h3 className="text-xl font-bold text-white group-hover:text-indigo-300 transition-colors">{g.name}</h3><p className="text-slate-400 text-sm mt-2 line-clamp-2 leading-relaxed">{g.description}</p><div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 text-xs text-slate-500 font-bold uppercase tracking-wider"><i className="fa-solid fa-user-group"></i> {g.memberCount || 0} Members</div></div>))}</div></div>);
-        }
+  useEffect(() => {
+    const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', `room_${roomId}`, 'tasks');
+    const q = query(tasksRef, orderBy('createdAt', 'desc'), limit(50));
+    
+    const unsub = onSnapshot(q, (snap) => {
+      setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [roomId]);
 
-        function ProfileView({ viewUserId, currentUser, onViewChange, setCurrentTopic }) {
-            const [profile, setProfile] = useState(null); const [posts, setPosts] = useState([]); const [isFollowing, setIsFollowing] = useState(false); const [editing, setEditing] = useState(false); const [newName, setNewName] = useState(""); const [newBio, setNewBio] = useState("");
-            useEffect(() => { const load = async () => { if(!viewUserId) return; const d = await db.collection('users').doc(viewUserId).get(); if(d.exists) { const data = d.data(); setProfile(data); setNewName(data.displayName); setNewBio(data.bio||""); if(currentUser) { const my = await db.collection('users').doc(currentUser.uid).get(); setIsFollowing(my.data().following?.includes(viewUserId)); } } try { const snap = await db.collection('topics').where('authorId','==',viewUserId).orderBy('createdAt','desc').limit(20).get(); setPosts(snap.docs.map(d=>({id:d.id,...d.data()}))); } catch(e) { if(e.message.includes("index")) console.warn("Missing Index"); } }; if(db && viewUserId) load(); }, [viewUserId, currentUser]);
-            const toggleFollow = async () => { if(!currentUser) return alert("Sign in!"); const my = db.collection('users').doc(currentUser.uid); const th = db.collection('users').doc(viewUserId); const b = db.batch(); if(isFollowing) { b.update(my,{following:firebase.firestore.FieldValue.arrayRemove(viewUserId)}); b.update(th,{followers:firebase.firestore.FieldValue.arrayRemove(currentUser.uid)}); } else { b.update(my,{following:firebase.firestore.FieldValue.arrayUnion(viewUserId)}); b.update(th,{followers:firebase.firestore.FieldValue.arrayUnion(currentUser.uid)}); b.set(db.collection('notifications').doc(), {toUserId:viewUserId, fromName:currentUser.displayName, message:"followed you", createdAt:firebase.firestore.FieldValue.serverTimestamp(), read:false}); } await b.commit(); setIsFollowing(!isFollowing); setProfile(p=>({...p, followers: isFollowing?p.followers.slice(0,-1):[...(p.followers||[]),currentUser.uid]})); };
-            const save = async () => { await db.collection('users').doc(currentUser.uid).update({displayName:newName, bio:newBio}); setProfile(p=>({...p, displayName:newName, bio:newBio})); setEditing(false); };
-            if(!profile) return <div className="text-center p-20 text-slate-500"><i className="fa-solid fa-spinner fa-spin text-3xl mb-4"></i><p>Loading Profile...</p></div>;
-            const isMe = currentUser && currentUser.uid === viewUserId; const rank = getRank(profile.postCount || 0);
-            return (<div className="max-w-4xl mx-auto p-6 fade-in"><button onClick={()=>onViewChange('home')} className="text-slate-400 hover:text-white mb-8 flex gap-2 items-center font-medium transition-colors"><i className="fa-solid fa-arrow-left"></i> Back to Feed</button><div className="glass-panel p-10 rounded-3xl mb-10 flex flex-col md:flex-row items-center gap-8 text-center md:text-left shadow-xl relative overflow-hidden"><div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 z-0"></div><img src={profile.photoURL} className="w-32 h-32 rounded-full border-4 border-white/10 shadow-2xl relative z-10"/><div className="flex-1 relative z-10">{editing ? (<div className="space-y-4 bg-slate-900/50 p-6 rounded-2xl border border-white/10"><h3 className="text-white font-bold mb-4">Edit Profile</h3><input className="w-full glass-input rounded-xl p-3 text-white font-bold" value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Display Name"/><textarea className="w-full glass-input rounded-xl p-3 text-white resize-none" rows="3" value={newBio} onChange={e=>setNewBio(e.target.value)} placeholder="Tell us about yourself..."/><div className="flex gap-3 justify-end pt-2"><button onClick={()=>setEditing(false)} className="btn-outline px-5 py-2 rounded-xl text-sm font-bold">Cancel</button><button onClick={save} className="btn-primary px-6 py-2 rounded-xl text-white text-sm font-bold">Save Changes</button></div></div>) : (<><div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-3 mb-2"><h1 className="text-4xl font-extrabold text-white tracking-tight">{profile.displayName}</h1><span className={rank.class}>{rank.label}</span></div><p className="text-indigo-200 text-lg mb-6 leading-relaxed max-w-2xl">{profile.bio}</p><div className="flex gap-8 justify-center md:justify-start text-sm text-slate-400 mb-6 bg-slate-900/30 p-4 rounded-2xl inline-flex border border-white/5"><div className="text-center"><strong className="text-white text-xl block">{profile.followers?.length||0}</strong> Followers</div><div className="text-center"><strong className="text-white text-xl block">{profile.following?.length||0}</strong> Following</div><div className="text-center"><strong className="text-white text-xl block">{profile.postCount||0}</strong> Posts</div></div><div>{isMe ? <button onClick={()=>setEditing(true)} className="btn-outline px-6 py-2.5 rounded-xl text-sm font-bold shadow-sm">Edit Profile</button> : <button onClick={toggleFollow} className={`px-8 py-2.5 rounded-xl font-bold shadow-lg transition-all ${isFollowing?'bg-slate-700 text-slate-300 hover:bg-slate-600':'btn-primary text-white'}`}>{isFollowing?'Following':'Follow'}</button>}</div></>)}</div></div><h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><i className="fa-solid fa-clock-rotate-left text-indigo-400"></i> Recent Activity</h3><div className="grid gap-4 md:grid-cols-2">{posts.map(p => (<div key={p.id} onClick={() => { setCurrentTopic(p); onViewChange('thread'); }} className="glass-panel glass-hover p-5 rounded-2xl flex gap-4 items-center transition-all hover:scale-[1.02] cursor-pointer"><div className="w-16 h-16 bg-slate-800/50 rounded-xl overflow-hidden flex-shrink-0 border border-white/5 relative">{p.topicImage ? <img src={p.topicImage} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-500"><i className="fa-regular fa-file-lines text-2xl"></i></div>}</div><div className="flex-1 min-w-0"><h4 className="text-base font-bold text-slate-200 truncate mb-1">{p.title}</h4><div className="text-indigo-300 text-xs font-medium">{new Date(p.createdAt?.seconds*1000).toLocaleDateString()}</div></div></div>))}</div></div>);
-        }
+  const addTask = async () => {
+    if (!newTask.trim()) return;
+    const isFirstTask = tasks.length === 0; 
+    
+    const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', `room_${roomId}`, 'tasks');
+    await addDoc(tasksRef, {
+      title: newTask,
+      completed: false,
+      createdBy: user.uid,
+      reward: isFirstTask ? FIRST_TASK_REWARD : 10, // Logic for first task bonus
+      createdAt: serverTimestamp()
+    });
+    setNewTask('');
+  };
 
-        function ThreadView({ user, topic, onViewChange, setViewUserId }) {
-            const [replies, setReplies] = useState([]); const [newReply, setNewReply] = useState(''); const bottomRef = useRef(null); const contentRef = useRef(null); const isAdmin = user && user.uid === ADMIN_UID;
-            useEffect(() => { if(!topic) return; const u = db.collection('replies').where('topicId','==',topic.id).orderBy('createdAt','asc').onSnapshot(s => setReplies(s.docs.map(d=>({id:d.id, ...d.data()})))); return ()=>u(); }, [topic]);
-            const postReply = async (e) => { e.preventDefault(); if(!newReply.trim()) return; const batch = db.batch(); const uRef = db.collection('users').doc(user.uid); const uDoc = await uRef.get(); const userData = uDoc.data(); const realName = userData.displayName || user.displayName; const cnt = (userData.postCount||0)+1; batch.update(uRef,{postCount:cnt}); batch.set(db.collection('replies').doc(), { content: newReply, topicId: topic.id, authorId: user.uid, authorName: realName, authorPhoto: user.photoURL, authorRank: getRank(cnt).label, createdAt: firebase.firestore.FieldValue.serverTimestamp(), likes: 0, likedBy: [] }); batch.update(db.collection('topics').doc(topic.id), { replyCount: firebase.firestore.FieldValue.increment(1) }); if(topic.authorId!==user.uid) batch.set(db.collection('notifications').doc(), { toUserId: topic.authorId, fromName: realName, message: "replied to your topic", createdAt: firebase.firestore.FieldValue.serverTimestamp(), read: false }); await batch.commit(); setNewReply(''); setTimeout(()=>bottomRef.current?.scrollIntoView({behavior:'smooth'}),100); };
-            const handleImageInsert = (url) => setNewReply(p => p + `\n![Image](${url})\n`);
-            const deleteReply = async (id) => { if(confirm("Delete?")) { const b = db.batch(); b.delete(db.collection('replies').doc(id)); b.update(db.collection('topics').doc(topic.id), {replyCount: firebase.firestore.FieldValue.increment(-1)}); await b.commit(); }};
-            return (<div className="max-w-4xl mx-auto p-6 h-[calc(100vh-80px)] flex flex-col fade-in"><button onClick={() => onViewChange('home')} className="text-slate-400 mb-4 w-fit flex items-center gap-2 font-medium transition-colors"><i className="fa-solid fa-arrow-left"></i> Back to Feed</button><div className="flex-1 overflow-y-auto space-y-6 pr-4 pb-6 custom-scrollbar"><div className="glass-panel p-8 rounded-3xl shadow-xl relative overflow-hidden"><div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div><div className="flex items-center gap-4 mb-6"><img src={topic.authorPhoto} className="w-14 h-14 rounded-full border-2 border-indigo-500/30 shadow-sm cursor-pointer hover:ring-2 ring-indigo-500 transition-all" onClick={()=>{setViewUserId(topic.authorId);onViewChange('profile')}}/><div><div className="text-lg font-bold text-white cursor-pointer hover:text-indigo-300 transition-colors" onClick={()=>{setViewUserId(topic.authorId);onViewChange('profile')}}>{topic.authorName}</div><span className={topic.authorRank.class}>{topic.authorRank.label}</span></div><div className="ml-auto text-sm text-slate-500 font-medium">{topic.createdAt ? new Date(topic.createdAt.seconds*1000).toLocaleDateString() : ''}</div></div><h1 className="text-3xl font-extrabold text-white mb-6 tracking-tight">{topic.title}</h1><RichText content={topic.content} /><div className="mt-8 pt-4 border-t border-white/10 flex items-center gap-4"><LikeButton user={user} docId={topic.id} collection="topics" likes={topic.likes} likedBy={topic.likedBy} authorId={topic.authorId} /><span className="text-slate-400 text-sm font-medium"><i className="fa-regular fa-comment-dots mr-2"></i> {topic.replyCount} Replies</span></div></div>{replies.map(r => (<div key={r.id} className="glass-panel p-6 rounded-2xl flex gap-5 relative group"><img src={r.authorPhoto} className="w-10 h-10 rounded-full cursor-pointer border border-slate-700 hover:border-indigo-500 transition-colors" onClick={()=>{setViewUserId(r.authorId);onViewChange('profile')}}/><div className="flex-1"><div className="flex justify-between items-center mb-3"><div className="flex items-center gap-2"><span className="text-indigo-300 font-bold cursor-pointer hover:underline" onClick={()=>{setViewUserId(r.authorId);onViewChange('profile')}}>{r.authorName}</span><span className={r.authorRank.class}>{r.authorRank.label}</span></div><div className="flex gap-3 items-center"><span className="text-xs text-slate-500 font-medium">{r.createdAt ? new Date(r.createdAt.seconds*1000).toLocaleDateString() : ''}</span>{(isAdmin||user?.uid===r.authorId)&&<button onClick={()=>deleteReply(r.id)} className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><i className="fa-solid fa-trash text-sm"></i></button>}</div></div><RichText content={r.content}/></div></div>))}<div ref={bottomRef}></div></div>{user && <div className="bg-[#0f172a]/80 backdrop-blur-xl p-4 rounded-3xl border border-white/10 mt-4 shadow-2xl"><div className="flex items-center justify-between mb-2"><MarkdownToolbar textareaRef={contentRef} value={newReply} setValue={setNewReply} /><div className="mb-1"><ImageUpload onUpload={handleImageInsert}/></div></div><form onSubmit={postReply} className="relative"><textarea ref={contentRef} value={newReply} onChange={e=>setNewReply(e.target.value)} className="w-full glass-input rounded-2xl p-4 pr-14 text-white placeholder-slate-500 resize-none" placeholder="Write a reply..." rows="3"/><button type="submit" className="absolute right-3 bottom-3 w-10 h-10 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg transition-colors"><i className="fa-solid fa-paper-plane"></i></button></form></div>}</div>);
-        }
+  const completeTask = async (task) => {
+    if (task.completed) return;
+    
+    const taskRef = doc(db, 'artifacts', appId, 'public', 'data', `room_${roomId}`, 'tasks', task.id);
+    const userRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile');
 
-        function CreateTopic({ user, onViewChange, selectedGuild }) {
-            const [form, setForm] = useState({ title: '', content: '', tag: 'General', guildId: selectedGuild ? selectedGuild.id : null }); const [submitting, setSubmitting] = useState(false); const contentRef = useRef(null);
-            const handleSubmit = async (e) => { e.preventDefault(); setSubmitting(true); const imgMatch = form.content.match(/!\[Image\]\((.*?)\)/); const topicImage = imgMatch ? imgMatch[1] : null; const cleanContent = form.content.replace(/!\[Image\]\(.*?\)/g, '[Image] '); const previewText = cleanContent.substring(0, 120) + '...'; const userRef = db.collection('users').doc(user.uid); const userDoc = await userRef.get(); const userData = userDoc.data(); const realName = userData.displayName || user.displayName; const currentCount = (userData.postCount || 0) + 1; await userRef.update({ postCount: currentCount }); await db.collection('topics').add({ ...form, preview: previewText, topicImage: topicImage, authorId: user.uid, authorName: realName, authorPhoto: user.photoURL, authorRank: getRank(currentCount).label, guildName: selectedGuild ? selectedGuild.name : null, createdAt: firebase.firestore.FieldValue.serverTimestamp(), replyCount: 0, likes: 0, likedBy: [], isPinned: false }); setSubmitting(false); onViewChange('home'); };
-            const handleImageInsert = (url) => setForm(prev => ({ ...prev, content: prev.content + `\n![Image](${url})\n` }));
-            return (<div className="max-w-3xl mx-auto p-6 fade-in"><button onClick={() => onViewChange('home')} className="text-slate-400 hover:text-white mb-6 flex items-center gap-2 font-medium transition-colors"><i className="fa-solid fa-arrow-left"></i> Back to Feed</button><div className="glass-panel p-10 rounded-3xl shadow-xl"><h2 className="text-3xl font-extrabold text-white mb-8 tracking-tight">{selectedGuild ? `New Post in ${selectedGuild.name}` : 'Create New Topic'}</h2><form onSubmit={handleSubmit} className="space-y-6"><input className="w-full glass-input rounded-xl px-5 py-4 text-white text-lg font-bold placeholder-slate-500" placeholder="Title" value={form.title} onChange={e=>setForm({...form, title:e.target.value})} required />{!selectedGuild && <select className="glass-input rounded-xl px-5 py-3 text-white font-medium" value={form.tag} onChange={e=>setForm({...form, tag:e.target.value})}><option>General</option><option>Help</option><option>Showcase</option><option>Ideas</option></select>}<div><MarkdownToolbar textareaRef={contentRef} value={form.content} setValue={(val)=>setForm({...form, content:val})} /><textarea ref={contentRef} className="w-full h-64 bg-slate-900/30 border border-white/10 rounded-xl p-4 text-white" placeholder="Content..." value={form.content} onChange={e=>setForm({...form, content:e.target.value})} required /><div className="mt-2"><ImageUpload onUpload={handleImageInsert} /></div></div><button type="submit" disabled={submitting} className="w-full btn-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg">{submitting ? "Publishing..." : "Publish"}</button></form></div></div>);
-        }
+    try {
+        await runTransaction(db, async (t) => {
+            t.update(taskRef, { 
+                completed: true, 
+                completedBy: user.uid,
+                completedAt: serverTimestamp()
+            });
+            t.update(userRef, {
+                coins: increment(task.reward)
+            });
+        });
+    } catch(e) { console.error(e); }
+  };
 
-        function TopicList({ user, onViewChange, setCurrentTopic, setViewUserId, selectedGuild, setSelectedGuild }) {
-            const [topics, setTopics] = useState([]); const [loading, setLoading] = useState(true); const [search, setSearch] = useState(""); const [filter, setFilter] = useState('all'); const [category, setCategory] = useState('All'); const [followingList, setFollowingList] = useState([]); const [myGuilds, setMyGuilds] = useState([]); const isAdmin = user && user.uid === ADMIN_UID;
-            useEffect(() => { if(user && db) { db.collection('users').doc(user.uid).get().then(doc => { if(doc.exists) { const d = doc.data(); setFollowingList(d.following || []); setMyGuilds(d.guilds || []); } }); } if(db) { let query = db.collection('topics'); if (selectedGuild) { query = query.where('guildId', '==', selectedGuild.id).orderBy('createdAt', 'desc'); } else { query = query.orderBy('createdAt', 'desc'); } const unsubscribe = query.onSnapshot(snap => { const list = snap.docs.map(d => ({ id: d.id, ...d.data() })); list.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0) || b.createdAt - a.createdAt); setTopics(list); setLoading(false); }, err => { console.error(err); if(err.message.includes("index")) { const link = err.message.match(/https:\/\/console\.firebase\.google\.com[^\s]*/); if(link && confirm("Missing Index! Click OK to create it.")) window.open(link[0]); } setLoading(false); }); return () => unsubscribe(); } }, [user, selectedGuild]);
-            const displayTopics = topics.filter(t => { const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase()) || t.content.toLowerCase().includes(search.toLowerCase()); const matchesFilter = filter === 'all' || (filter === 'following' && followingList.includes(t.authorId)); const matchesCategory = category === 'All' || t.tag === category; const isGuildVisible = !t.guildId || myGuilds.includes(t.guildId) || (selectedGuild && selectedGuild.id === t.guildId); return matchesSearch && matchesFilter && matchesCategory && isGuildVisible; });
-            const goToProfile = (e, uid) => { e.stopPropagation(); setViewUserId(uid); onViewChange('profile'); };
-            const deleteTopic = async (e, t) => { e.stopPropagation(); if(confirm("Delete?")) { const b = db.batch(); b.delete(db.collection('topics').doc(t.id)); const userRef = db.collection('users').doc(t.authorId); b.update(userRef, { postCount: firebase.firestore.FieldValue.increment(-1) }); const rs = await db.collection('replies').where('topicId','==',t.id).get(); rs.forEach(r => b.delete(r.ref)); await b.commit(); } };
-            const togglePin = async (e, topic) => { e.stopPropagation(); await db.collection('topics').doc(topic.id).update({ isPinned: !topic.isPinned }); };
-            return (<div className="max-w-5xl mx-auto p-4 fade-in space-y-6"><div className="flex flex-col md:flex-row gap-4 justify-between items-center"><div className="flex gap-4 items-center w-full md:w-auto">{selectedGuild && <button onClick={()=>{setSelectedGuild(null); onViewChange('guilds');}} className="text-slate-400 hover:text-white"><i className="fa-solid fa-arrow-left"></i></button>}<h2 className="text-3xl font-bold text-white">{selectedGuild ? selectedGuild.name : 'Feed'}</h2>{user && !selectedGuild && (<div className="flex bg-slate-800 rounded-lg p-1"><button onClick={()=>setFilter('all')} className={`px-3 py-1 rounded text-sm font-medium ${filter==='all'?'bg-slate-600 text-white':'text-slate-400'}`}>All</button><button onClick={()=>setFilter('following')} className={`px-3 py-1 rounded text-sm font-medium ${filter==='following'?'bg-indigo-500 text-white':'text-slate-400'}`}>Following</button></div>)}</div><div className="flex gap-3 w-full md:w-auto"><div className="relative flex-1 md:w-64"><i className="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-500"></i><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-white"/></div>{user && <button onClick={() => onViewChange('create')} className="btn-primary text-white px-4 py-2 rounded-xl flex items-center gap-2 whitespace-nowrap"><i className="fa-solid fa-plus"></i> New</button>}</div></div>{!selectedGuild && (<div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">{['All', 'General', 'Help', 'Showcase', 'Ideas'].map(c => (<button key={c} onClick={() => setCategory(c)} className={`category-chip ${category === c ? 'active' : ''}`}>{c}</button>))}</div>)}{loading ? <div className="text-slate-500 text-center">Loading...</div> : displayTopics.map(topic => (<div key={topic.id} onClick={() => {setCurrentTopic(topic); onViewChange('thread')}} className={`glass-panel p-5 rounded-xl cursor-pointer hover:bg-slate-800 flex gap-4 ${topic.isPinned ? 'border-l-4 border-amber-400' : ''}`}><div onClick={(e)=>goToProfile(e, topic.authorId)} className="flex-shrink-0 pt-1 cursor-pointer hover:opacity-80"><img src={topic.authorPhoto} className="w-10 h-10 rounded-full"/></div><div className="flex-1 min-w-0"><div className="flex justify-between"><div className="flex items-center gap-2"><h3 className="text-lg font-semibold text-slate-200 truncate">{topic.title}</h3>{topic.isPinned && <i className="fa-solid fa-thumbtack text-amber-400 text-xs"></i>}</div><div className="flex gap-2">{isAdmin && <button onClick={(e)=>togglePin(e,topic)} className={`text-xs p-2 rounded ${topic.isPinned ? 'text-amber-400' : 'text-slate-600 hover:text-amber-400'}`}><i className="fa-solid fa-thumbtack"></i></button>}{(isAdmin || user?.uid === topic.authorId) && <button onClick={(e)=>deleteTopic(e,topic)} className="text-slate-500 hover:text-red-400"><i className="fa-solid fa-trash"></i></button>}</div></div>{topic.topicImage && (<div className="w-full h-48 bg-slate-900 rounded-lg my-3 overflow-hidden border border-slate-700"><img src={topic.topicImage} className="w-full h-full object-cover" alt="Preview"/></div>)}<div className="text-slate-400 text-sm line-clamp-2 mt-1"><RichText content={topic.preview||""}/></div><div className="flex items-center gap-4 mt-3 text-xs text-slate-500"><span className={`text-[10px] px-2 py-0.5 rounded ${getRank(0).class}`}>{topic.authorRank?.label || 'Newcomer'}</span><span onClick={(e)=>goToProfile(e, topic.authorId)} className="hover:text-indigo-400 cursor-pointer font-medium">{topic.authorName}</span>{topic.guildName && <span className="bg-slate-700 px-2 py-0.5 rounded text-slate-300">{topic.guildName}</span>}<div className="flex items-center gap-3 ml-auto"><LikeButton user={user} docId={topic.id} collection="topics" likes={topic.likes} likedBy={topic.likedBy} authorId={topic.authorId} /><span><i className="fa-regular fa-comment-dots"></i> {topic.replyCount||0}</span></div></div></div></div>))}</div>);
-        }
+  return (
+    <div className="h-full bg-gray-50 flex flex-col p-4 pb-24 overflow-y-auto">
+      <div className="bg-white p-4 rounded-xl shadow-sm mb-4">
+        <h3 className="text-sm font-bold text-gray-500 uppercase mb-2">New Task</h3>
+        <div className="flex gap-2">
+          <input 
+            type="text" 
+            value={newTask}
+            onChange={(e) => setNewTask(e.target.value)}
+            placeholder="e.g. Do 10 minutes of reading"
+            className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            onKeyDown={(e) => e.key === 'Enter' && addTask()}
+          />
+          <button 
+            onClick={addTask}
+            className="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700"
+          >
+            <ArrowRight size={20} />
+          </button>
+        </div>
+      </div>
 
-        function App() {
-            const [view, setView] = useState('home');
-            const [user, setUser] = useState(null);
-            const [currentTopic, setCurrentTopic] = useState(null);
-            const [viewUserId, setViewUserId] = useState(null);
-            const [selectedGuild, setSelectedGuild] = useState(null);
-            const [isConfigured, setIsConfigured] = useState(false);
-            const [showAdmin, setShowAdmin] = useState(false);
+      <div className="space-y-2">
+        {tasks.map(task => (
+          <div key={task.id} className={`p-4 rounded-xl border flex items-center justify-between transition-all ${task.completed ? 'bg-gray-100 border-gray-100 opacity-60' : 'bg-white border-gray-200 shadow-sm'}`}>
+            <div className="flex-1">
+              <p className={`font-medium ${task.completed ? 'line-through text-gray-500' : 'text-gray-800'}`}>{task.title}</p>
+              <span className="text-xs text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded flex w-fit items-center mt-1">
+                +{task.reward} Coins
+              </span>
+            </div>
+            <button 
+              onClick={() => completeTask(task)}
+              disabled={task.completed}
+              className={`p-2 rounded-full ${task.completed ? 'text-green-600' : 'text-gray-300 hover:text-green-500 hover:bg-green-50'}`}
+            >
+              <CheckSquare size={24} className={task.completed ? 'fill-current' : ''} />
+            </button>
+          </div>
+        ))}
+        {tasks.length === 0 && (
+            <div className="text-center text-gray-400 mt-10">
+                <p>No tasks yet. Create one to earn coins!</p>
+                <p className="text-xs mt-2 text-yellow-600">First task gives {FIRST_TASK_REWARD} coins!</p>
+            </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
-            useEffect(() => {
-                if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
-                    setIsConfigured(true);
-                    return auth.onAuthStateChanged(async (u) => {
-                        if(u) await ensureUserProfile(u);
-                        setUser(u);
-                    });
-                }
-            }, []);
+// 5. SHOP VIEW
+const ShopView = ({ user, userData }) => {
+  const buyItem = async (itemId) => {
+    const item = ITEMS[itemId];
+    if (userData.coins < item.cost) {
+      alert("Not enough coins!");
+      return;
+    }
 
-            if (!isConfigured) return <SetupScreen />;
+    const userRef = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'profile');
+    try {
+        await updateDoc(userRef, {
+            coins: increment(-item.cost),
+            [`inventory.${itemId}`]: increment(1)
+        });
+    } catch(e) { console.error(e); }
+  };
 
-            return (
-                <div className="min-h-screen pb-10">
-                    <Navbar user={user} onViewChange={setView} onOpenAdmin={() => setShowAdmin(true)} setViewUserId={setViewUserId} />
-                    
-                    {showAdmin && <AdminDashboard onClose={() => setShowAdmin(false)} />}
-                    
-                    {view === 'home' && <TopicList user={user} onViewChange={setView} setCurrentTopic={setCurrentTopic} setViewUserId={setViewUserId} selectedGuild={selectedGuild} setSelectedGuild={setSelectedGuild} />}
-                    
-                    {view === 'guilds' && <GuildList user={user} onViewChange={setView} setSelectedGuild={setSelectedGuild} />}
-                    
-                    {view === 'createGuild' && <CreateGuild user={user} onViewChange={setView} />}
-                    
-                    {view === 'create' && <CreateTopic user={user} onViewChange={setView} selectedGuild={selectedGuild} />}
-                    
-                    {view === 'thread' && currentTopic && <ThreadView user={user} topic={currentTopic} onViewChange={setView} setViewUserId={setViewUserId} />}
-                    
-                    {view === 'profile' && <ProfileView viewUserId={viewUserId} currentUser={user} onViewChange={setView} setCurrentTopic={setCurrentTopic} />}
+  return (
+    <div className="h-full bg-gray-50 p-4 pb-24 overflow-y-auto">
+      <div className="bg-gradient-to-r from-orange-100 to-yellow-50 p-4 rounded-xl mb-6 shadow-sm border border-orange-200">
+        <h2 className="text-lg font-bold text-orange-800 flex items-center">
+            <ShoppingBag className="mr-2" size={20}/> General Store
+        </h2>
+        <p className="text-sm text-orange-600 opacity-80">Buy seeds to beautify your garden.</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3">
+        {Object.values(ITEMS).map(item => (
+          <div key={item.id} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-center">
+            <div className="w-16 h-16 bg-gray-50 rounded-lg flex items-center justify-center text-4xl mr-4">
+              {item.icon}
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-gray-800">{item.name}</h3>
+              <p className="text-xs text-gray-500">{item.type === 'plant' ? `Harvests for ${item.sellPrice} Gems` : 'Decoration'}</p>
+            </div>
+            <button 
+              onClick={() => buyItem(item.id)}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center hover:bg-green-700 transition-colors"
+            >
+              {item.cost} <Coins size={12} className="ml-1" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// 6. SOCIAL VIEW
+const SocialView = ({ roomId }) => {
+    // This would ideally query all public rooms, but for now we just show a static placeholder
+    // or info about the current room
+    return (
+        <div className="h-full bg-gray-50 p-4 flex flex-col items-center justify-center text-center">
+            <div className="bg-white p-8 rounded-2xl shadow-sm max-w-sm">
+                <Heart size={48} className="text-red-400 mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-gray-800 mb-2">Community Gardens</h2>
+                <p className="text-gray-500 text-sm mb-6">
+                    In a full version, you would see a list of other users' gardens here, like them, and visit them to see their progress!
+                </p>
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 text-blue-800 text-sm">
+                    <strong>Current Room ID:</strong><br/>
+                    <span className="font-mono text-lg select-all">{roomId}</span>
                 </div>
-            );
-        }
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+            </div>
+        </div>
+    )
+}
 
+const root = createRoot(document.getElementById('root'));
+root.render(<App />);
 
