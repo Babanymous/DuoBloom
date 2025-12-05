@@ -19,7 +19,6 @@
                     animation: {
                         'sway': 'sway 3s ease-in-out infinite',
                         'float': 'float 3s ease-in-out infinite',
-                        'pop': 'pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     },
                     keyframes: {
                         sway: {
@@ -29,10 +28,6 @@
                         float: {
                             '0%, 100%': { transform: 'translateY(0)' },
                             '50%': { transform: 'translateY(-5px)' },
-                        },
-                        pop: {
-                            '0%': { transform: 'scale(0)' },
-                            '100%': { transform: 'scale(1)' },
                         }
                     }
                 }
@@ -48,7 +43,6 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
-        /* Gras Textur */
         .bg-grass-pattern {
             background-color: #a3cf90;
             background-image: 
@@ -65,11 +59,26 @@
         }
         .soil-inset { box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3); }
         .night-overlay { background-color: rgba(10, 15, 30, 0.5); mix-blend-mode: hard-light; pointer-events: none; }
-        
-        /* Macht Emojis hübscher */
-        .emoji-3d {
-            filter: drop-shadow(0px 2px 0px rgba(0,0,0,0.2));
+        .emoji-3d { filter: drop-shadow(0px 2px 0px rgba(0,0,0,0.2)); }
+
+        /* NEUE BODEN TEXTUREN */
+        .texture-wood {
+            background-color: #d97706;
+            background-image: repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 10px);
+            box-shadow: inset 0 0 2px rgba(0,0,0,0.3);
         }
+        .texture-stone {
+            background-color: #94a3b8;
+            background-image: 
+                linear-gradient(45deg, #64748b 25%, transparent 25%, transparent 75%, #64748b 75%, #64748b),
+                linear-gradient(45deg, #64748b 25%, transparent 25%, transparent 75%, #64748b 75%, #64748b);
+            background-size: 10px 10px;
+            background-position: 0 0, 5px 5px;
+            box-shadow: inset 0 0 2px rgba(0,0,0,0.3);
+        }
+        .dark .texture-stone { filter: brightness(0.7); }
+        .dark .texture-wood { filter: brightness(0.7); }
+
     </style>
 </head>
 <body class="bg-stone-100 text-gray-900 dark:bg-slate-950 dark:text-slate-100 select-none transition-colors duration-700">
@@ -79,7 +88,6 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect } from 'https://esm.sh/react@18.2.0';
         import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-        // Wir nutzen Lucide NUR für UI Icons (Menüs etc.)
         import { 
             Sprout, Droplet, CheckSquare, ShoppingBag, Users, Gem, Coins, 
             Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, 
@@ -117,7 +125,7 @@
             db = getFirestore(app);
         } catch(e) { console.error("Firebase Init Fehler:", e); }
 
-        // --- ITEMS MIT EMOJIS (Viel stabiler!) ---
+        // --- ITEMS (Jetzt mit Textur-Klassen für Böden) ---
         const ITEMS = {
             'seed_wheat': { id: 'seed_wheat', name: 'Weizen', type: 'plant', cost: 20, icon: '🌾', stages: 2, sellPrice: 10, sellCurrency: 'gems' },
             'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icon: '🥕', stages: 3, sellPrice: 15, sellCurrency: 'gems' },
@@ -128,9 +136,11 @@
             'seed_tulip': { id: 'seed_tulip', name: 'Tulpe', type: 'plant', cost: 200, icon: '🌷', stages: 3, sellPrice: 40, sellCurrency: 'gems' },
             'seed_corn': { id: 'seed_corn', name: 'Mais', type: 'plant', cost: 80, icon: '🌽', stages: 3, sellPrice: 25, sellCurrency: 'gems' },
             
-            // Deko
-            'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'floor', cost: 50, icon: '🪨', bg: '#94a3b8', stages: 1 },
-            'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'floor', cost: 50, icon: '🪵', bg: '#d97706', stages: 1 },
+            // Texture-based Items (kein Icon, dafür textureClass)
+            'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'floor', cost: 50, textureClass: 'texture-stone', stages: 1 },
+            'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'floor', cost: 50, textureClass: 'texture-wood', stages: 1 },
+            
+            // Emoji Deko
             'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 100, icon: '🚧', stages: 1 },
             'deco_bush': { id: 'deco_bush', name: 'Hecke', type: 'decor', cost: 150, icon: '🌳', stages: 1 },
             'deco_bench': { id: 'deco_bench', name: 'Bank', type: 'decor', cost: 300, icon: '🪑', stages: 1 },
@@ -421,6 +431,7 @@
                         <div className="relative p-3 md:p-4 rounded-2xl shadow-2xl transition-all duration-700 bg-[#8d6e63] border-4 border-[#5d4037]" 
                              style={{ width: '100%', maxWidth: '600px', aspectRatio:'1' }}>
                              
+                            {/* Wooden Texture Overlay */}
                             <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 11px)'}}></div>
                              
                             {isNight && <div className="absolute inset-0 pointer-events-none z-0 rounded night-overlay"></div>}
@@ -445,8 +456,9 @@
                                                 ${isMoving ? 'ring-4 ring-blue-400 z-20 scale-105 shadow-xl' : ''}
                                                 ${moveMode && !c && moveSrc !== null ? 'ring-2 ring-blue-300 bg-blue-500/20' : ''}
                                                 ${sel===i ? 'ring-4 ring-bloom-400 z-10' : ''}
+                                                ${c && item.textureClass ? item.textureClass : ''}
                                              `}
-                                             style={{backgroundColor: c ? (item.type === 'decor' ? 'transparent' : soilColor) : undefined}}
+                                             style={{backgroundColor: c && item.type !== 'decor' && !item.textureClass ? soilColor : undefined}}
                                         >
                                             
                                             {c && item.type === 'decor' && <div className={`absolute inset-0 rounded-lg -z-10 bg-grass-pattern shadow-inner opacity-80`}/>}
@@ -460,7 +472,6 @@
                                                         </div>
                                                     )}
 
-                                                    {/* EMOJI DISPLAY MIT SCHATTEN */}
                                                     <span className={`
                                                         emoji-3d select-none transition-transform
                                                         ${item.type==='plant' ? 'text-4xl md:text-5xl animate-sway origin-bottom' : 'text-3xl md:text-5xl'} 
@@ -476,6 +487,7 @@
                                                     {item.type === 'plant' && c.stage >= item.stages && !moveMode && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-lg border-2 border-yellow-300 shadow-[0_0_15px_rgba(253,224,71,0.5)]"/>}
                                                 </div>
                                             ) : (
+                                                /* Leerer Boden = Löcher im Gitter */
                                                 <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>
                                             )}
                                         </div>
@@ -498,7 +510,13 @@
                                 <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
                                     {Object.keys(data?.inventory||{}).map(k => (data.inventory[k]>0) && (
                                         <button key={k} onClick={()=>plant(k)} className="bg-stone-50 dark:bg-slate-800 p-4 rounded-2xl min-w-[100px] flex flex-col items-center border-2 border-transparent hover:border-bloom-500 transition-all relative group">
-                                            <span className="text-4xl mb-2 group-hover:scale-110 transition-transform emoji-3d">{ITEMS[k].icon}</span>
+                                            {/* Preview in Drawer */}
+                                            {ITEMS[k].textureClass ? (
+                                                <div className={`w-12 h-12 rounded-lg mb-2 shadow-inner ${ITEMS[k].textureClass}`}></div>
+                                            ) : (
+                                                <span className="text-4xl mb-2 group-hover:scale-110 transition-transform emoji-3d">{ITEMS[k].icon}</span>
+                                            )}
+                                            
                                             <span className="text-xs font-bold text-gray-600 dark:text-gray-300 line-clamp-1">{ITEMS[k].name}</span>
                                             <span className="absolute top-2 right-2 bg-bloom-100 dark:bg-green-900 text-bloom-700 dark:text-green-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">x{data.inventory[k]}</span>
                                         </button>
@@ -510,7 +528,7 @@
                             {room.grid[sel] && (
                                 <div className="flex justify-center">
                                     <button onClick={remove} className="w-full flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-6 py-4 rounded-2xl font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
-                                        <Trash2 size={20}/> {ITEMS[room.grid[sel].type].name} entfernen
+                                        <Trash2 size={20}/> {ITEMS[room.grid[sel].type]?.name || 'Objekt'} entfernen
                                     </button>
                                 </div>
                             )}
@@ -572,8 +590,9 @@
                     {Object.values(ITEMS).map(i=>(
                         <div key={i.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex items-center gap-4 hover:shadow-md transition-shadow">
                             <div className="w-16 h-16 bg-stone-100 dark:bg-slate-700 rounded-xl flex items-center justify-center text-4xl shadow-inner relative overflow-hidden emoji-3d">
-                                {i.icon}
-                                {i.type==='floor' && <div className="w-full h-full absolute inset-0" style={{backgroundColor: i.bg, opacity: 0.5}}></div>}
+                                {i.textureClass ? (
+                                    <div className={`w-full h-full ${i.textureClass}`}></div>
+                                ) : i.icon}
                             </div>
                             <div className="flex-1"><div className="font-bold text-gray-800 dark:text-white">{i.name}</div><div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{i.type === 'plant' ? 'Pflanze' : (i.type==='floor'?'Boden':'Deko')}</div><div className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{i.cost} 🪙</div></div>
                             <button onClick={() => coins >= i.cost && updateDoc(doc(db,'users',uid),{coins:increment(-i.cost), [`inventory.${i.id}`]:increment(1)})} className="bg-bloom-600 hover:bg-bloom-500 text-white px-4 py-2 rounded-lg text-sm font-bold active:scale-95 transition-all">Kaufen</button>
