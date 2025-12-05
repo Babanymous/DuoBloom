@@ -61,22 +61,19 @@
         .night-overlay { background-color: rgba(10, 15, 30, 0.5); mix-blend-mode: hard-light; pointer-events: none; }
         .emoji-3d { filter: drop-shadow(0px 2px 0px rgba(0,0,0,0.2)); }
 
-        /* NEUE BODEN TEXTUREN */
         .texture-wood {
             background-color: #d97706;
             background-image: repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 10px);
             box-shadow: inset 0 0 2px rgba(0,0,0,0.3);
         }
-        
-        /* FIX: Kieselstein-Look statt Schachbrett */
         .texture-stone {
-            background-color: #94a3b8; /* Slate 400 Basis */
+            background-color: #94a3b8;
             background-image: 
                 radial-gradient(circle at 20% 20%, #64748b 15%, transparent 16%),
                 radial-gradient(circle at 80% 80%, #64748b 15%, transparent 16%),
                 radial-gradient(circle at 50% 50%, #475569 10%, transparent 11%),
                 radial-gradient(circle at 80% 20%, #475569 10%, transparent 11%);
-            background-size: 20px 20px; /* Kleinere Wiederholung */
+            background-size: 20px 20px;
             box-shadow: inset 0 0 3px rgba(0,0,0,0.3);
         }
         
@@ -95,7 +92,8 @@
         import { 
             Sprout, Droplet, CheckSquare, ShoppingBag, Users, Gem, Coins, 
             Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, 
-            LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History, Moon, Sun, Flower, Star
+            LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History, Moon, Sun, Flower, Star,
+            Wind, PenTool, Cloud, TreeDeciduous, Grid, Armchair, Lightbulb, Square, Circle, Package
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -108,7 +106,7 @@
             runTransaction, query, orderBy, limit, deleteDoc, Timestamp 
         } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-        // --- KONFIGURATION (HIER WIEDER DEINE DATEN REIN) ---
+        // --- KONFIGURATION ---
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -129,6 +127,7 @@
             db = getFirestore(app);
         } catch(e) { console.error("Firebase Init Fehler:", e); }
 
+        // --- ITEMS ---
         const ITEMS = {
             'seed_wheat': { id: 'seed_wheat', name: 'Weizen', type: 'plant', cost: 20, icon: '🌾', stages: 2, sellPrice: 10, sellCurrency: 'gems' },
             'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icon: '🥕', stages: 3, sellPrice: 15, sellCurrency: 'gems' },
@@ -139,9 +138,11 @@
             'seed_tulip': { id: 'seed_tulip', name: 'Tulpe', type: 'plant', cost: 200, icon: '🌷', stages: 3, sellPrice: 40, sellCurrency: 'gems' },
             'seed_corn': { id: 'seed_corn', name: 'Mais', type: 'plant', cost: 80, icon: '🌽', stages: 3, sellPrice: 25, sellCurrency: 'gems' },
             
+            // Texture-based Floors
             'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'floor', cost: 50, textureClass: 'texture-stone', stages: 1 },
             'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'floor', cost: 50, textureClass: 'texture-wood', stages: 1 },
             
+            // Deko
             'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 100, icon: '🚧', stages: 1 },
             'deco_bush': { id: 'deco_bush', name: 'Hecke', type: 'decor', cost: 150, icon: '🌳', stages: 1 },
             'deco_bench': { id: 'deco_bench', name: 'Bank', type: 'decor', cost: 300, icon: '🪑', stages: 1 },
@@ -218,7 +219,10 @@
             const createRoom = async (name) => {
                 if(!name) return; setLoading(true);
                 const id = Math.random().toString(36).substr(2,6).toUpperCase();
-                const grid = {}; for(let i=0; i<16; i++) grid[i] = null;
+                // Neue Struktur: jedes Feld hat floor und item
+                const grid = {}; 
+                for(let i=0; i<16; i++) grid[i] = { floor: null, item: null };
+                
                 try {
                     await setDoc(doc(db, 'rooms', `r_${id}`), { id, name, grid, expansion: 4, owner: user.uid, members: [user.uid] });
                     const tasksRef = collection(db, 'rooms', `r_${id}`, 'tasks');
@@ -284,15 +288,9 @@
                             <SidebarBtn i={CheckSquare} l="Aufgaben" a={tab==='tasks'} set={()=>setTab('tasks')}/>
                             <SidebarBtn i={ShoppingBag} l="Shop" a={tab==='shop'} set={()=>setTab('shop')}/>
                         </nav>
-                        <div className="border-t dark:border-slate-800 pt-4">
-                            <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Code kopiert!");}} className="w-full text-blue-500 text-sm p-2 rounded hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2 mb-2 font-medium">
-                                <UserPlus size={16}/> Code: {room.id}
-                            </button>
-                            <button onClick={leaveRoom} className="w-full text-red-500 text-sm p-2 rounded hover:bg-red-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium"><LogOut size={16}/> Verlassen</button>
-                        </div>
+                        <button onClick={leaveRoom} className="text-red-500 text-sm hover:bg-red-50 dark:hover:bg-slate-800 p-3 rounded-lg flex gap-3 font-medium transition-colors"><LogOut size={18}/> Verlassen</button>
                     </div>
 
-                    {/* MOBILE HEADER - FIX: Invite Code ist jetzt sichtbar */}
                     <div className="md:hidden bg-white/80 backdrop-blur dark:bg-slate-900/80 p-3 shadow-sm z-10 flex justify-between items-center border-b dark:border-slate-800 sticky top-0">
                         <div className="flex flex-col overflow-hidden max-w-[40%]">
                             <span className="font-bold truncate text-gray-800 dark:text-white">{room.name}</span>
@@ -319,7 +317,7 @@
                             <div className="flex gap-4 items-center">
                                 <div className="bg-white dark:bg-slate-800 px-4 py-1.5 rounded-full border border-stone-200 dark:border-slate-700 font-bold text-yellow-600 dark:text-yellow-400 flex items-center shadow-sm"><Coins size={16} className="mr-2"/>{userData?.coins||0}</div>
                                 <div className="bg-white dark:bg-slate-800 px-4 py-1.5 rounded-full border border-stone-200 dark:border-slate-700 font-bold text-purple-600 dark:text-purple-400 flex items-center shadow-sm"><Gem size={16} className="mr-2"/>{userData?.gems||0}</div>
-                                <div className="bg-bloom-50 dark:bg-slate-800 px-3 py-1.5 rounded-full text-sm text-bloom-600 dark:text-blue-400 font-bold flex gap-1 items-center border border-bloom-100 dark:border-slate-700">Code: {room.id}</div>
+                                <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="text-sm text-bloom-600 dark:text-blue-400 font-bold hover:underline flex gap-1 bg-bloom-50 dark:bg-slate-800 px-3 py-1.5 rounded-full"><UserPlus size={16}/> {room.id}</button>
                             </div>
                         </div>
 
@@ -370,45 +368,140 @@
             const size = room.expansion || 4;
             useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
-            const plant = async (id) => {
-                if((data.inventory?.[id]||0) <= 0) return;
-                await runTransaction(db, async(t)=>{
-                    t.update(doc(db,'users',user.uid), {[`inventory.${id}`]: increment(-1)});
-                    t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}`]: {type:id, stage:0, lastWatered: 0, user: user.displayName}});
-                });
+            const placeItem = async (itemId) => {
+                if((data.inventory?.[itemId]||0) <= 0) return;
+                const itemDef = ITEMS[itemId];
+                
+                // MIGRATION HELPER: Check for old data structure
+                let cell = room.grid[sel];
+                if (!cell || typeof cell !== 'object') cell = { floor: null, item: null };
+                // Fix if cell has old 'type' property
+                if(cell.type) { 
+                    if(ITEMS[cell.type]?.type === 'floor') cell = { floor: cell.type, item: null };
+                    else cell = { floor: null, item: { ...cell } };
+                }
+
+                // LOGIK PRÜFUNG
+                if (itemDef.type === 'floor') {
+                    // Boden immer erlaubt -> alter Boden zurück ins Inventar? 
+                    // Simpel: Überschreiben und alten Boden 'verlieren' oder gutschreiben. 
+                    // Wir schreiben gut, falls einer da war.
+                    await runTransaction(db, async(t)=>{
+                        if (cell.floor) t.update(doc(db,'users',user.uid), {[`inventory.${cell.floor}`]: increment(1)});
+                        t.update(doc(db,'users',user.uid), {[`inventory.${itemId}`]: increment(-1)});
+                        t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}.floor`]: itemId});
+                    });
+                } 
+                else if (itemDef.type === 'plant') {
+                    // Pflanzen NUR auf Erde (kein Floor)
+                    if (cell.floor) { alert("Pflanzen brauchen Erde (kein Bodenbelag)!"); return; }
+                    if (cell.item) { alert("Hier steht schon was!"); return; }
+                    
+                    await runTransaction(db, async(t)=>{
+                        t.update(doc(db,'users',user.uid), {[`inventory.${itemId}`]: increment(-1)});
+                        t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}.item`]: {type:itemId, stage:0, lastWatered: 0, user: user.displayName}});
+                    });
+                }
+                else if (itemDef.type === 'decor') {
+                    // Deko NUR auf Floor (außer Zwerg)
+                    if (itemDef.id !== 'deco_gnome' && !cell.floor) { alert("Deko braucht einen Boden (Holz/Stein)!"); return; }
+                    if (cell.item) { alert("Platz belegt!"); return; }
+
+                    await runTransaction(db, async(t)=>{
+                        t.update(doc(db,'users',user.uid), {[`inventory.${itemId}`]: increment(-1)});
+                        t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}.item`]: {type:itemId, stage:1, user: user.displayName}}); // Deko ist immer stage 1
+                    });
+                }
                 setSel(null);
             };
 
-            const action = async (idx, cell) => {
-                const item = ITEMS[cell.type];
+            const action = async (idx) => {
+                let cell = room.grid[idx] || { floor: null, item: null };
+                // Migration safeguard
+                if(cell.type) {
+                     if(ITEMS[cell.type]?.type === 'floor') cell = { floor: cell.type, item: null };
+                     else cell = { floor: null, item: { ...cell } };
+                }
+
                 if (moveMode) {
-                    if (moveSrc === null) setMoveSrc(idx); else if (moveSrc === idx) setMoveSrc(null);
+                    if (moveSrc === null) {
+                        // Pick up check
+                        if (!cell.item) return; // Can only move items, not floors directly via this? Or allow? Let's assume items.
+                        setMoveSrc(idx);
+                    } else if (moveSrc === idx) {
+                        setMoveSrc(null);
+                    } else {
+                        // Move logic requires same rules? For now simple swap/move
+                        // Implementation simplified for prototype
+                        alert("Verschieben noch in Arbeit für neue Logik");
+                        setMoveSrc(null);
+                    }
                     return;
                 }
-                if (item.type === 'decor' || item.type === 'floor') return; 
-                if(cell.stage < item.stages) {
-                    if(now < cell.lastWatered + CYCLE_MS) { alert("Pflanze braucht Ruhe!"); return; }
-                    await updateDoc(doc(db,'rooms',`r_${room.id}`), { [`grid.${idx}.lastWatered`]: Date.now(), [`grid.${idx}.stage`]: increment(1) });
+
+                if (!cell.item) {
+                    setSel(idx);
+                    return;
+                }
+
+                const itemDef = ITEMS[cell.item.type];
+                
+                // HARVEST / WATER LOGIC
+                if (itemDef.type === 'plant') {
+                    if(cell.item.stage < itemDef.stages) {
+                        if(now < cell.item.lastWatered + CYCLE_MS) { alert("Pflanze braucht Ruhe!"); return; }
+                        await updateDoc(doc(db,'rooms',`r_${room.id}`), { [`grid.${idx}.item.lastWatered`]: Date.now(), [`grid.${idx}.item.stage`]: increment(1) });
+                    } else {
+                        await runTransaction(db, async(t)=>{
+                            t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${idx}.item`]: null});
+                            t.update(doc(db,'users',user.uid), {[itemDef.sellCurrency]: increment(itemDef.sellPrice)});
+                        });
+                    }
                 } else {
-                    await runTransaction(db, async(t)=>{
-                        t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${idx}`]: null});
-                        t.update(doc(db,'users',user.uid), {[item.sellCurrency]: increment(item.sellPrice)});
-                    });
+                    // Clicking on Decor -> Open Menu to Remove/Store
+                    setSel(idx);
                 }
             };
 
-            const handleEmptyClick = async (idx) => {
-                if (moveMode && moveSrc !== null) {
-                    const srcData = room.grid[moveSrc];
-                    await updateDoc(doc(db, 'rooms', `r_${room.id}`), { [`grid.${idx}`]: srcData, [`grid.${moveSrc}`]: null });
-                    setMoveSrc(null);
-                } else { if(!moveMode) setSel(idx); }
+            // Einlagern (Store) Logic
+            const storeItem = async () => {
+                if (sel === null) return;
+                const cell = room.grid[sel];
+                if (!cell || !cell.item) return;
+                const type = cell.item.type;
+                
+                if (ITEMS[type].type === 'plant') {
+                    // Plants are destroyed
+                    if (confirm("Pflanze entfernen? (Keine Rückerstattung)")) {
+                        await updateDoc(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}.item`]: null});
+                        setSel(null);
+                    }
+                } else {
+                    // Decor is stored
+                    await runTransaction(db, async(t)=>{
+                        t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}.item`]: null});
+                        t.update(doc(db,'users',user.uid), {[`inventory.${type}`]: increment(1)});
+                    });
+                    setSel(null);
+                }
             };
 
-            const remove = async () => {
-                if (sel === null || !room.grid[sel]) return;
-                if (confirm(`Entfernen?`)) { await updateDoc(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}`]: null}); setSel(null); }
-            }
+            const removeFloor = async () => {
+                if (sel === null) return;
+                const cell = room.grid[sel];
+                if (!cell || !cell.floor) return;
+                
+                if(cell.item && ITEMS[cell.item.type].type === 'decor' && ITEMS[cell.item.type].id !== 'deco_gnome') {
+                    alert("Erst Deko entfernen!");
+                    return;
+                }
+
+                await runTransaction(db, async(t)=>{
+                    t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}.floor`]: null});
+                    t.update(doc(db,'users',user.uid), {[`inventory.${cell.floor}`]: increment(1)});
+                });
+                setSel(null);
+            };
 
             const expand = async () => {
                  if(data.gems < 50) return alert("Brauchst 50 Gems!");
@@ -416,7 +509,7 @@
                     t.update(doc(db, 'users', user.uid), { gems: increment(-50) });
                     const newLevel = room.expansion + 1;
                     const updates = { expansion: newLevel };
-                    for(let i = room.expansion**2; i < newLevel**2; i++) updates[`grid.${i}`] = null;
+                    for(let i = room.expansion**2; i < newLevel**2; i++) updates[`grid.${i}`] = {floor: null, item: null};
                     t.update(doc(db, 'rooms', `r_${room.id}`), updates);
                 });
             };
@@ -438,7 +531,7 @@
                                 {isNight ? 'Nacht 🌙' : 'Tag ☀️'}
                              </div>
                         </div>
-                        <button onClick={() => { setMoveMode(!moveMode); setMoveSrc(null); setSel(null); }} className={`flex items-center gap-1 text-xs px-4 py-2 rounded-full font-bold shadow-md transition-all ${moveMode ? 'bg-blue-600 text-white scale-105 ring-2 ring-white' : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200'}`}><Move size={14}/> {moveMode ? 'Verschieben...' : 'Umbauen'}</button>
+                        {/* Move Mode Disabled for now to keep logic simple */}
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center justify-center">
@@ -453,56 +546,66 @@
 
                             <div className="grid gap-1 w-full h-full relative z-10" style={{gridTemplateColumns:`repeat(${size}, 1fr)`}}>
                                 {Array.from({length:size*size}).map((_,i)=>{
-                                    const c = room.grid?.[i];
-                                    const item = c ? ITEMS[c.type] : null;
-                                    const isMoving = moveSrc === i;
+                                    // SAFELY ACCESS CELL DATA
+                                    let c = room.grid?.[i] || { floor: null, item: null };
+                                    // Migration on the fly for rendering
+                                    if(c.type) {
+                                        if(ITEMS[c.type]?.type === 'floor') c = { floor: c.type, item: null };
+                                        else c = { floor: null, item: { ...c } };
+                                    }
+
+                                    const item = c.item ? ITEMS[c.item.type] : null;
+                                    const floorItem = c.floor ? ITEMS[c.floor] : null;
                                     
-                                    const isFloor = c && item.type === 'floor';
-                                    const isDry = c && item.type === 'plant' && now > c.lastWatered + CYCLE_MS;
-                                    const soilColor = isFloor ? item.bg : (isDry ? '#d6b48e' : '#5d4037');
+                                    const isDry = item && item.type === 'plant' && now > c.item.lastWatered + CYCLE_MS;
                                     
+                                    // Background logic: Floor Texture OR Soil Color
+                                    let bgClass = '';
+                                    let bgColor = isDry ? '#d6b48e' : '#5d4037'; // Default soil
+                                    if (floorItem) {
+                                        bgClass = floorItem.textureClass;
+                                        bgColor = undefined;
+                                    } else if (isNight) {
+                                        bgColor = '#3e2723';
+                                    }
+
                                     return (
-                                        <div key={i} onClick={()=> c ? action(i,c) : handleEmptyClick(i)} 
+                                        <div key={i} onClick={()=> action(i)} 
                                              className={`
                                                 rounded-lg relative flex items-center justify-center cursor-pointer transition-all duration-300
-                                                ${!c ? (isNight ? 'bg-[#3e2723]' : 'bg-[#5d4037]') : ''} 
-                                                ${!c || (c && item.type === 'plant') ? 'soil-inset' : ''}
-                                                ${!c && !isNight ? 'hover:brightness-110' : ''}
-                                                ${isMoving ? 'ring-4 ring-blue-400 z-20 scale-105 shadow-xl' : ''}
-                                                ${moveMode && !c && moveSrc !== null ? 'ring-2 ring-blue-300 bg-blue-500/20' : ''}
+                                                ${!c.floor ? 'soil-inset' : ''}
+                                                ${!c.item && !isNight ? 'hover:brightness-110' : ''}
+                                                ${bgClass}
                                                 ${sel===i ? 'ring-4 ring-bloom-400 z-10' : ''}
-                                                ${c && item.textureClass ? item.textureClass : ''}
                                              `}
-                                             style={{backgroundColor: c && item.type !== 'decor' && !item.textureClass ? soilColor : undefined}}
+                                             style={{backgroundColor: bgColor}}
                                         >
-                                            
-                                            {c && item.type === 'decor' && <div className={`absolute inset-0 rounded-lg -z-10 bg-grass-pattern shadow-inner opacity-80`}/>}
-
-                                            {c ? (
+                                            {c.item ? (
                                                 <div className="w-full h-full flex flex-col items-center justify-center relative group p-1">
                                                     
-                                                    {item.type === 'plant' && c.stage < item.stages && !moveMode && (
-                                                        <div className={`absolute -top-3 scale-75 md:scale-100 transition-all font-mono font-bold px-2 py-0.5 rounded-full shadow-lg z-20 border border-white/20 ${now > c.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/40 text-white backdrop-blur-sm'}`}>
-                                                            {now > c.lastWatered + CYCLE_MS ? <Droplet size={12}/> : getTimerString(c.lastWatered)}
+                                                    {item.type === 'plant' && c.item.stage < item.stages && (
+                                                        <div className={`absolute -top-3 scale-75 md:scale-100 transition-all font-mono font-bold px-2 py-0.5 rounded-full shadow-lg z-20 border border-white/20 ${now > c.item.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/40 text-white backdrop-blur-sm'}`}>
+                                                            {now > c.item.lastWatered + CYCLE_MS ? <Droplet size={12}/> : getTimerString(c.item.lastWatered)}
                                                         </div>
                                                     )}
 
                                                     <span className={`
                                                         emoji-3d select-none transition-transform
                                                         ${item.type==='plant' ? 'text-4xl md:text-5xl animate-sway origin-bottom' : 'text-3xl md:text-5xl'} 
-                                                        ${!moveMode && 'group-hover:scale-110'}
+                                                        ${item.type === 'plant' && c.item.stage >= item.stages ? 'animate-pulse' : ''}
                                                     `}>
                                                         {item.icon}
                                                     </span>
                                                     
                                                     {item.type === 'plant' && <div className="absolute bottom-2 w-8 h-2 bg-black/20 rounded-full blur-sm"></div>}
 
-                                                    {item.type === 'plant' && item.stages > 1 && !moveMode && (<div className="absolute bottom-1 w-8 h-1.5 bg-black/30 rounded-full overflow-hidden border border-white/10"><div className="h-full bg-bloom-500" style={{width: `${(c.stage/item.stages)*100}%`}}></div></div>)}
+                                                    {item.type === 'plant' && item.stages > 1 && (<div className="absolute bottom-1 w-8 h-1.5 bg-black/30 rounded-full overflow-hidden border border-white/10"><div className="h-full bg-bloom-500" style={{width: `${(c.item.stage/item.stages)*100}%`}}></div></div>)}
                                                     
-                                                    {item.type === 'plant' && c.stage >= item.stages && !moveMode && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-lg border-2 border-yellow-300 shadow-[0_0_15px_rgba(253,224,71,0.5)]"/>}
+                                                    {item.type === 'plant' && c.item.stage >= item.stages && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-lg border-2 border-yellow-300 shadow-[0_0_15px_rgba(253,224,71,0.5)]"/>}
                                                 </div>
                                             ) : (
-                                                <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>
+                                                /* Empty Soil Texture if no floor */
+                                                !c.floor && <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>
                                             )}
                                         </div>
                                     )
@@ -515,37 +618,49 @@
                     {/* ITEM DRAWER */}
                     {sel !== null && (
                         <div className="absolute bottom-0 w-full bg-white/95 backdrop-blur dark:bg-slate-900/95 p-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)] animate-slide-up z-30 md:max-w-md md:left-1/2 md:-translate-x-1/2 md:mb-6 md:rounded-3xl border border-gray-100 dark:border-slate-700">
+                            
+                            {/* Header */}
                             <div className="flex justify-between mb-4 font-bold text-gray-700 dark:text-white items-center">
-                                <span className="text-lg">{room.grid[sel] ? 'Objekt verwalten' : 'Pflanzen & Bauen'}</span>
+                                <span className="text-lg">
+                                    {room.grid[sel]?.item || room.grid[sel]?.floor ? 'Feld bearbeiten' : 'Bauen & Pflanzen'}
+                                </span>
                                 <button onClick={()=>setSel(null)} className="bg-gray-100 dark:bg-slate-800 p-2 rounded-full hover:rotate-90 transition-transform"><X size={20}/></button>
                             </div>
                             
-                            {!room.grid[sel] && (
+                            {/* Inventory List (Only if empty slot or floor only) */}
+                            {(!room.grid[sel]?.item) && (
                                 <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
-                                    {Object.keys(data?.inventory||{}).map(k => (data.inventory[k]>0) && (
-                                        <button key={k} onClick={()=>plant(k)} className="bg-stone-50 dark:bg-slate-800 p-4 rounded-2xl min-w-[100px] flex flex-col items-center border-2 border-transparent hover:border-bloom-500 transition-all relative group">
-                                            {/* Preview in Drawer */}
-                                            {ITEMS[k].textureClass ? (
-                                                <div className={`w-12 h-12 rounded-lg mb-2 shadow-inner ${ITEMS[k].textureClass}`}></div>
-                                            ) : (
-                                                <span className="text-4xl mb-2 group-hover:scale-110 transition-transform emoji-3d">{ITEMS[k].icon}</span>
-                                            )}
-                                            
-                                            <span className="text-xs font-bold text-gray-600 dark:text-gray-300 line-clamp-1">{ITEMS[k].name}</span>
-                                            <span className="absolute top-2 right-2 bg-bloom-100 dark:bg-green-900 text-bloom-700 dark:text-green-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">x{data.inventory[k]}</span>
-                                        </button>
-                                    ))}
-                                    {Object.values(data?.inventory||{}).every(v=>v<=0) && <div className="text-sm text-gray-400 w-full text-center py-4">Dein Inventar ist leer.<br/>Besuche den Shop!</div>}
+                                    {Object.keys(data?.inventory||{}).map(k => {
+                                        const item = ITEMS[k];
+                                        if(data.inventory[k]>0) return (
+                                            <button key={k} onClick={()=>placeItem(k)} className="bg-stone-50 dark:bg-slate-800 p-4 rounded-2xl min-w-[100px] flex flex-col items-center border-2 border-transparent hover:border-bloom-500 transition-all relative group">
+                                                <div className="text-4xl mb-2 group-hover:scale-110 transition-transform emoji-3d">
+                                                    {item.textureClass ? <div className={`w-8 h-8 rounded ${item.textureClass}`}></div> : item.icon}
+                                                </div>
+                                                <span className="text-xs font-bold text-gray-600 dark:text-gray-300 line-clamp-1">{item.name}</span>
+                                                <span className="absolute top-2 right-2 bg-bloom-100 dark:bg-green-900 text-bloom-700 dark:text-green-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">x{data.inventory[k]}</span>
+                                            </button>
+                                        )
+                                    })}
                                 </div>
                             )}
 
-                            {room.grid[sel] && (
-                                <div className="flex justify-center">
-                                    <button onClick={remove} className="w-full flex items-center justify-center gap-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 px-6 py-4 rounded-2xl font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
-                                        <Trash2 size={20}/> {ITEMS[room.grid[sel].type]?.name || 'Objekt'} entfernen
+                            {/* Actions for Existing Items/Floors */}
+                            <div className="flex gap-2 justify-center">
+                                {/* Item Removal */}
+                                {room.grid[sel]?.item && (
+                                    <button onClick={storeItem} className="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-600 px-4 py-4 rounded-2xl font-bold hover:bg-blue-100">
+                                        {ITEMS[room.grid[sel].item.type].type === 'plant' ? <Trash2 size={20}/> : <Package size={20}/>}
+                                        {ITEMS[room.grid[sel].item.type].type === 'plant' ? 'Entfernen' : 'Einlagern'}
                                     </button>
-                                </div>
-                            )}
+                                )}
+                                {/* Floor Removal */}
+                                {room.grid[sel]?.floor && (
+                                    <button onClick={removeFloor} className="flex-1 flex items-center justify-center gap-2 bg-orange-50 text-orange-700 px-4 py-4 rounded-2xl font-bold hover:bg-orange-100">
+                                        <Package size={20}/> Boden aufheben
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
