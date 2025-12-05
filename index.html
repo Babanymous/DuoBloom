@@ -25,7 +25,7 @@
         import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
         import { 
             Sprout, Droplet, CheckSquare, ShoppingBag, Users, Gem, Coins, 
-            Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, LogOut, Copy, UserPlus, Timer
+            Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, LogOut, Copy, UserPlus, Timer, Trash2
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -35,7 +35,7 @@
         import { 
             getFirestore, collection, doc, setDoc, addDoc, getDoc, 
             onSnapshot, updateDoc, increment, arrayUnion, serverTimestamp, 
-            runTransaction, query, orderBy, limit 
+            runTransaction, query, orderBy, limit, deleteDoc 
         } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
         // --- KONFIGURATION (HIER DATEN EINFÜGEN) ---
@@ -50,7 +50,6 @@
           };
 
         // --- ZEIT EINSTELLUNG ---
-        // 6.0 Stunden pro Zyklus. Zum Testen auf 0.01 stellen.
         const HOURS_PER_CYCLE = 6.0; 
         const CYCLE_MS = HOURS_PER_CYCLE * 60 * 60 * 1000;
 
@@ -112,44 +111,75 @@
                 const grid = {}; for(let i=0; i<16; i++) grid[i] = null;
                 
                 try {
-                    // 1. Raum erstellen
-                    await setDoc(doc(db, 'rooms', `r_${id}`), { id, name, grid, expansion: 4, owner: user.uid, members: [user.uid] });
+                    // 1. Raum erstellen (Mit members Array!)
+                    await setDoc(doc(db, 'rooms', `r_${id}`), { 
+                        id, name, grid, expansion: 4, 
+                        owner: user.uid, 
+                        members: [user.uid] // WICHTIG für die Lösch-Logik
+                    });
                     
-                    // 2. STARTER AUFGABEN HINZUFÜGEN (NEU!)
+                    // 2. Starter Aufgaben
                     const tasksRef = collection(db, 'rooms', `r_${id}`, 'tasks');
                     const starters = [
                         { txt: "👋 Sag deinem Partner Hallo", rew: 50 },
                         { txt: "💧 Trinkt beide ein Glas Wasser", rew: 20 },
                         { txt: "📝 Plant euer erstes Beet", rew: 50 }
                     ];
-                    // Wir erstellen die Aufgaben parallel
-                    await Promise.all(starters.map(t => 
-                        addDoc(tasksRef, { 
-                            txt: t.txt, 
-                            done: false, 
-                            rew: t.rew, 
-                            at: serverTimestamp() 
-                        })
-                    ));
+                    await Promise.all(starters.map(t => addDoc(tasksRef, { txt: t.txt, done: false, rew: t.rew, at: serverTimestamp() })));
 
                     // 3. User zuweisen
                     await updateDoc(doc(db, 'users', user.uid), { currentGarden: id });
 
                 } catch(e) { console.error(e); alert("Fehler beim Erstellen"); }
-                
                 setLoading(false);
             };
 
             const joinRoom = async (id) => {
                 const cleanId = id.trim().toUpperCase();
-                const snap = await getDoc(doc(db, 'rooms', `r_${cleanId}`));
+                const rRef = doc(db, 'rooms', `r_${cleanId}`);
+                const snap = await getDoc(rRef);
                 if(snap.exists()) {
-                    await updateDoc(doc(db, 'rooms', `r_${cleanId}`), { members: arrayUnion(user.uid) });
+                    // WICHTIG: User zur Member-Liste hinzufügen
+                    await updateDoc(rRef, { members: arrayUnion(user.uid) });
                     await updateDoc(doc(db, 'users', user.uid), { currentGarden: cleanId });
                 } else alert("Nicht gefunden!");
             };
 
-            const leaveRoom = async () => confirm("Verlassen?") && updateDoc(doc(db, 'users', user.uid), { currentGarden: null });
+            // --- NEUE LEAVE LOGIK (AUTO DELETE) ---
+            const leaveRoom = async () => {
+                if(!confirm("Willst du den Garten verlassen? ACHTUNG: Wenn du der letzte Gärtner bist, wird der Garten gelöscht!")) return;
+                
+                const roomRef = doc(db, 'rooms', `r_${room.id}`);
+                const userRef = doc(db, 'users', user.uid);
+
+                try {
+                    await runTransaction(db, async (transaction) => {
+                        const roomDoc = await transaction.get(roomRef);
+                        if (!roomDoc.exists()) {
+                             transaction.update(userRef, { currentGarden: null });
+                             return;
+                        }
+
+                        const roomData = roomDoc.data();
+                        // Liste der Mitglieder OHNE mich
+                        const remainingMembers = (roomData.members || []).filter(uid => uid !== user.uid);
+
+                        if (remainingMembers.length === 0) {
+                            // Niemand mehr da? Löschen!
+                            transaction.delete(roomRef);
+                        } else {
+                            // Noch wer da? Nur mich austragen.
+                            transaction.update(roomRef, { members: remainingMembers });
+                        }
+
+                        // Meine Bindung lösen
+                        transaction.update(userRef, { currentGarden: null });
+                    });
+                } catch(e) {
+                    console.error(e);
+                    alert("Fehler beim Verlassen: " + e.message);
+                }
+            };
 
             if(!user) return (
                 <div className="h-screen flex flex-col items-center justify-center bg-green-50 p-4 text-center">
@@ -289,7 +319,7 @@
             return (
                 <div className="h-full flex flex-col">
                     <div className="p-3 bg-yellow-50/80 backdrop-blur border-b sticky top-0 z-10 flex justify-between items-center md:hidden">
-                        <span className="text-xs font-bold text-yellow-800">Echtzeit-Garten</span>
+                        <span className="text-xs font-bold text-yellow-800 uppercase">Echtzeit-Garten</span>
                         <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="flex items-center gap-1 text-xs bg-white border px-2 py-1 rounded text-blue-600"><UserPlus size={12}/> Einladen</button>
                     </div>
                     
