@@ -14,6 +14,8 @@
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-900 select-none">
@@ -25,7 +27,8 @@
         import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
         import { 
             Sprout, Droplet, CheckSquare, ShoppingBag, Users, Gem, Coins, 
-            Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, LogOut, Copy, UserPlus, Timer, Trash2, Move, MousePointer2
+            Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, 
+            LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -35,10 +38,10 @@
         import { 
             getFirestore, collection, doc, setDoc, addDoc, getDoc, 
             onSnapshot, updateDoc, increment, arrayUnion, serverTimestamp, 
-            runTransaction, query, orderBy, limit, deleteDoc 
+            runTransaction, query, orderBy, limit, deleteDoc, Timestamp 
         } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-        // --- KONFIGURATION (HIER DATEN EINFÜGEN) ---
+        // --- CONFIG ---
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -49,7 +52,6 @@
             measurementId: "G-Z0W0LK6D88"
           };
 
-        // --- ZEIT EINSTELLUNG ---
         const HOURS_PER_CYCLE = 6.0; 
         const CYCLE_MS = HOURS_PER_CYCLE * 60 * 60 * 1000;
 
@@ -62,9 +64,7 @@
             }
         } catch(e) { console.error(e); }
 
-        // --- ITEMS & DEKO ---
         const ITEMS = {
-            // PFLANZEN
             'seed_wheat': { id: 'seed_wheat', name: 'Weizen', type: 'plant', cost: 20, icon: '🌾', stages: 2, sellPrice: 10, sellCurrency: 'gems' },
             'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icon: '🥕', stages: 3, sellPrice: 15, sellCurrency: 'gems' },
             'seed_flower': { id: 'seed_flower', name: 'Rose', type: 'plant', cost: 150, icon: '🌹', stages: 4, sellPrice: 30, sellCurrency: 'gems' },
@@ -72,15 +72,12 @@
             'seed_pumpkin': { id: 'seed_pumpkin', name: 'Kürbis', type: 'plant', cost: 600, icon: '🎃', stages: 5, sellPrice: 150, sellCurrency: 'gems' },
             'seed_tree': { id: 'seed_tree', name: 'Baum', type: 'plant', cost: 1000, icon: '🌳', stages: 6, sellPrice: 250, sellCurrency: 'gems' },
             
-            // DEKO (type: 'decor' braucht kein Wasser)
             'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'decor', cost: 50, icon: '🪨', stages: 1 },
             'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'decor', cost: 50, icon: '🪵', stages: 1 },
             'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 100, icon: '🚧', stages: 1 },
             'deco_bush': { id: 'deco_bush', name: 'Hecke', type: 'decor', cost: 150, icon: '🌳', stages: 1 },
-            'deco_flowerpot': { id: 'deco_flowerpot', name: 'Blumentopf', type: 'decor', cost: 200, icon: '🪴', stages: 1 },
             'deco_bench': { id: 'deco_bench', name: 'Bank', type: 'decor', cost: 300, icon: '🪑', stages: 1 },
             'deco_lamp': { id: 'deco_lamp', name: 'Lampe', type: 'decor', cost: 400, icon: '💡', stages: 1 },
-            'deco_fountain': { id: 'deco_fountain', name: 'Brunnen', type: 'decor', cost: 800, icon: '⛲', stages: 1 },
             'deco_gnome': { id: 'deco_gnome', name: 'Zwerg', type: 'decor', cost: 1000, icon: '🎅', stages: 1 },
         };
 
@@ -92,6 +89,20 @@
                 return this.props.children;
             }
         }
+
+        // --- HELPER FUNCTIONS ---
+        const formatDate = (timestamp) => {
+            if(!timestamp) return '';
+            const d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+        };
+
+        const isToday = (timestamp) => {
+            if(!timestamp) return false;
+            const d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            const today = new Date();
+            return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+        };
 
         const App = () => {
             const [user, setUser] = useState(null);
@@ -128,8 +139,9 @@
                 try {
                     await setDoc(doc(db, 'rooms', `r_${id}`), { id, name, grid, expansion: 4, owner: user.uid, members: [user.uid] });
                     const tasksRef = collection(db, 'rooms', `r_${id}`, 'tasks');
-                    const starters = [ { txt: "👋 Sag deinem Partner Hallo", rew: 50 }, { txt: "💧 Trinkt beide ein Glas Wasser", rew: 20 }, { txt: "📝 Baut einen Weg", rew: 50 } ];
-                    await Promise.all(starters.map(t => addDoc(tasksRef, { txt: t.txt, done: false, rew: t.rew, at: serverTimestamp() })));
+                    // Neue Struktur für Starter Tasks
+                    await addDoc(tasksRef, { txt: "👋 Sag Hallo", rew: 50, type: 'once', done: false, at: serverTimestamp() });
+                    await addDoc(tasksRef, { txt: "💧 Trink Wasser", rew: 20, type: 'daily', lastDone: null, at: serverTimestamp() });
                     await updateDoc(doc(db, 'users', user.uid), { currentGarden: id });
                 } catch(e) { console.error(e); alert("Fehler beim Erstellen"); }
                 setLoading(false);
@@ -167,7 +179,7 @@
                     <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
                         <Sprout size={48} className="text-green-600 mx-auto mb-4"/>
                         <h1 className="text-2xl font-bold mb-2">Unser Garten</h1>
-                        <p className="text-gray-500 mb-6">Pflanzen, Deko & Co-op</p>
+                        <p className="text-gray-500 mb-6">Pflanzen, Deko & Aufgaben</p>
                         <button onClick={googleLogin} className="w-full bg-white border hover:bg-gray-50 text-gray-700 font-bold py-3 rounded-lg flex items-center justify-center">
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 mr-3" />Login mit Google
                         </button>
@@ -210,7 +222,7 @@
 
                         <div className="flex-1 overflow-hidden relative">
                             {tab === 'garden' && <Garden room={room} user={user} data={userData} />}
-                            {tab === 'tasks' && <Tasks rid={room.id} uid={user.uid} />}
+                            {tab === 'tasks' && <Tasks rid={room.id} user={user} />}
                             {tab === 'shop' && <Shop uid={user.uid} coins={userData?.coins||0} />}
                         </div>
                     </div>
@@ -241,18 +253,16 @@
         const NavBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex flex-col items-center w-16 ${a?'text-green-600':'text-gray-400'}`}><I size={24} strokeWidth={a?2.5:2}/><span className="text-[10px] font-bold mt-1">{l}</span></button>;
         const SidebarBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex items-center w-full p-3 rounded-lg gap-3 ${a?'bg-green-50 text-green-700 font-bold':'text-gray-500 hover:bg-gray-50'}`}><I size={20}/><span className="text-sm">{l}</span></button>;
 
-        // --- GARDEN LOGIC (MIT MOVE TOOL) ---
-
+        // --- GARDEN LOGIC ---
         const Garden = ({ room, user, data }) => {
             const [sel, setSel] = useState(null);
             const [moveMode, setMoveMode] = useState(false);
-            const [moveSrc, setMoveSrc] = useState(null); // Which cell are we moving?
+            const [moveSrc, setMoveSrc] = useState(null);
             const [now, setNow] = useState(Date.now());
             const size = room.expansion || 4;
             
             useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
-            // 1. PLANTING LOGIC
             const plant = async (id) => {
                 if((data.inventory?.[id]||0) <= 0) return;
                 await runTransaction(db, async(t)=>{
@@ -262,24 +272,14 @@
                 setSel(null);
             };
 
-            // 2. INTERACTION LOGIC (WATER/HARVEST)
             const action = async (idx, cell) => {
                 const item = ITEMS[cell.type];
-                
-                // MOVE MODE LOGIC
                 if (moveMode) {
-                    if (moveSrc === null) {
-                        setMoveSrc(idx); // Pick up
-                    } else {
-                        // Swap logic could go here, but for now simple:
-                        // If clicking self, deselect
-                        if (moveSrc === idx) setMoveSrc(null);
-                    }
+                    if (moveSrc === null) setMoveSrc(idx); 
+                    else if (moveSrc === idx) setMoveSrc(null);
                     return;
                 }
-
-                if (item.type === 'decor') return; // Deko macht nix beim Klicken
-
+                if (item.type === 'decor') return; 
                 if(cell.stage < item.stages) {
                     if(now < cell.lastWatered + CYCLE_MS) { alert("Pflanze braucht Ruhe!"); return; }
                     await updateDoc(doc(db,'rooms',`r_${room.id}`), { [`grid.${idx}.lastWatered`]: Date.now(), [`grid.${idx}.stage`]: increment(1) });
@@ -291,30 +291,17 @@
                 }
             };
 
-            // 3. MOVE TARGET LOGIC (Clicking empty cell)
             const handleEmptyClick = async (idx) => {
                 if (moveMode && moveSrc !== null) {
-                    // Move item from moveSrc to idx
                     const srcData = room.grid[moveSrc];
-                    await updateDoc(doc(db, 'rooms', `r_${room.id}`), {
-                        [`grid.${idx}`]: srcData,
-                        [`grid.${moveSrc}`]: null
-                    });
-                    setMoveSrc(null); // Reset selection
-                } else {
-                    if(!moveMode) setSel(idx); // Open plant menu
-                }
+                    await updateDoc(doc(db, 'rooms', `r_${room.id}`), { [`grid.${idx}`]: srcData, [`grid.${moveSrc}`]: null });
+                    setMoveSrc(null);
+                } else { if(!moveMode) setSel(idx); }
             };
 
-            // 4. SHOVEL / REMOVE DECOR
             const remove = async () => {
                 if (sel === null || !room.grid[sel]) return;
-                const cell = room.grid[sel];
-                // Optional: Refund? For now just destroy.
-                if (confirm(`${ITEMS[cell.type].name} entfernen?`)) {
-                    await updateDoc(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}`]: null});
-                    setSel(null);
-                }
+                if (confirm(`Entfernen?`)) { await updateDoc(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}`]: null}); setSel(null); }
             }
 
             const expand = async () => {
@@ -344,67 +331,31 @@
                             <span className="text-xs font-bold text-yellow-800 uppercase hidden md:inline">Echtzeit-Garten</span>
                             <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="flex items-center gap-1 text-xs bg-white border px-2 py-1 rounded text-blue-600"><UserPlus size={12}/> Einladen</button>
                         </div>
-                        
-                        {/* MOVE TOOL TOGGLE */}
-                        <button 
-                            onClick={() => { setMoveMode(!moveMode); setMoveSrc(null); setSel(null); }}
-                            className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-full font-bold shadow-sm transition-all ${moveMode ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-white text-gray-600'}`}
-                        >
-                            <Move size={14}/> {moveMode ? 'Verschieben an...' : 'Umbauen'}
-                        </button>
+                        <button onClick={() => { setMoveMode(!moveMode); setMoveSrc(null); setSel(null); }} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-full font-bold shadow-sm transition-all ${moveMode ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-white text-gray-600'}`}><Move size={14}/> {moveMode ? 'Verschieben...' : 'Umbauen'}</button>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
-                        {moveMode && <div className="mb-4 bg-blue-100 text-blue-800 px-4 py-2 rounded-lg text-sm font-bold animate-pulse">Klicke ein Objekt, dann ein leeres Feld.</div>}
+                        {moveMode && <div className="mb-4 bg-blue-100 text-blue-800 px-4 py-2 rounded-lg text-sm font-bold animate-pulse">Klicke Objekt, dann leeres Feld.</div>}
 
-                        <div className="grid gap-1 bg-[#dcdcdc] p-2 rounded-lg border-4 border-[#c0c0c0] shadow-lg" 
-                             style={{gridTemplateColumns:`repeat(${size}, 1fr)`, width: '100%', maxWidth: '600px', aspectRatio:'1'}}>
+                        <div className="grid gap-1 bg-[#dcdcdc] p-2 rounded-lg border-4 border-[#c0c0c0] shadow-lg" style={{gridTemplateColumns:`repeat(${size}, 1fr)`, width: '100%', maxWidth: '600px', aspectRatio:'1'}}>
                             {Array.from({length:size*size}).map((_,i)=>{
                                 const c = room.grid?.[i];
                                 const item = c ? ITEMS[c.type] : null;
                                 const isMoving = moveSrc === i;
-                                
                                 return (
                                     <div key={i} onClick={()=> c ? action(i,c) : handleEmptyClick(i)} 
-                                         className={`
-                                            rounded relative flex items-center justify-center cursor-pointer transition-all
-                                            ${!c ? 'bg-[#8B5E3C] hover:brightness-105' : ''} 
-                                            ${c && item.type === 'decor' ? 'bg-transparent' : (c ? 'bg-[#8B5E3C]' : '')}
-                                            ${isMoving ? 'ring-4 ring-blue-500 z-20 scale-110' : ''}
-                                            ${moveMode && !c && moveSrc !== null ? 'ring-2 ring-blue-300 bg-blue-50/20' : ''}
-                                            ${sel===i ? 'ring-4 ring-green-400 z-10' : ''}
-                                         `}>
-                                        
-                                        {/* DRAW GRID BACKGROUND IF DECO IS TRANSPARENT-ISH (Like Fence) */}
+                                         className={`rounded relative flex items-center justify-center cursor-pointer transition-all ${!c ? 'bg-[#8B5E3C] hover:brightness-105' : ''} ${c && item.type === 'decor' ? 'bg-transparent' : (c ? 'bg-[#8B5E3C]' : '')} ${isMoving ? 'ring-4 ring-blue-500 z-20 scale-110' : ''} ${moveMode && !c && moveSrc !== null ? 'ring-2 ring-blue-300 bg-blue-50/20' : ''} ${sel===i ? 'ring-4 ring-green-400 z-10' : ''}`}>
                                         {c && item.type === 'decor' && <div className="absolute inset-0 bg-[#8B5E3C] rounded -z-10"/>}
-
                                         {c ? (
                                             <div className="w-full h-full flex flex-col items-center justify-center relative group">
-                                                {/* STATUS FOR PLANTS ONLY */}
                                                 {item.type === 'plant' && c.stage < item.stages && !moveMode && (
-                                                    <div className={`absolute -top-2 md:-top-3 text-[9px] font-mono font-bold px-1 py-0.5 rounded shadow-sm z-20 ${now > c.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white' : 'bg-black/50 text-white'}`}>
-                                                        {getTimerString(c.lastWatered)}
-                                                    </div>
+                                                    <div className={`absolute -top-2 md:-top-3 text-[9px] font-mono font-bold px-1 py-0.5 rounded shadow-sm z-20 ${now > c.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white' : 'bg-black/50 text-white'}`}>{getTimerString(c.lastWatered)}</div>
                                                 )}
-
-                                                <span className={`drop-shadow-md select-none ${item.type==='decor'?'text-4xl md:text-6xl':'text-3xl md:text-5xl transform hover:scale-110 transition-transform'}`}>
-                                                    {item.type === 'plant' && c.stage===0 ? '🌱' : item.icon}
-                                                </span>
-                                                
-                                                {/* Plant Progress */}
-                                                {item.type === 'plant' && item.stages > 1 && !moveMode && (
-                                                    <div className="absolute bottom-1 w-8 h-1 bg-black/30 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-green-400" style={{width: `${(c.stage/item.stages)*100}%`}}></div>
-                                                    </div>
-                                                )}
-
-                                                {/* Ready to Harvest */}
+                                                <span className={`drop-shadow-md select-none ${item.type==='decor'?'text-4xl md:text-6xl':'text-3xl md:text-5xl transform hover:scale-110 transition-transform'}`}>{item.type === 'plant' && c.stage===0 ? '🌱' : item.icon}</span>
+                                                {item.type === 'plant' && item.stages > 1 && !moveMode && (<div className="absolute bottom-1 w-8 h-1 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-green-400" style={{width: `${(c.stage/item.stages)*100}%`}}></div></div>)}
                                                 {item.type === 'plant' && c.stage >= item.stages && !moveMode && <div className="absolute inset-0 bg-yellow-400/20 animate-pulse rounded border-2 border-yellow-400"/>}
                                             </div>
-                                        ) : (
-                                            /* Empty Cell Marker */
-                                            <div className="w-1 h-1 rounded-full bg-black/10"/>
-                                        )}
+                                        ) : <div className="w-1 h-1 rounded-full bg-black/10"/>}
                                     </div>
                                 )
                             })}
@@ -412,15 +363,9 @@
                         <button onClick={expand} className="mt-8 bg-white border border-purple-200 text-purple-700 px-6 py-2 rounded-full shadow-sm hover:bg-purple-50 font-bold flex items-center gap-2"><Gem size={16}/> Fläche erweitern (50)</button>
                     </div>
 
-                    {/* SELECTION DRAWER */}
                     {sel !== null && (
                         <div className="absolute bottom-0 w-full bg-white p-4 rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] animate-slide-up z-30 md:max-w-md md:left-1/2 md:-translate-x-1/2 md:mb-4 md:rounded-2xl">
-                            <div className="flex justify-between mb-4 font-bold text-gray-700">
-                                <span>{room.grid[sel] ? 'Entfernen?' : 'Platzieren'}</span>
-                                <button onClick={()=>setSel(null)}><X size={20}/></button>
-                            </div>
-                            
-                            {/* IF SLOT IS EMPTY -> SHOW INVENTORY */}
+                            <div className="flex justify-between mb-4 font-bold text-gray-700"><span>{room.grid[sel] ? 'Entfernen?' : 'Platzieren'}</span><button onClick={()=>setSel(null)}><X size={20}/></button></div>
                             {!room.grid[sel] && (
                                 <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                                     {Object.keys(data?.inventory||{}).map(k => (data.inventory[k]>0) && (
@@ -433,39 +378,163 @@
                                     {Object.values(data?.inventory||{}).every(v=>v<=0) && <div className="text-sm text-gray-400 w-full text-center">Inventar leer.</div>}
                                 </div>
                             )}
-
-                            {/* IF SLOT HAS ITEM -> SHOW REMOVE OPTION */}
-                            {room.grid[sel] && (
-                                <div className="flex justify-center">
-                                    <button onClick={remove} className="flex items-center gap-2 bg-red-100 text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-200">
-                                        <Trash2 size={20}/> {ITEMS[room.grid[sel].type].name} entfernen
-                                    </button>
-                                </div>
-                            )}
+                            {room.grid[sel] && <div className="flex justify-center"><button onClick={remove} className="flex items-center gap-2 bg-red-100 text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-200"><Trash2 size={20}/> Entfernen</button></div>}
                         </div>
                     )}
                 </div>
             );
         };
 
-        const Tasks = ({rid, uid}) => {
+        // --- NEW ADVANCED TASKS SYSTEM ---
+        const Tasks = ({rid, user}) => {
             const [list, setList] = useState([]);
-            const [txt, setTxt] = useState('');
-            useEffect(()=>onSnapshot(query(collection(db,'rooms',`r_${rid}`,'tasks'), orderBy('at','desc'), limit(30)), s=>setList(s.docs.map(d=>({id:d.id,...d.data()})))), [rid]);
-            const add = async () => { if(!txt) return; await addDoc(collection(db,'rooms',`r_${rid}`,'tasks'), {txt, done:false, rew:10, at:serverTimestamp()}); setTxt(''); };
+            const [showAdd, setShowAdd] = useState(false);
+            
+            // New Task Form State
+            const [newTaskTxt, setNewTaskTxt] = useState('');
+            const [newTaskRew, setNewTaskRew] = useState(20);
+            const [newTaskType, setNewTaskType] = useState('once'); // once, date, daily
+            const [newTaskDate, setNewTaskDate] = useState('');
+
+            useEffect(()=>onSnapshot(query(collection(db,'rooms',`r_${rid}`,'tasks'), orderBy('at','desc'), limit(50)), s=>setList(s.docs.map(d=>({id:d.id,...d.data()})))), [rid]);
+
+            const addTask = async () => {
+                if(!newTaskTxt) return;
+                await addDoc(collection(db,'rooms',`r_${rid}`,'tasks'), {
+                    txt: newTaskTxt,
+                    rew: parseInt(newTaskRew),
+                    type: newTaskType,
+                    due: newTaskType === 'date' ? newTaskDate : null,
+                    done: false,
+                    lastDone: null, // For daily
+                    at: serverTimestamp(),
+                    creator: user.displayName.split(' ')[0]
+                });
+                setNewTaskTxt(''); setShowAdd(false);
+            };
+
+            const completeTask = async (task) => {
+                const isDaily = task.type === 'daily';
+                // Check daily logic
+                if(isDaily && isToday(task.lastDone)) return; // Already done today
+
+                await runTransaction(db, async(tr)=>{
+                    const taskRef = doc(db,'rooms',`r_${rid}`,'tasks',task.id);
+                    const userRef = doc(db,'users',user.uid);
+
+                    if(isDaily) {
+                        // Daily: Update lastDone, but keep done=false (so it shows as available tomorrow)
+                        tr.update(taskRef, { 
+                            lastDone: serverTimestamp(),
+                            doneBy: user.displayName,
+                            doneAt: serverTimestamp() 
+                        });
+                    } else {
+                        // Once/Date: Mark done permanently
+                        tr.update(taskRef, { 
+                            done: true, 
+                            doneBy: user.displayName, 
+                            doneAt: serverTimestamp() 
+                        });
+                    }
+                    tr.update(userRef, { coins: increment(task.rew) });
+                });
+            };
+
+            const deleteTask = async (id) => {
+                if(confirm("Löschen?")) await deleteDoc(doc(db,'rooms',`r_${rid}`,'tasks',id));
+            }
+
             return (
-                <div className="h-full flex flex-col max-w-2xl mx-auto w-full md:p-6">
-                    <div className="bg-white p-4 md:rounded-xl shadow-sm mb-4 flex gap-2 border-b md:border-0 sticky top-0 z-10">
-                        <input value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} className="flex-1 bg-gray-50 border-0 ring-1 ring-gray-200 rounded-lg px-4 py-2 outline-none" placeholder="Neue Aufgabe..."/>
-                        <button onClick={add} className="bg-green-600 text-white p-2.5 rounded-lg"><ArrowRight size={20}/></button>
+                <div className="h-full flex flex-col max-w-2xl mx-auto w-full md:p-6 bg-gray-50/50">
+                    {/* Header with Add Button */}
+                    <div className="p-4 flex justify-between items-center bg-white shadow-sm md:rounded-xl mb-4 border-b md:border-0 sticky top-0 z-10">
+                        <h2 className="font-bold text-lg text-gray-700">Aufgaben</h2>
+                        <button onClick={()=>setShowAdd(!showAdd)} className="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1 shadow-sm">
+                            <Plus size={20}/> Neu
+                        </button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4 md:p-0 space-y-2 pb-20 md:pb-0">
-                        {list.map(t=>(
-                            <div key={t.id} className={`p-4 rounded-xl flex justify-between items-center transition-all ${t.done ? 'bg-gray-100 opacity-60' : 'bg-white shadow-sm hover:shadow-md'}`}>
-                                <div><div className={`font-medium ${t.done?'line-through text-gray-500':'text-gray-800'}`}>{t.txt}</div><div className="text-xs text-yellow-600 font-bold mt-1 inline-block bg-yellow-50 px-1 rounded">+{t.rew} Coins</div></div>
-                                <button disabled={t.done} onClick={()=>!t.done && runTransaction(db,async(tr)=>{ tr.update(doc(db,'rooms',`r_${rid}`,'tasks',t.id),{done:true}); tr.update(doc(db,'users',uid),{coins:increment(t.rew)}); })} className={`p-2 rounded-full ${t.done?'text-green-600':'text-gray-300 hover:bg-green-50'}`}><CheckSquare size={24}/></button>
+
+                    {/* ADD TASK FORM */}
+                    {showAdd && (
+                        <div className="bg-white p-4 m-4 mt-0 rounded-xl shadow-md border border-green-100 fade-in space-y-3">
+                            <div>
+                                <label className="text-xs font-bold text-gray-400 uppercase">Aufgabe</label>
+                                <input value={newTaskTxt} onChange={e=>setNewTaskTxt(e.target.value)} className="w-full p-2 border rounded-lg mt-1" placeholder="Was ist zu tun?"/>
                             </div>
-                        ))}
+                            
+                            <div className="flex gap-4">
+                                <div className="flex-1">
+                                    <label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskRew}</label>
+                                    <input type="range" min="10" max="100" step="5" value={newTaskRew} onChange={e=>setNewTaskRew(e.target.value)} className="w-full mt-2 accent-green-600"/>
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-xs font-bold text-gray-400 uppercase">Typ</label>
+                                    <select value={newTaskType} onChange={e=>setNewTaskType(e.target.value)} className="w-full p-2 border rounded-lg mt-1 bg-white">
+                                        <option value="once">Einmalig</option>
+                                        <option value="daily">Täglich</option>
+                                        <option value="date">Bis Datum</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {newTaskType === 'date' && (
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400 uppercase">Fällig am</label>
+                                    <input type="date" value={newTaskDate} onChange={e=>setNewTaskDate(e.target.value)} className="w-full p-2 border rounded-lg mt-1"/>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button onClick={()=>setShowAdd(false)} className="text-gray-400 px-3 py-1">Abbrechen</button>
+                                <button onClick={addTask} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm">Erstellen</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TASK LIST */}
+                    <div className="flex-1 overflow-y-auto p-4 md:p-0 space-y-3 pb-20 md:pb-0">
+                        {list.map(t => {
+                            const isDaily = t.type === 'daily';
+                            const doneToday = isDaily && isToday(t.lastDone);
+                            const isDone = t.done || doneToday;
+                            const isOverdue = t.type === 'date' && t.due && new Date(t.due) < new Date() && !isDone;
+
+                            return (
+                                <div key={t.id} className={`p-4 rounded-xl border flex flex-col transition-all ${isDone ? 'bg-gray-50 opacity-70 border-gray-100' : 'bg-white shadow-sm border-gray-200 hover:shadow-md'}`}>
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                {isDaily && <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1"><Repeat size={10}/> Täglich</span>}
+                                                {t.type === 'date' && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}><Calendar size={10}/> {t.due}</span>}
+                                                <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1"><Coins size={10}/> {t.rew}</span>
+                                            </div>
+                                            <div className={`font-medium text-lg ${isDone ? 'line-through text-gray-400' : 'text-gray-800'}`}>{t.txt}</div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2">
+                                            <button disabled={isDone} onClick={() => completeTask(t)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isDone ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 hover:bg-green-500 hover:text-white'}`}>
+                                                <CheckSquare size={20} className={isDone ? 'fill-current' : ''}/>
+                                            </button>
+                                            <button onClick={()=>deleteTask(t.id)} className="p-2 text-gray-300 hover:text-red-400"><Trash2 size={16}/></button>
+                                        </div>
+                                    </div>
+
+                                    {/* INFO FOOTER: Wer hat es gemacht? */}
+                                    {(t.doneBy || t.creator) && (
+                                        <div className="mt-3 pt-2 border-t border-gray-100 text-[10px] text-gray-400 flex justify-between">
+                                            <span>Erstellt von {t.creator || 'Unbekannt'}</span>
+                                            {isDone && (
+                                                <span className="flex items-center gap-1 text-green-600 font-medium">
+                                                    <History size={10}/> Erledigt von {t.doneBy} am {formatDate(t.doneAt || t.lastDone)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        {list.length === 0 && !showAdd && <div className="text-center text-gray-400 mt-10">Alles erledigt! 🎉</div>}
                     </div>
                 </div>
             )
