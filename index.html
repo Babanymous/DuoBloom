@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Co-op Garden</title>
+    <title>DuoBloom</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -80,7 +80,7 @@
 
         let app, auth, db;
         try {
-            if(firebaseConfig.apiKey !== "HIER_EINFÜGEN") {
+            if(firebaseConfig.apiKey !== "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg") {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
@@ -153,7 +153,7 @@
             
             const isNight = useNightMode(); // Hier aktivieren wir den Nachtmodus
 
-            if(firebaseConfig.apiKey === "HIER_EINFÜGEN") return <div className="p-10 text-center"><b>Config fehlt!</b></div>;
+            if(firebaseConfig.apiKey === "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg") return <div className="p-10 text-center"><b>Config fehlt!</b></div>;
 
             useEffect(() => onAuthStateChanged(auth, (u) => { setUser(u); if(!u) { setUserData(null); setRoom(null); } }), []);
 
@@ -233,7 +233,7 @@
                     {/* Desktop Sidebar */}
                     <div className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r dark:border-slate-800 p-4 shadow-sm z-20">
                         <div className="text-xl font-bold text-green-700 dark:text-green-400 mb-8 flex items-center gap-2">
-                            <Sprout/> Unser Garten {isNight && <Moon size={16} className="text-blue-200 ml-2 animate-pulse"/>}
+                            <Sprout/> DuoBloom {isNight && <Moon size={16} className="text-blue-200 ml-2 animate-pulse"/>}
                         </div>
                         <nav className="space-y-2 flex-1">
                             <SidebarBtn i={Sprout} l="Garten" a={tab==='garden'} set={()=>setTab('garden')}/>
