@@ -25,7 +25,7 @@
         import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
         import { 
             Sprout, Droplet, CheckSquare, ShoppingBag, Users, Gem, Coins, 
-            Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, LogOut, Copy, UserPlus, Timer, Trash2
+            Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, LogOut, Copy, UserPlus, Timer, Trash2, Move, MousePointer2
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -62,11 +62,26 @@
             }
         } catch(e) { console.error(e); }
 
+        // --- ITEMS & DEKO ---
         const ITEMS = {
+            // PFLANZEN
+            'seed_wheat': { id: 'seed_wheat', name: 'Weizen', type: 'plant', cost: 20, icon: '🌾', stages: 2, sellPrice: 10, sellCurrency: 'gems' },
             'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icon: '🥕', stages: 3, sellPrice: 15, sellCurrency: 'gems' },
             'seed_flower': { id: 'seed_flower', name: 'Rose', type: 'plant', cost: 150, icon: '🌹', stages: 4, sellPrice: 30, sellCurrency: 'gems' },
-            'seed_tree': { id: 'seed_tree', name: 'Baum', type: 'plant', cost: 500, icon: '🌳', stages: 5, sellPrice: 100, sellCurrency: 'gems' },
-            'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 200, icon: '🪵', stages: 1, sellPrice: 0, sellCurrency: 'none' }
+            'seed_sun': { id: 'seed_sun', name: 'Sonnenblume', type: 'plant', cost: 300, icon: '🌻', stages: 4, sellPrice: 60, sellCurrency: 'gems' },
+            'seed_pumpkin': { id: 'seed_pumpkin', name: 'Kürbis', type: 'plant', cost: 600, icon: '🎃', stages: 5, sellPrice: 150, sellCurrency: 'gems' },
+            'seed_tree': { id: 'seed_tree', name: 'Baum', type: 'plant', cost: 1000, icon: '🌳', stages: 6, sellPrice: 250, sellCurrency: 'gems' },
+            
+            // DEKO (type: 'decor' braucht kein Wasser)
+            'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'decor', cost: 50, icon: '🪨', stages: 1 },
+            'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'decor', cost: 50, icon: '🪵', stages: 1 },
+            'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 100, icon: '🚧', stages: 1 },
+            'deco_bush': { id: 'deco_bush', name: 'Hecke', type: 'decor', cost: 150, icon: '🌳', stages: 1 },
+            'deco_flowerpot': { id: 'deco_flowerpot', name: 'Blumentopf', type: 'decor', cost: 200, icon: '🪴', stages: 1 },
+            'deco_bench': { id: 'deco_bench', name: 'Bank', type: 'decor', cost: 300, icon: '🪑', stages: 1 },
+            'deco_lamp': { id: 'deco_lamp', name: 'Lampe', type: 'decor', cost: 400, icon: '💡', stages: 1 },
+            'deco_fountain': { id: 'deco_fountain', name: 'Brunnen', type: 'decor', cost: 800, icon: '⛲', stages: 1 },
+            'deco_gnome': { id: 'deco_gnome', name: 'Zwerg', type: 'decor', cost: 1000, icon: '🎅', stages: 1 },
         };
 
         class ErrorBoundary extends React.Component {
@@ -111,25 +126,11 @@
                 const grid = {}; for(let i=0; i<16; i++) grid[i] = null;
                 
                 try {
-                    // 1. Raum erstellen (Mit members Array!)
-                    await setDoc(doc(db, 'rooms', `r_${id}`), { 
-                        id, name, grid, expansion: 4, 
-                        owner: user.uid, 
-                        members: [user.uid] // WICHTIG für die Lösch-Logik
-                    });
-                    
-                    // 2. Starter Aufgaben
+                    await setDoc(doc(db, 'rooms', `r_${id}`), { id, name, grid, expansion: 4, owner: user.uid, members: [user.uid] });
                     const tasksRef = collection(db, 'rooms', `r_${id}`, 'tasks');
-                    const starters = [
-                        { txt: "👋 Sag deinem Partner Hallo", rew: 50 },
-                        { txt: "💧 Trinkt beide ein Glas Wasser", rew: 20 },
-                        { txt: "📝 Plant euer erstes Beet", rew: 50 }
-                    ];
+                    const starters = [ { txt: "👋 Sag deinem Partner Hallo", rew: 50 }, { txt: "💧 Trinkt beide ein Glas Wasser", rew: 20 }, { txt: "📝 Baut einen Weg", rew: 50 } ];
                     await Promise.all(starters.map(t => addDoc(tasksRef, { txt: t.txt, done: false, rew: t.rew, at: serverTimestamp() })));
-
-                    // 3. User zuweisen
                     await updateDoc(doc(db, 'users', user.uid), { currentGarden: id });
-
                 } catch(e) { console.error(e); alert("Fehler beim Erstellen"); }
                 setLoading(false);
             };
@@ -139,46 +140,26 @@
                 const rRef = doc(db, 'rooms', `r_${cleanId}`);
                 const snap = await getDoc(rRef);
                 if(snap.exists()) {
-                    // WICHTIG: User zur Member-Liste hinzufügen
                     await updateDoc(rRef, { members: arrayUnion(user.uid) });
                     await updateDoc(doc(db, 'users', user.uid), { currentGarden: cleanId });
                 } else alert("Nicht gefunden!");
             };
 
-            // --- NEUE LEAVE LOGIK (AUTO DELETE) ---
             const leaveRoom = async () => {
-                if(!confirm("Willst du den Garten verlassen? ACHTUNG: Wenn du der letzte Gärtner bist, wird der Garten gelöscht!")) return;
-                
+                if(!confirm("Verlassen? Leere Gärten werden gelöscht!")) return;
                 const roomRef = doc(db, 'rooms', `r_${room.id}`);
                 const userRef = doc(db, 'users', user.uid);
-
                 try {
-                    await runTransaction(db, async (transaction) => {
-                        const roomDoc = await transaction.get(roomRef);
-                        if (!roomDoc.exists()) {
-                             transaction.update(userRef, { currentGarden: null });
-                             return;
-                        }
-
-                        const roomData = roomDoc.data();
-                        // Liste der Mitglieder OHNE mich
-                        const remainingMembers = (roomData.members || []).filter(uid => uid !== user.uid);
-
-                        if (remainingMembers.length === 0) {
-                            // Niemand mehr da? Löschen!
-                            transaction.delete(roomRef);
-                        } else {
-                            // Noch wer da? Nur mich austragen.
-                            transaction.update(roomRef, { members: remainingMembers });
-                        }
-
-                        // Meine Bindung lösen
-                        transaction.update(userRef, { currentGarden: null });
+                    await runTransaction(db, async (t) => {
+                        const rd = await t.get(roomRef);
+                        if (!rd.exists()) { t.update(userRef, { currentGarden: null }); return; }
+                        const rData = rd.data();
+                        const rem = (rData.members || []).filter(uid => uid !== user.uid);
+                        if (rem.length === 0) t.delete(roomRef);
+                        else t.update(roomRef, { members: rem });
+                        t.update(userRef, { currentGarden: null });
                     });
-                } catch(e) {
-                    console.error(e);
-                    alert("Fehler beim Verlassen: " + e.message);
-                }
+                } catch(e) { console.error(e); }
             };
 
             if(!user) return (
@@ -186,7 +167,7 @@
                     <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
                         <Sprout size={48} className="text-green-600 mx-auto mb-4"/>
                         <h1 className="text-2xl font-bold mb-2">Unser Garten</h1>
-                        <p className="text-gray-500 mb-6">Wachstumszeit: {HOURS_PER_CYCLE} Std.</p>
+                        <p className="text-gray-500 mb-6">Pflanzen, Deko & Co-op</p>
                         <button onClick={googleLogin} className="w-full bg-white border hover:bg-gray-50 text-gray-700 font-bold py-3 rounded-lg flex items-center justify-center">
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 mr-3" />Login mit Google
                         </button>
@@ -198,7 +179,6 @@
 
             return (
                 <div className="h-screen flex flex-col md:flex-row bg-gray-100 overflow-hidden">
-                    {/* Desktop Sidebar */}
                     <div className="hidden md:flex flex-col w-64 bg-white border-r p-4 shadow-sm z-20">
                         <div className="text-xl font-bold text-green-700 mb-8 flex items-center gap-2"><Sprout/> Unser Garten</div>
                         <nav className="space-y-2 flex-1">
@@ -209,7 +189,6 @@
                         <button onClick={leaveRoom} className="text-red-500 text-sm hover:bg-red-50 p-2 rounded flex gap-2"><LogOut size={16}/> Verlassen</button>
                     </div>
 
-                    {/* Mobile Header */}
                     <div className="md:hidden bg-white p-3 shadow-sm z-10 flex justify-between items-center">
                         <span className="font-bold truncate">{room.name}</span>
                         <div className="flex gap-2 text-xs font-bold">
@@ -219,7 +198,6 @@
                         <button onClick={leaveRoom} className="text-gray-400"><LogOut size={18}/></button>
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1 flex flex-col relative overflow-hidden bg-[#e5e7eb]">
                         <div className="hidden md:flex justify-between items-center p-4 bg-white/60 backdrop-blur border-b">
                             <h2 className="text-xl font-bold">{room.name}</h2>
@@ -237,7 +215,6 @@
                         </div>
                     </div>
 
-                    {/* Mobile Bottom Nav */}
                     <div className="md:hidden bg-white border-t p-2 pb-6 flex justify-around shadow-lg z-20">
                         <NavBtn i={Sprout} l="Garten" a={tab==='garden'} set={()=>setTab('garden')}/>
                         <NavBtn i={CheckSquare} l="Tasks" a={tab==='tasks'} set={()=>setTab('tasks')}/>
@@ -264,15 +241,18 @@
         const NavBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex flex-col items-center w-16 ${a?'text-green-600':'text-gray-400'}`}><I size={24} strokeWidth={a?2.5:2}/><span className="text-[10px] font-bold mt-1">{l}</span></button>;
         const SidebarBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex items-center w-full p-3 rounded-lg gap-3 ${a?'bg-green-50 text-green-700 font-bold':'text-gray-500 hover:bg-gray-50'}`}><I size={20}/><span className="text-sm">{l}</span></button>;
 
-        // --- GARDEN LOGIC ---
+        // --- GARDEN LOGIC (MIT MOVE TOOL) ---
 
         const Garden = ({ room, user, data }) => {
             const [sel, setSel] = useState(null);
+            const [moveMode, setMoveMode] = useState(false);
+            const [moveSrc, setMoveSrc] = useState(null); // Which cell are we moving?
             const [now, setNow] = useState(Date.now());
             const size = room.expansion || 4;
             
             useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
+            // 1. PLANTING LOGIC
             const plant = async (id) => {
                 if((data.inventory?.[id]||0) <= 0) return;
                 await runTransaction(db, async(t)=>{
@@ -282,8 +262,24 @@
                 setSel(null);
             };
 
+            // 2. INTERACTION LOGIC (WATER/HARVEST)
             const action = async (idx, cell) => {
                 const item = ITEMS[cell.type];
+                
+                // MOVE MODE LOGIC
+                if (moveMode) {
+                    if (moveSrc === null) {
+                        setMoveSrc(idx); // Pick up
+                    } else {
+                        // Swap logic could go here, but for now simple:
+                        // If clicking self, deselect
+                        if (moveSrc === idx) setMoveSrc(null);
+                    }
+                    return;
+                }
+
+                if (item.type === 'decor') return; // Deko macht nix beim Klicken
+
                 if(cell.stage < item.stages) {
                     if(now < cell.lastWatered + CYCLE_MS) { alert("Pflanze braucht Ruhe!"); return; }
                     await updateDoc(doc(db,'rooms',`r_${room.id}`), { [`grid.${idx}.lastWatered`]: Date.now(), [`grid.${idx}.stage`]: increment(1) });
@@ -294,6 +290,32 @@
                     });
                 }
             };
+
+            // 3. MOVE TARGET LOGIC (Clicking empty cell)
+            const handleEmptyClick = async (idx) => {
+                if (moveMode && moveSrc !== null) {
+                    // Move item from moveSrc to idx
+                    const srcData = room.grid[moveSrc];
+                    await updateDoc(doc(db, 'rooms', `r_${room.id}`), {
+                        [`grid.${idx}`]: srcData,
+                        [`grid.${moveSrc}`]: null
+                    });
+                    setMoveSrc(null); // Reset selection
+                } else {
+                    if(!moveMode) setSel(idx); // Open plant menu
+                }
+            };
+
+            // 4. SHOVEL / REMOVE DECOR
+            const remove = async () => {
+                if (sel === null || !room.grid[sel]) return;
+                const cell = room.grid[sel];
+                // Optional: Refund? For now just destroy.
+                if (confirm(`${ITEMS[cell.type].name} entfernen?`)) {
+                    await updateDoc(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}`]: null});
+                    setSel(null);
+                }
+            }
 
             const expand = async () => {
                  if(data.gems < 50) return alert("Brauchst 50 Gems!");
@@ -312,35 +334,77 @@
                 if(diff <= 0) return "Gießen!";
                 const h = Math.floor(diff / 3600000);
                 const m = Math.floor((diff % 3600000) / 60000);
-                const s = Math.floor((diff % 60000) / 1000);
-                return `${h}:${m<10?'0'+m:m}:${s<10?'0'+s:s}`;
+                return `${h}:${m<10?'0'+m:m}`;
             };
 
             return (
                 <div className="h-full flex flex-col">
-                    <div className="p-3 bg-yellow-50/80 backdrop-blur border-b sticky top-0 z-10 flex justify-between items-center md:hidden">
-                        <span className="text-xs font-bold text-yellow-800 uppercase">Echtzeit-Garten</span>
-                        <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="flex items-center gap-1 text-xs bg-white border px-2 py-1 rounded text-blue-600"><UserPlus size={12}/> Einladen</button>
+                    <div className="p-3 bg-yellow-50/80 backdrop-blur border-b sticky top-0 z-10 flex justify-between items-center">
+                        <div className="flex gap-2">
+                            <span className="text-xs font-bold text-yellow-800 uppercase hidden md:inline">Echtzeit-Garten</span>
+                            <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="flex items-center gap-1 text-xs bg-white border px-2 py-1 rounded text-blue-600"><UserPlus size={12}/> Einladen</button>
+                        </div>
+                        
+                        {/* MOVE TOOL TOGGLE */}
+                        <button 
+                            onClick={() => { setMoveMode(!moveMode); setMoveSrc(null); setSel(null); }}
+                            className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-full font-bold shadow-sm transition-all ${moveMode ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-white text-gray-600'}`}
+                        >
+                            <Move size={14}/> {moveMode ? 'Verschieben an...' : 'Umbauen'}
+                        </button>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
-                        <div className="grid gap-2 p-3 rounded-2xl transition-all" style={{gridTemplateColumns:`repeat(${size}, 1fr)`, width: '100%', maxWidth: '600px', aspectRatio:'1'}}>
+                        {moveMode && <div className="mb-4 bg-blue-100 text-blue-800 px-4 py-2 rounded-lg text-sm font-bold animate-pulse">Klicke ein Objekt, dann ein leeres Feld.</div>}
+
+                        <div className="grid gap-1 bg-[#dcdcdc] p-2 rounded-lg border-4 border-[#c0c0c0] shadow-lg" 
+                             style={{gridTemplateColumns:`repeat(${size}, 1fr)`, width: '100%', maxWidth: '600px', aspectRatio:'1'}}>
                             {Array.from({length:size*size}).map((_,i)=>{
                                 const c = room.grid?.[i];
+                                const item = c ? ITEMS[c.type] : null;
+                                const isMoving = moveSrc === i;
+                                
                                 return (
-                                    <div key={i} onClick={()=>!c && setSel(i)} className={`bg-[#8B5E3C] rounded-lg relative flex items-center justify-center cursor-pointer shadow-sm border-b-4 border-[#6d4a30] active:border-b-0 active:translate-y-1 ${sel===i ? 'ring-4 ring-green-400 z-10' : ''}`}>
+                                    <div key={i} onClick={()=> c ? action(i,c) : handleEmptyClick(i)} 
+                                         className={`
+                                            rounded relative flex items-center justify-center cursor-pointer transition-all
+                                            ${!c ? 'bg-[#8B5E3C] hover:brightness-105' : ''} 
+                                            ${c && item.type === 'decor' ? 'bg-transparent' : (c ? 'bg-[#8B5E3C]' : '')}
+                                            ${isMoving ? 'ring-4 ring-blue-500 z-20 scale-110' : ''}
+                                            ${moveMode && !c && moveSrc !== null ? 'ring-2 ring-blue-300 bg-blue-50/20' : ''}
+                                            ${sel===i ? 'ring-4 ring-green-400 z-10' : ''}
+                                         `}>
+                                        
+                                        {/* DRAW GRID BACKGROUND IF DECO IS TRANSPARENT-ISH (Like Fence) */}
+                                        {c && item.type === 'decor' && <div className="absolute inset-0 bg-[#8B5E3C] rounded -z-10"/>}
+
                                         {c ? (
-                                            <div onClick={(e)=>{e.stopPropagation(); action(i,c)}} className="w-full h-full flex flex-col items-center justify-center relative group">
-                                                {c.stage < ITEMS[c.type].stages && (
-                                                    <div className={`absolute -top-2 md:-top-4 text-[9px] md:text-xs font-mono font-bold px-1.5 py-0.5 rounded-full shadow-sm z-20 ${now > c.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-pulse' : 'bg-black/50 text-white'}`}>
+                                            <div className="w-full h-full flex flex-col items-center justify-center relative group">
+                                                {/* STATUS FOR PLANTS ONLY */}
+                                                {item.type === 'plant' && c.stage < item.stages && !moveMode && (
+                                                    <div className={`absolute -top-2 md:-top-3 text-[9px] font-mono font-bold px-1 py-0.5 rounded shadow-sm z-20 ${now > c.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white' : 'bg-black/50 text-white'}`}>
                                                         {getTimerString(c.lastWatered)}
                                                     </div>
                                                 )}
-                                                <span className="text-3xl md:text-5xl drop-shadow-md transform transition-transform hover:scale-110">{c.stage===0 ? '🌱' : ITEMS[c.type].icon}</span>
-                                                {ITEMS[c.type].stages > 1 && (<div className="absolute bottom-2 w-8 h-1 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-green-400" style={{width: `${(c.stage/ITEMS[c.type].stages)*100}%`}}></div></div>)}
-                                                {c.stage >= ITEMS[c.type].stages && <div className="absolute inset-0 bg-yellow-400/20 animate-pulse rounded-lg border-2 border-yellow-400"/>}
+
+                                                <span className={`drop-shadow-md select-none ${item.type==='decor'?'text-4xl md:text-6xl':'text-3xl md:text-5xl transform hover:scale-110 transition-transform'}`}>
+                                                    {item.type === 'plant' && c.stage===0 ? '🌱' : item.icon}
+                                                </span>
+                                                
+                                                {/* Plant Progress */}
+                                                {item.type === 'plant' && item.stages > 1 && !moveMode && (
+                                                    <div className="absolute bottom-1 w-8 h-1 bg-black/30 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-green-400" style={{width: `${(c.stage/item.stages)*100}%`}}></div>
+                                                    </div>
+                                                )}
+
+                                                {/* Ready to Harvest */}
+                                                {item.type === 'plant' && c.stage >= item.stages && !moveMode && <div className="absolute inset-0 bg-yellow-400/20 animate-pulse rounded border-2 border-yellow-400"/>}
                                             </div>
-                                        ) : <div className="w-2 h-2 rounded-full bg-black/10"/>}
+                                        ) : (
+                                            /* Empty Cell Marker */
+                                            <div className="w-1 h-1 rounded-full bg-black/10"/>
+                                        )}
                                     </div>
                                 )
                             })}
@@ -348,18 +412,36 @@
                         <button onClick={expand} className="mt-8 bg-white border border-purple-200 text-purple-700 px-6 py-2 rounded-full shadow-sm hover:bg-purple-50 font-bold flex items-center gap-2"><Gem size={16}/> Fläche erweitern (50)</button>
                     </div>
 
+                    {/* SELECTION DRAWER */}
                     {sel !== null && (
                         <div className="absolute bottom-0 w-full bg-white p-4 rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] animate-slide-up z-30 md:max-w-md md:left-1/2 md:-translate-x-1/2 md:mb-4 md:rounded-2xl">
-                            <div className="flex justify-between mb-4 font-bold text-gray-700"><span>Pflanzen</span><button onClick={()=>setSel(null)}><X size={20}/></button></div>
-                            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                                {Object.keys(data?.inventory||{}).map(k => (data.inventory[k]>0) && (
-                                    <button key={k} onClick={()=>plant(k)} className="bg-green-50 p-3 rounded-xl min-w-[90px] flex flex-col items-center border border-green-100">
-                                        <span className="text-3xl mb-1">{ITEMS[k].icon}</span>
-                                        <span className="text-xs font-bold text-green-800">x{data.inventory[k]}</span>
-                                    </button>
-                                ))}
-                                {Object.values(data?.inventory||{}).every(v=>v<=0) && <div className="text-sm text-gray-400 w-full text-center">Keine Samen.</div>}
+                            <div className="flex justify-between mb-4 font-bold text-gray-700">
+                                <span>{room.grid[sel] ? 'Entfernen?' : 'Platzieren'}</span>
+                                <button onClick={()=>setSel(null)}><X size={20}/></button>
                             </div>
+                            
+                            {/* IF SLOT IS EMPTY -> SHOW INVENTORY */}
+                            {!room.grid[sel] && (
+                                <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                                    {Object.keys(data?.inventory||{}).map(k => (data.inventory[k]>0) && (
+                                        <button key={k} onClick={()=>plant(k)} className="bg-green-50 p-3 rounded-xl min-w-[90px] flex flex-col items-center border border-green-100 relative">
+                                            <span className="text-3xl mb-1">{ITEMS[k].icon}</span>
+                                            <span className="text-xs font-bold text-green-800 line-clamp-1">{ITEMS[k].name}</span>
+                                            <span className="absolute top-1 right-1 bg-green-200 text-green-900 text-[9px] px-1 rounded-full">x{data.inventory[k]}</span>
+                                        </button>
+                                    ))}
+                                    {Object.values(data?.inventory||{}).every(v=>v<=0) && <div className="text-sm text-gray-400 w-full text-center">Inventar leer.</div>}
+                                </div>
+                            )}
+
+                            {/* IF SLOT HAS ITEM -> SHOW REMOVE OPTION */}
+                            {room.grid[sel] && (
+                                <div className="flex justify-center">
+                                    <button onClick={remove} className="flex items-center gap-2 bg-red-100 text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-200">
+                                        <Trash2 size={20}/> {ITEMS[room.grid[sel].type].name} entfernen
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -391,14 +473,20 @@
 
         const Shop = ({uid, coins}) => (
             <div className="h-full overflow-y-auto bg-gray-50 p-4 md:p-8">
-                <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Object.values(ITEMS).map(i=>(
-                        <div key={i.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md">
-                            <div className="w-16 h-16 bg-gray-50 rounded-lg flex items-center justify-center text-4xl">{i.icon}</div>
-                            <div className="flex-1"><div className="font-bold text-gray-800">{i.name}</div><div className="text-sm text-gray-500">{i.cost} Münzen</div></div>
-                            <button onClick={() => coins >= i.cost && updateDoc(doc(db,'users',uid),{coins:increment(-i.cost), [`inventory.${i.id}`]:increment(1)})} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold active:scale-95">Kaufen</button>
-                        </div>
-                    ))}
+                <div className="max-w-4xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {Object.values(ITEMS).map(i=>(
+                            <div key={i.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md">
+                                <div className="w-16 h-16 bg-gray-50 rounded-lg flex items-center justify-center text-4xl shadow-inner">{i.icon}</div>
+                                <div className="flex-1">
+                                    <div className="font-bold text-gray-800">{i.name}</div>
+                                    <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{i.type === 'plant' ? 'Pflanze' : 'Deko'}</div>
+                                    <div className="text-sm font-bold text-yellow-600">{i.cost} 🪙</div>
+                                </div>
+                                <button onClick={() => coins >= i.cost && updateDoc(doc(db,'users',uid),{coins:increment(-i.cost), [`inventory.${i.id}`]:increment(1)})} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold active:scale-95">Kaufen</button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         );
