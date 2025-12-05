@@ -43,24 +43,23 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
-        .bg-grass-pattern {
-            background-color: #a3cf90;
-            background-image: 
-                linear-gradient(45deg, #a3cf90 25%, transparent 25%, transparent 75%, #a3cf90 75%, #a3cf90),
-                linear-gradient(-45deg, #a3cf90 25%, transparent 25%, transparent 75%, #a3cf90 75%, #a3cf90);
-            background-size: 20px 20px;
+        /* --- NEUER ORGANISCHER GRAS HINTERGRUND --- */
+        .bg-grass-realistic {
+            background-color: #65a30d; /* Sattes Wiesengrün */
+            /* Eingebettetes SVG für Grasbüschel-Optik statt Schachbrett */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath fill='%234d7c0f' fill-opacity='0.15' d='M15 15c0-5 2-10 5-10s2 5 2 10h-2c0-3-1-6-2-6s-2 3-2 6h-1zm30 20c0-5 2-10 5-10s2 5 2 10h-2c0-3-1-6-2-6s-2 3-2 6h-1zm20-30c0-5 2-10 5-10s2 5 2 10h-2c0-3-1-6-2-6s-2 3-2 6h-1zM5 65c0-5 2-10 5-10s2 5 2 10H8c0-3-1-6-2-6s-2 3-2 6H5zm50 5c0-5 2-10 5-10s2 5 2 10h-2c0-3-1-6-2-6s-2 3-2 6h-1z'/%3E%3C/svg%3E");
+            background-size: 80px 80px;
         }
-        .dark .bg-grass-pattern {
-            background-color: #2d5a27;
-            background-image: 
-                linear-gradient(45deg, #2d5a27 25%, transparent 25%, transparent 75%, #2d5a27 75%, #2d5a27),
-                linear-gradient(-45deg, #2d5a27 25%, transparent 25%, transparent 75%, #2d5a27 75%, #2d5a27);
-            background-size: 20px 20px;
+        .dark .bg-grass-realistic {
+            background-color: #1a2e05; /* Dunkles Nachtgrün */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath fill='%2314532d' fill-opacity='0.4' d='M15 15c0-5 2-10 5-10s2 5 2 10h-2c0-3-1-6-2-6s-2 3-2 6h-1zm30 20c0-5 2-10 5-10s2 5 2 10h-2c0-3-1-6-2-6s-2 3-2 6h-1zm20-30c0-5 2-10 5-10s2 5 2 10h-2c0-3-1-6-2-6s-2 3-2 6h-1zM5 65c0-5 2-10 5-10s2 5 2 10H8c0-3-1-6-2-6s-2 3-2 6H5zm50 5c0-5 2-10 5-10s2 5 2 10h-2c0-3-1-6-2-6s-2 3-2 6h-1z'/%3E%3C/svg%3E");
         }
+
         .soil-inset { box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3); }
         .night-overlay { background-color: rgba(10, 15, 30, 0.5); mix-blend-mode: hard-light; pointer-events: none; }
-        .emoji-3d { filter: drop-shadow(0px 2px 0px rgba(0,0,0,0.2)); }
+        .emoji-3d { filter: drop-shadow(0px 3px 0px rgba(0,0,0,0.15)); }
 
+        /* TEXTUREN */
         .texture-wood {
             background-color: #d97706;
             background-image: repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 10px);
@@ -76,7 +75,6 @@
             background-size: 20px 20px;
             box-shadow: inset 0 0 3px rgba(0,0,0,0.3);
         }
-        
         .dark .texture-stone { filter: brightness(0.7); }
         .dark .texture-wood { filter: brightness(0.7); }
 
@@ -93,7 +91,7 @@
             Sprout, Droplet, CheckSquare, ShoppingBag, Users, Gem, Coins, 
             Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, 
             LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History, Moon, Sun, Flower, Star,
-            Wind, PenTool, Cloud, TreeDeciduous, Grid, Armchair, Lightbulb, Square, Circle, Package
+            Package, Box
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -129,6 +127,7 @@
 
         // --- ITEMS ---
         const ITEMS = {
+            // PFLANZEN (type: 'plant') -> Nur auf Erde
             'seed_wheat': { id: 'seed_wheat', name: 'Weizen', type: 'plant', cost: 20, icon: '🌾', stages: 2, sellPrice: 10, sellCurrency: 'gems' },
             'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icon: '🥕', stages: 3, sellPrice: 15, sellCurrency: 'gems' },
             'seed_flower': { id: 'seed_flower', name: 'Rose', type: 'plant', cost: 150, icon: '🌹', stages: 4, sellPrice: 30, sellCurrency: 'gems' },
@@ -138,11 +137,11 @@
             'seed_tulip': { id: 'seed_tulip', name: 'Tulpe', type: 'plant', cost: 200, icon: '🌷', stages: 3, sellPrice: 40, sellCurrency: 'gems' },
             'seed_corn': { id: 'seed_corn', name: 'Mais', type: 'plant', cost: 80, icon: '🌽', stages: 3, sellPrice: 25, sellCurrency: 'gems' },
             
-            // Texture-based Floors
+            // BÖDEN (type: 'floor') -> Überall platzierbar
             'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'floor', cost: 50, textureClass: 'texture-stone', stages: 1 },
             'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'floor', cost: 50, textureClass: 'texture-wood', stages: 1 },
             
-            // Deko
+            // DEKO (type: 'decor') -> Nur auf Boden (außer Zwerg)
             'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 100, icon: '🚧', stages: 1 },
             'deco_bush': { id: 'deco_bush', name: 'Hecke', type: 'decor', cost: 150, icon: '🌳', stages: 1 },
             'deco_bench': { id: 'deco_bench', name: 'Bank', type: 'decor', cost: 300, icon: '🪑', stages: 1 },
@@ -261,7 +260,7 @@
             };
 
             if(!user) return (
-                <div className="h-screen flex flex-col items-center justify-center bg-grass-pattern dark:bg-slate-900 p-4 text-center transition-colors">
+                <div className="h-screen flex flex-col items-center justify-center bg-grass-realistic dark:bg-slate-900 p-4 text-center transition-colors">
                     <div className="bg-white/90 backdrop-blur dark:bg-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-sm">
                         <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
                             <Flower size={48} className="text-bloom-600 dark:text-green-500 animate-float"/>
@@ -288,7 +287,12 @@
                             <SidebarBtn i={CheckSquare} l="Aufgaben" a={tab==='tasks'} set={()=>setTab('tasks')}/>
                             <SidebarBtn i={ShoppingBag} l="Shop" a={tab==='shop'} set={()=>setTab('shop')}/>
                         </nav>
-                        <button onClick={leaveRoom} className="text-red-500 text-sm hover:bg-red-50 dark:hover:bg-slate-800 p-3 rounded-lg flex gap-3 font-medium transition-colors"><LogOut size={18}/> Verlassen</button>
+                        <div className="border-t dark:border-slate-800 pt-4">
+                            <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Code kopiert!");}} className="w-full text-blue-500 text-sm p-2 rounded hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2 mb-2 font-medium">
+                                <UserPlus size={16}/> Code: {room.id}
+                            </button>
+                            <button onClick={leaveRoom} className="w-full text-red-500 text-sm p-2 rounded hover:bg-red-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium"><LogOut size={16}/> Verlassen</button>
+                        </div>
                     </div>
 
                     <div className="md:hidden bg-white/80 backdrop-blur dark:bg-slate-900/80 p-3 shadow-sm z-10 flex justify-between items-center border-b dark:border-slate-800 sticky top-0">
@@ -338,7 +342,7 @@
         };
 
         const Lobby = ({ user, createRoom, joinRoom, loading, isNight }) => (
-            <div className="min-h-screen bg-grass-pattern dark:bg-slate-900 flex items-center justify-center p-6 text-center transition-colors">
+            <div className="min-h-screen bg-grass-realistic dark:bg-slate-900 flex items-center justify-center p-6 text-center transition-colors">
                 <div className="bg-white/95 dark:bg-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-md space-y-8 backdrop-blur-sm">
                     <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Willkommen, {user.displayName?.split(' ')[0]}!</h2>
                     <div className="space-y-6">
@@ -372,20 +376,17 @@
                 if((data.inventory?.[itemId]||0) <= 0) return;
                 const itemDef = ITEMS[itemId];
                 
-                // MIGRATION HELPER: Check for old data structure
                 let cell = room.grid[sel];
                 if (!cell || typeof cell !== 'object') cell = { floor: null, item: null };
-                // Fix if cell has old 'type' property
+                // Migration Fix
                 if(cell.type) { 
                     if(ITEMS[cell.type]?.type === 'floor') cell = { floor: cell.type, item: null };
                     else cell = { floor: null, item: { ...cell } };
                 }
 
-                // LOGIK PRÜFUNG
+                // --- NEUE LOGIK REGELN ---
                 if (itemDef.type === 'floor') {
-                    // Boden immer erlaubt -> alter Boden zurück ins Inventar? 
-                    // Simpel: Überschreiben und alten Boden 'verlieren' oder gutschreiben. 
-                    // Wir schreiben gut, falls einer da war.
+                    // Boden
                     await runTransaction(db, async(t)=>{
                         if (cell.floor) t.update(doc(db,'users',user.uid), {[`inventory.${cell.floor}`]: increment(1)});
                         t.update(doc(db,'users',user.uid), {[`inventory.${itemId}`]: increment(-1)});
@@ -393,9 +394,9 @@
                     });
                 } 
                 else if (itemDef.type === 'plant') {
-                    // Pflanzen NUR auf Erde (kein Floor)
+                    // Pflanze -> Nur Erde
                     if (cell.floor) { alert("Pflanzen brauchen Erde (kein Bodenbelag)!"); return; }
-                    if (cell.item) { alert("Hier steht schon was!"); return; }
+                    if (cell.item) { alert("Platz belegt!"); return; }
                     
                     await runTransaction(db, async(t)=>{
                         t.update(doc(db,'users',user.uid), {[`inventory.${itemId}`]: increment(-1)});
@@ -403,13 +404,13 @@
                     });
                 }
                 else if (itemDef.type === 'decor') {
-                    // Deko NUR auf Floor (außer Zwerg)
+                    // Deko -> Nur auf Boden (außer Zwerg)
                     if (itemDef.id !== 'deco_gnome' && !cell.floor) { alert("Deko braucht einen Boden (Holz/Stein)!"); return; }
                     if (cell.item) { alert("Platz belegt!"); return; }
 
                     await runTransaction(db, async(t)=>{
                         t.update(doc(db,'users',user.uid), {[`inventory.${itemId}`]: increment(-1)});
-                        t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}.item`]: {type:itemId, stage:1, user: user.displayName}}); // Deko ist immer stage 1
+                        t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}.item`]: {type:itemId, stage:1, user: user.displayName}}); 
                     });
                 }
                 setSel(null);
@@ -417,7 +418,6 @@
 
             const action = async (idx) => {
                 let cell = room.grid[idx] || { floor: null, item: null };
-                // Migration safeguard
                 if(cell.type) {
                      if(ITEMS[cell.type]?.type === 'floor') cell = { floor: cell.type, item: null };
                      else cell = { floor: null, item: { ...cell } };
@@ -425,15 +425,13 @@
 
                 if (moveMode) {
                     if (moveSrc === null) {
-                        // Pick up check
-                        if (!cell.item) return; // Can only move items, not floors directly via this? Or allow? Let's assume items.
+                        // Pick up (nur Items, keine Böden beim Verschieben)
+                        if (!cell.item) return; 
                         setMoveSrc(idx);
                     } else if (moveSrc === idx) {
                         setMoveSrc(null);
                     } else {
-                        // Move logic requires same rules? For now simple swap/move
-                        // Implementation simplified for prototype
-                        alert("Verschieben noch in Arbeit für neue Logik");
+                        alert("Verschieben noch nicht implementiert für Layer-System (Nutze Einlagern)");
                         setMoveSrc(null);
                     }
                     return;
@@ -446,7 +444,6 @@
 
                 const itemDef = ITEMS[cell.item.type];
                 
-                // HARVEST / WATER LOGIC
                 if (itemDef.type === 'plant') {
                     if(cell.item.stage < itemDef.stages) {
                         if(now < cell.item.lastWatered + CYCLE_MS) { alert("Pflanze braucht Ruhe!"); return; }
@@ -458,7 +455,6 @@
                         });
                     }
                 } else {
-                    // Clicking on Decor -> Open Menu to Remove/Store
                     setSel(idx);
                 }
             };
@@ -471,13 +467,12 @@
                 const type = cell.item.type;
                 
                 if (ITEMS[type].type === 'plant') {
-                    // Plants are destroyed
                     if (confirm("Pflanze entfernen? (Keine Rückerstattung)")) {
                         await updateDoc(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}.item`]: null});
                         setSel(null);
                     }
                 } else {
-                    // Decor is stored
+                    // Deko einlagern
                     await runTransaction(db, async(t)=>{
                         t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}.item`]: null});
                         t.update(doc(db,'users',user.uid), {[`inventory.${type}`]: increment(1)});
@@ -524,14 +519,13 @@
             };
 
             return (
-                <div className="h-full flex flex-col bg-grass-pattern dark:bg-slate-950 transition-colors duration-700">
+                <div className="h-full flex flex-col bg-grass-realistic dark:bg-slate-950 transition-colors duration-700">
                     <div className="p-4 flex justify-between items-center z-10">
                         <div className="flex gap-2">
                              <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-gray-700 dark:text-gray-300 shadow-sm border border-white/20">
                                 {isNight ? 'Nacht 🌙' : 'Tag ☀️'}
                              </div>
                         </div>
-                        {/* Move Mode Disabled for now to keep logic simple */}
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center justify-center">
@@ -548,7 +542,7 @@
                                 {Array.from({length:size*size}).map((_,i)=>{
                                     // SAFELY ACCESS CELL DATA
                                     let c = room.grid?.[i] || { floor: null, item: null };
-                                    // Migration on the fly for rendering
+                                    // Migration on the fly
                                     if(c.type) {
                                         if(ITEMS[c.type]?.type === 'floor') c = { floor: c.type, item: null };
                                         else c = { floor: null, item: { ...c } };
