@@ -43,17 +43,22 @@
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
-        /* Texture Patterns via CSS Gradients */
-        .bg-grass {
-            background-color: #86efac;
-            background-image: radial-gradient(#4ade80 2px, transparent 2px);
+        /* Verbesserte Gras-Textur */
+        .bg-grass-pattern {
+            background-color: #a3cf90;
+            background-image: 
+                linear-gradient(45deg, #a3cf90 25%, transparent 25%, transparent 75%, #a3cf90 75%, #a3cf90),
+                linear-gradient(-45deg, #a3cf90 25%, transparent 25%, transparent 75%, #a3cf90 75%, #a3cf90);
             background-size: 20px 20px;
         }
-        .dark .bg-grass {
-            background-color: #14532d;
-            background-image: radial-gradient(#166534 2px, transparent 2px);
+        .dark .bg-grass-pattern {
+            background-color: #2d5a27;
+            background-image: 
+                linear-gradient(45deg, #2d5a27 25%, transparent 25%, transparent 75%, #2d5a27 75%, #2d5a27),
+                linear-gradient(-45deg, #2d5a27 25%, transparent 25%, transparent 75%, #2d5a27 75%, #2d5a27);
+            background-size: 20px 20px;
         }
-        
+
         .soil-inset {
             box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3);
         }
@@ -68,10 +73,13 @@
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect } from 'https://esm.sh/react@18.2.0';
         import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+        // Alle benötigten Icons importieren
         import { 
             Sprout, Droplet, CheckSquare, ShoppingBag, Users, Gem, Coins, 
             Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, 
-            LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History, Moon, Sun, Flower, Star
+            LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History, Moon, Sun, Flower, Star,
+            Wheat, Carrot, SunSnow, TreeDeciduous, Fence, Shrub, Armchair, Lightbulb,
+            Square,
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -105,20 +113,22 @@
             db = getFirestore(app);
         } catch(e) { console.error("Firebase Init Fehler:", e); }
 
+        // --- ITEMS MIT SVG-ICONS ---
+        // Für Pflanzen definieren wir verschiedene Stadien
         const ITEMS = {
-            'seed_wheat': { id: 'seed_wheat', name: 'Weizen', type: 'plant', cost: 20, icon: '🌾', stages: 2, sellPrice: 10, sellCurrency: 'gems' },
-            'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icon: '🥕', stages: 3, sellPrice: 15, sellCurrency: 'gems' },
-            'seed_flower': { id: 'seed_flower', name: 'Rose', type: 'plant', cost: 150, icon: '🌹', stages: 4, sellPrice: 30, sellCurrency: 'gems' },
-            'seed_sun': { id: 'seed_sun', name: 'Sonnenblume', type: 'plant', cost: 300, icon: '🌻', stages: 4, sellPrice: 60, sellCurrency: 'gems' },
-            'seed_pumpkin': { id: 'seed_pumpkin', name: 'Kürbis', type: 'plant', cost: 600, icon: '🎃', stages: 5, sellPrice: 150, sellCurrency: 'gems' },
-            'seed_tree': { id: 'seed_tree', name: 'Baum', type: 'plant', cost: 1000, icon: '🌳', stages: 6, sellPrice: 250, sellCurrency: 'gems' },
-            'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'floor', cost: 50, icon: '', bg: '#94a3b8', stages: 1 },
-            'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'floor', cost: 50, icon: '', bg: '#d97706', stages: 1 },
-            'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 100, icon: '🚧', stages: 1 },
-            'deco_bush': { id: 'deco_bush', name: 'Hecke', type: 'decor', cost: 150, icon: '🌳', stages: 1 },
-            'deco_bench': { id: 'deco_bench', name: 'Bank', type: 'decor', cost: 300, icon: '🪑', stages: 1 },
-            'deco_lamp': { id: 'deco_lamp', name: 'Lampe', type: 'decor', cost: 400, icon: '💡', stages: 1 },
-            'deco_gnome': { id: 'deco_gnome', name: 'Zwerg', type: 'decor', cost: 1000, icon: '🎅', stages: 1 },
+            'seed_wheat': { id: 'seed_wheat', name: 'Weizen', type: 'plant', cost: 20, icons: [Sprout, Wheat], stages: 2, sellPrice: 10, sellCurrency: 'gems' },
+            'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icons: [Sprout, Carrot], stages: 3, sellPrice: 15, sellCurrency: 'gems' },
+            'seed_flower': { id: 'seed_flower', name: 'Rose', type: 'plant', cost: 150, icons: [Sprout, Flower], stages: 4, sellPrice: 30, sellCurrency: 'gems' },
+            'seed_sun': { id: 'seed_sun', name: 'Sonnenblume', type: 'plant', cost: 300, icons: [Sprout, SunSnow], stages: 4, sellPrice: 60, sellCurrency: 'gems' },
+            'seed_tree': { id: 'seed_tree', name: 'Baum', type: 'plant', cost: 1000, icons: [Sprout, TreeDeciduous], stages: 6, sellPrice: 250, sellCurrency: 'gems' },
+            
+            // Deko und Bodenbeläge verwenden ein einzelnes Icon oder nur eine Hintergrundfarbe
+            'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'floor', cost: 50, icon: Square, bg: '#94a3b8', stages: 1 },
+            'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'floor', cost: 50, icon: Square, bg: '#d97706', stages: 1 },
+            'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 100, icon: Fence, stages: 1 },
+            'deco_bush': { id: 'deco_bush', name: 'Hecke', type: 'decor', cost: 150, icon: Shrub, stages: 1 },
+            'deco_bench': { id: 'deco_bench', name: 'Bank', type: 'decor', cost: 300, icon: Armchair, stages: 1 },
+            'deco_lamp': { id: 'deco_lamp', name: 'Lampe', type: 'decor', cost: 400, icon: Lightbulb, stages: 1 },
         };
 
         class ErrorBoundary extends React.Component {
@@ -227,7 +237,7 @@
             };
 
             if(!user) return (
-                <div className="h-screen flex flex-col items-center justify-center bg-grass dark:bg-slate-900 p-4 text-center transition-colors">
+                <div className="h-screen flex flex-col items-center justify-center bg-grass-pattern dark:bg-slate-900 p-4 text-center transition-colors">
                     <div className="bg-white/90 backdrop-blur dark:bg-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-sm">
                         <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
                             <Flower size={48} className="text-bloom-600 dark:text-green-500 animate-float"/>
@@ -296,7 +306,7 @@
         };
 
         const Lobby = ({ user, createRoom, joinRoom, loading, isNight }) => (
-            <div className="min-h-screen bg-grass dark:bg-slate-900 flex items-center justify-center p-6 text-center transition-colors">
+            <div className="min-h-screen bg-grass-pattern dark:bg-slate-900 flex items-center justify-center p-6 text-center transition-colors">
                 <div className="bg-white/95 dark:bg-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-md space-y-8 backdrop-blur-sm">
                     <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Willkommen, {user.displayName?.split(' ')[0]}!</h2>
                     <div className="space-y-6">
@@ -387,7 +397,7 @@
             };
 
             return (
-                <div className="h-full flex flex-col bg-grass dark:bg-slate-950 transition-colors duration-700">
+                <div className="h-full flex flex-col bg-grass-pattern dark:bg-slate-950 transition-colors duration-700">
                     <div className="p-4 flex justify-between items-center z-10">
                         <div className="flex gap-2">
                              <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-gray-700 dark:text-gray-300 shadow-sm border border-white/20">
@@ -399,11 +409,9 @@
                     
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center justify-center">
                         
-                        {/* THE GARDEN CONTAINER */}
                         <div className="relative p-3 md:p-4 rounded-2xl shadow-2xl transition-all duration-700 bg-[#8d6e63] border-4 border-[#5d4037]" 
                              style={{ width: '100%', maxWidth: '600px', aspectRatio:'1' }}>
                              
-                            {/* Wooden Texture Overlay */}
                             <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 11px)'}}></div>
                              
                             {isNight && <div className="absolute inset-0 pointer-events-none z-0 rounded night-overlay"></div>}
@@ -414,11 +422,20 @@
                                     const item = c ? ITEMS[c.type] : null;
                                     const isMoving = moveSrc === i;
                                     
-                                    // Visual Logic for Soil
                                     const isFloor = c && item.type === 'floor';
                                     const isDry = c && item.type === 'plant' && now > c.lastWatered + CYCLE_MS;
-                                    const soilColor = isFloor ? item.bg : (isDry ? '#d6b48e' : '#5d4037'); // Dry vs Wet
+                                    const soilColor = isFloor ? item.bg : (isDry ? '#d6b48e' : '#5d4037');
                                     
+                                    // Logik zur Auswahl des richtigen Icons basierend auf dem Wachstumsstadium
+                                    let ItemIcon = null;
+                                    if (item) {
+                                        if (item.type === 'plant') {
+                                            ItemIcon = c.stage < item.stages - 1 ? item.icons[0] : item.icons[1];
+                                        } else {
+                                            ItemIcon = item.icon;
+                                        }
+                                    }
+
                                     return (
                                         <div key={i} onClick={()=> c ? action(i,c) : handleEmptyClick(i)} 
                                              className={`
@@ -433,38 +450,34 @@
                                              style={{backgroundColor: c ? (item.type === 'decor' ? 'transparent' : soilColor) : undefined}}
                                         >
                                             
-                                            {c && item.type === 'decor' && <div className={`absolute inset-0 rounded-lg -z-10 bg-grass shadow-inner opacity-80`}/>}
+                                            {c && item.type === 'decor' && <div className={`absolute inset-0 rounded-lg -z-10 bg-grass-pattern shadow-inner opacity-80`}/>}
 
                                             {c ? (
-                                                <div className="w-full h-full flex flex-col items-center justify-center relative group">
+                                                <div className="w-full h-full flex flex-col items-center justify-center relative group p-1">
                                                     
-                                                    {/* Water Indicator */}
                                                     {item.type === 'plant' && c.stage < item.stages && !moveMode && (
                                                         <div className={`absolute -top-3 scale-75 md:scale-100 transition-all font-mono font-bold px-2 py-0.5 rounded-full shadow-lg z-20 border border-white/20 ${now > c.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/40 text-white backdrop-blur-sm'}`}>
                                                             {now > c.lastWatered + CYCLE_MS ? <Droplet size={12}/> : getTimerString(c.lastWatered)}
                                                         </div>
                                                     )}
 
-                                                    {/* The Item Icon */}
+                                                    {/* SVG-Icon Darstellung */}
                                                     <span className={`
                                                         drop-shadow-lg select-none transition-transform
-                                                        ${item.type==='plant' ? 'text-4xl md:text-5xl animate-sway origin-bottom' : 'text-3xl md:text-5xl'} 
+                                                        ${item.type==='plant' ? 'animate-sway origin-bottom' : ''} 
                                                         ${!moveMode && 'group-hover:scale-110'}
+                                                        ${item.type === 'plant' && c.stage >= item.stages && !moveMode ? 'animate-pulse text-yellow-300' : 'text-white'}
                                                     `}>
-                                                        {item.type === 'plant' && c.stage===0 ? '🌱' : item.icon}
+                                                        {ItemIcon && <ItemIcon size={32} className={isNight && item.type !== 'floor' ? 'text-blue-200' : ''} />}
                                                     </span>
                                                     
-                                                    {/* Shadow under plants */}
                                                     {item.type === 'plant' && <div className="absolute bottom-2 w-8 h-2 bg-black/20 rounded-full blur-sm"></div>}
 
-                                                    {/* Progress Bar */}
                                                     {item.type === 'plant' && item.stages > 1 && !moveMode && (<div className="absolute bottom-1 w-8 h-1.5 bg-black/30 rounded-full overflow-hidden border border-white/10"><div className="h-full bg-bloom-500" style={{width: `${(c.stage/item.stages)*100}%`}}></div></div>)}
                                                     
-                                                    {/* Ready Glow */}
                                                     {item.type === 'plant' && c.stage >= item.stages && !moveMode && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-lg border-2 border-yellow-300 shadow-[0_0_15px_rgba(253,224,71,0.5)]"/>}
                                                 </div>
                                             ) : (
-                                                /* Empty Soil Texture */
                                                 <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>
                                             )}
                                         </div>
@@ -475,7 +488,6 @@
                         <button onClick={expand} className="mt-8 bg-white dark:bg-slate-800 border dark:border-slate-700 text-purple-700 dark:text-purple-400 px-6 py-3 rounded-full shadow-lg hover:shadow-xl hover:bg-purple-50 dark:hover:bg-slate-700 font-bold flex items-center gap-2 transition-all"><Gem size={16}/> Fläche erweitern (50)</button>
                     </div>
 
-                    {/* ITEM DRAWER */}
                     {sel !== null && (
                         <div className="absolute bottom-0 w-full bg-white/95 backdrop-blur dark:bg-slate-900/95 p-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)] animate-slide-up z-30 md:max-w-md md:left-1/2 md:-translate-x-1/2 md:mb-6 md:rounded-3xl border border-gray-100 dark:border-slate-700">
                             <div className="flex justify-between mb-4 font-bold text-gray-700 dark:text-white items-center">
@@ -485,13 +497,20 @@
                             
                             {!room.grid[sel] && (
                                 <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
-                                    {Object.keys(data?.inventory||{}).map(k => (data.inventory[k]>0) && (
-                                        <button key={k} onClick={()=>plant(k)} className="bg-stone-50 dark:bg-slate-800 p-4 rounded-2xl min-w-[100px] flex flex-col items-center border-2 border-transparent hover:border-bloom-500 transition-all relative group">
-                                            <span className="text-4xl mb-2 group-hover:scale-110 transition-transform">{ITEMS[k].icon}</span>
-                                            <span className="text-xs font-bold text-gray-600 dark:text-gray-300 line-clamp-1">{ITEMS[k].name}</span>
-                                            <span className="absolute top-2 right-2 bg-bloom-100 dark:bg-green-900 text-bloom-700 dark:text-green-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">x{data.inventory[k]}</span>
-                                        </button>
-                                    ))}
+                                    {Object.keys(data?.inventory||{}).map(k => {
+                                        const item = ITEMS[k];
+                                        const InventoryIcon = item.type === 'plant' ? item.icons[1] : item.icon;
+                                        
+                                        if(data.inventory[k]>0) return (
+                                            <button key={k} onClick={()=>plant(k)} className="bg-stone-50 dark:bg-slate-800 p-4 rounded-2xl min-w-[100px] flex flex-col items-center border-2 border-transparent hover:border-bloom-500 transition-all relative group">
+                                                <span className="text-3xl mb-2 group-hover:scale-110 transition-transform text-gray-600 dark:text-gray-300">
+                                                    {InventoryIcon && <InventoryIcon size={32} />}
+                                                </span>
+                                                <span className="text-xs font-bold text-gray-600 dark:text-gray-300 line-clamp-1">{item.name}</span>
+                                                <span className="absolute top-2 right-2 bg-bloom-100 dark:bg-green-900 text-bloom-700 dark:text-green-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">x{data.inventory[k]}</span>
+                                            </button>
+                                        )
+                                    })}
                                     {Object.values(data?.inventory||{}).every(v=>v<=0) && <div className="text-sm text-gray-400 w-full text-center py-4">Dein Inventar ist leer.<br/>Besuche den Shop!</div>}
                                 </div>
                             )}
@@ -558,15 +577,19 @@
         const Shop = ({uid, coins}) => (
             <div className="h-full overflow-y-auto bg-stone-50 dark:bg-slate-900 p-4 md:p-8">
                 <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Object.values(ITEMS).map(i=>(
-                        <div key={i.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex items-center gap-4 hover:shadow-md transition-shadow">
-                            <div className="w-16 h-16 bg-stone-100 dark:bg-slate-700 rounded-xl flex items-center justify-center text-4xl shadow-inner relative overflow-hidden">
-                                {i.icon || (i.type==='floor' && <div className="w-full h-full" style={{backgroundColor: i.bg}}></div>)}
+                    {Object.values(ITEMS).map(i=>{
+                        const ShopIcon = i.type === 'plant' ? i.icons[1] : i.icon;
+                        return (
+                            <div key={i.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex items-center gap-4 hover:shadow-md transition-shadow">
+                                <div className="w-16 h-16 bg-stone-100 dark:bg-slate-700 rounded-xl flex items-center justify-center text-4xl shadow-inner relative overflow-hidden text-gray-600 dark:text-gray-300">
+                                    {ShopIcon && <ShopIcon size={32} />}
+                                    {i.type==='floor' && <div className="w-full h-full absolute inset-0" style={{backgroundColor: i.bg, opacity: 0.5}}></div>}
+                                </div>
+                                <div className="flex-1"><div className="font-bold text-gray-800 dark:text-white">{i.name}</div><div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{i.type === 'plant' ? 'Pflanze' : (i.type==='floor'?'Boden':'Deko')}</div><div className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{i.cost} 🪙</div></div>
+                                <button onClick={() => coins >= i.cost && updateDoc(doc(db,'users',uid),{coins:increment(-i.cost), [`inventory.${i.id}`]:increment(1)})} className="bg-bloom-600 hover:bg-bloom-500 text-white px-4 py-2 rounded-lg text-sm font-bold active:scale-95 transition-all">Kaufen</button>
                             </div>
-                            <div className="flex-1"><div className="font-bold text-gray-800 dark:text-white">{i.name}</div><div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{i.type === 'plant' ? 'Pflanze' : (i.type==='floor'?'Boden':'Deko')}</div><div className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{i.cost} 🪙</div></div>
-                            <button onClick={() => coins >= i.cost && updateDoc(doc(db,'users',uid),{coins:increment(-i.cost), [`inventory.${i.id}`]:increment(1)})} className="bg-bloom-600 hover:bg-bloom-500 text-white px-4 py-2 rounded-lg text-sm font-bold active:scale-95 transition-all">Kaufen</button>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
         );
