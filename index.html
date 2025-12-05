@@ -14,10 +14,6 @@
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #555; }
-        @keyframes pulse-slow {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-900 select-none">
@@ -42,7 +38,7 @@
             runTransaction, query, orderBy, limit 
         } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-        // --- KONFIGURATION (HIER DEINE DATEN) ---
+        // --- KONFIGURATION (HIER DATEN EINFÜGEN) ---
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -54,11 +50,8 @@
           };
 
         // --- ZEIT EINSTELLUNG ---
-        // Hier kannst du einstellen, wie lange ein Zyklus dauert.
-        // Zum Testen: 0.01 (ca 36 Sekunden). Für Echt: 6.0
+        // 6.0 Stunden pro Zyklus. Zum Testen auf 0.01 stellen.
         const HOURS_PER_CYCLE = 6.0; 
-        
-        // Umrechnung in Millisekunden
         const CYCLE_MS = HOURS_PER_CYCLE * 60 * 60 * 1000;
 
         let app, auth, db;
@@ -100,7 +93,7 @@
             useEffect(() => {
                 if(!user) return;
                 const ref = doc(db, 'users', user.uid);
-                getDoc(ref).then(s => !s.exists() && setDoc(ref, { email: user.email, name: user.displayName, coins: 100, gems: 0, inventory: {}, currentGarden: null }));
+                getDoc(ref).then(s => !s.exists() && setDoc(ref, { email: user.email, name: user.displayName, coins: 0, gems: 0, inventory: {}, currentGarden: null }));
                 return onSnapshot(ref, s => {
                     const data = s.data();
                     setUserData(data);
@@ -113,11 +106,37 @@
             const googleLogin = async () => { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch(e) { alert(e.message); } };
             
             const createRoom = async (name) => {
-                if(!name) return; setLoading(true);
+                if(!name) return; 
+                setLoading(true);
                 const id = Math.random().toString(36).substr(2,6).toUpperCase();
                 const grid = {}; for(let i=0; i<16; i++) grid[i] = null;
-                await setDoc(doc(db, 'rooms', `r_${id}`), { id, name, grid, expansion: 4, owner: user.uid, members: [user.uid] });
-                await updateDoc(doc(db, 'users', user.uid), { currentGarden: id });
+                
+                try {
+                    // 1. Raum erstellen
+                    await setDoc(doc(db, 'rooms', `r_${id}`), { id, name, grid, expansion: 4, owner: user.uid, members: [user.uid] });
+                    
+                    // 2. STARTER AUFGABEN HINZUFÜGEN (NEU!)
+                    const tasksRef = collection(db, 'rooms', `r_${id}`, 'tasks');
+                    const starters = [
+                        { txt: "👋 Sag deinem Partner Hallo", rew: 50 },
+                        { txt: "💧 Trinkt beide ein Glas Wasser", rew: 20 },
+                        { txt: "📝 Plant euer erstes Beet", rew: 50 }
+                    ];
+                    // Wir erstellen die Aufgaben parallel
+                    await Promise.all(starters.map(t => 
+                        addDoc(tasksRef, { 
+                            txt: t.txt, 
+                            done: false, 
+                            rew: t.rew, 
+                            at: serverTimestamp() 
+                        })
+                    ));
+
+                    // 3. User zuweisen
+                    await updateDoc(doc(db, 'users', user.uid), { currentGarden: id });
+
+                } catch(e) { console.error(e); alert("Fehler beim Erstellen"); }
+                
                 setLoading(false);
             };
 
@@ -137,7 +156,7 @@
                     <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
                         <Sprout size={48} className="text-green-600 mx-auto mb-4"/>
                         <h1 className="text-2xl font-bold mb-2">Unser Garten</h1>
-                        <p className="text-gray-500 mb-6">Jede {HOURS_PER_CYCLE} Stunden gießen.</p>
+                        <p className="text-gray-500 mb-6">Wachstumszeit: {HOURS_PER_CYCLE} Std.</p>
                         <button onClick={googleLogin} className="w-full bg-white border hover:bg-gray-50 text-gray-700 font-bold py-3 rounded-lg flex items-center justify-center">
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 mr-3" />Login mit Google
                         </button>
@@ -215,24 +234,19 @@
         const NavBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex flex-col items-center w-16 ${a?'text-green-600':'text-gray-400'}`}><I size={24} strokeWidth={a?2.5:2}/><span className="text-[10px] font-bold mt-1">{l}</span></button>;
         const SidebarBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex items-center w-full p-3 rounded-lg gap-3 ${a?'bg-green-50 text-green-700 font-bold':'text-gray-500 hover:bg-gray-50'}`}><I size={20}/><span className="text-sm">{l}</span></button>;
 
-        // --- GARDEN LOGIC (REALTIME) ---
+        // --- GARDEN LOGIC ---
 
         const Garden = ({ room, user, data }) => {
             const [sel, setSel] = useState(null);
             const [now, setNow] = useState(Date.now());
             const size = room.expansion || 4;
             
-            // Timer Ticker: Update UI every second
-            useEffect(() => {
-                const timer = setInterval(() => setNow(Date.now()), 1000);
-                return () => clearInterval(timer);
-            }, []);
+            useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
             const plant = async (id) => {
                 if((data.inventory?.[id]||0) <= 0) return;
                 await runTransaction(db, async(t)=>{
                     t.update(doc(db,'users',user.uid), {[`inventory.${id}`]: increment(-1)});
-                    // plantedAt = now, lastWatered = 0 (means needs water immediately)
                     t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${sel}`]: {type:id, stage:0, lastWatered: 0, user: user.displayName}});
                 });
                 setSel(null);
@@ -241,20 +255,9 @@
             const action = async (idx, cell) => {
                 const item = ITEMS[cell.type];
                 if(cell.stage < item.stages) {
-                    // Check Time
-                    const nextWaterTime = cell.lastWatered + CYCLE_MS;
-                    if(now < nextWaterTime) { 
-                        alert(`Noch warten! Pflanze braucht Ruhe.`); 
-                        return; 
-                    }
-                    
-                    // Water
-                    await updateDoc(doc(db,'rooms',`r_${room.id}`), {
-                        [`grid.${idx}.lastWatered`]: Date.now(), // Store real timestamp
-                        [`grid.${idx}.stage`]: increment(1)
-                    });
+                    if(now < cell.lastWatered + CYCLE_MS) { alert("Pflanze braucht Ruhe!"); return; }
+                    await updateDoc(doc(db,'rooms',`r_${room.id}`), { [`grid.${idx}.lastWatered`]: Date.now(), [`grid.${idx}.stage`]: increment(1) });
                 } else {
-                    // Harvest
                     await runTransaction(db, async(t)=>{
                         t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${idx}`]: null});
                         t.update(doc(db,'users',user.uid), {[item.sellCurrency]: increment(item.sellPrice)});
@@ -273,55 +276,38 @@
                 });
             };
 
-            // Helper to format time remaining
             const getTimerString = (lastWatered) => {
-                if(!lastWatered) return "Gießen!"; // New plant
+                if(!lastWatered) return "Gießen!";
                 const diff = (lastWatered + CYCLE_MS) - now;
                 if(diff <= 0) return "Gießen!";
-                
-                const h = Math.floor(diff / (1000 * 60 * 60));
-                const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                const s = Math.floor((diff % (1000 * 60)) / 1000);
-                return `${h}:${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const s = Math.floor((diff % 60000) / 1000);
+                return `${h}:${m<10?'0'+m:m}:${s<10?'0'+s:s}`;
             };
 
             return (
                 <div className="h-full flex flex-col">
                     <div className="p-3 bg-yellow-50/80 backdrop-blur border-b sticky top-0 z-10 flex justify-between items-center md:hidden">
-                        <span className="text-xs font-bold text-yellow-800 uppercase">Echtzeit-Garten</span>
+                        <span className="text-xs font-bold text-yellow-800">Echtzeit-Garten</span>
                         <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="flex items-center gap-1 text-xs bg-white border px-2 py-1 rounded text-blue-600"><UserPlus size={12}/> Einladen</button>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
-                        <div className="grid gap-2 p-3 rounded-2xl transition-all duration-300" 
-                             style={{gridTemplateColumns:`repeat(${size}, 1fr)`, width: '100%', maxWidth: '600px', aspectRatio:'1'}}>
+                        <div className="grid gap-2 p-3 rounded-2xl transition-all" style={{gridTemplateColumns:`repeat(${size}, 1fr)`, width: '100%', maxWidth: '600px', aspectRatio:'1'}}>
                             {Array.from({length:size*size}).map((_,i)=>{
                                 const c = room.grid?.[i];
                                 return (
-                                    <div key={i} onClick={()=>!c && setSel(i)} 
-                                         className={`bg-[#8B5E3C] rounded-lg relative flex items-center justify-center cursor-pointer shadow-sm border-b-4 border-[#6d4a30] active:border-b-0 active:translate-y-1 transition-all ${sel===i ? 'ring-4 ring-green-400 z-10' : ''}`}>
+                                    <div key={i} onClick={()=>!c && setSel(i)} className={`bg-[#8B5E3C] rounded-lg relative flex items-center justify-center cursor-pointer shadow-sm border-b-4 border-[#6d4a30] active:border-b-0 active:translate-y-1 ${sel===i ? 'ring-4 ring-green-400 z-10' : ''}`}>
                                         {c ? (
                                             <div onClick={(e)=>{e.stopPropagation(); action(i,c)}} className="w-full h-full flex flex-col items-center justify-center relative group">
-                                                
-                                                {/* TIMER / STATUS ANZEIGE */}
                                                 {c.stage < ITEMS[c.type].stages && (
-                                                    <div className={`absolute -top-3 md:-top-6 text-[10px] md:text-xs font-mono font-bold px-1.5 py-0.5 rounded-full shadow-sm z-20 ${now > c.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-pulse' : 'bg-black/50 text-white'}`}>
+                                                    <div className={`absolute -top-2 md:-top-4 text-[9px] md:text-xs font-mono font-bold px-1.5 py-0.5 rounded-full shadow-sm z-20 ${now > c.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-pulse' : 'bg-black/50 text-white'}`}>
                                                         {getTimerString(c.lastWatered)}
                                                     </div>
                                                 )}
-
-                                                <span className="text-3xl md:text-5xl drop-shadow-md transform transition-transform hover:scale-110">
-                                                    {c.stage===0 ? '🌱' : ITEMS[c.type].icon}
-                                                </span>
-                                                
-                                                {/* Fortschrittsbalken */}
-                                                {ITEMS[c.type].stages > 1 && (
-                                                    <div className="absolute bottom-2 w-8 h-1 bg-black/30 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-green-400" style={{width: `${(c.stage/ITEMS[c.type].stages)*100}%`}}></div>
-                                                    </div>
-                                                )}
-
-                                                {/* Ernte Indikator */}
+                                                <span className="text-3xl md:text-5xl drop-shadow-md transform transition-transform hover:scale-110">{c.stage===0 ? '🌱' : ITEMS[c.type].icon}</span>
+                                                {ITEMS[c.type].stages > 1 && (<div className="absolute bottom-2 w-8 h-1 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-green-400" style={{width: `${(c.stage/ITEMS[c.type].stages)*100}%`}}></div></div>)}
                                                 {c.stage >= ITEMS[c.type].stages && <div className="absolute inset-0 bg-yellow-400/20 animate-pulse rounded-lg border-2 border-yellow-400"/>}
                                             </div>
                                         ) : <div className="w-2 h-2 rounded-full bg-black/10"/>}
@@ -329,7 +315,7 @@
                                 )
                             })}
                         </div>
-                        <button onClick={expand} className="mt-8 bg-white border border-purple-200 text-purple-700 px-6 py-2 rounded-full shadow-sm hover:bg-purple-50 font-bold flex items-center gap-2 transition-all"><Gem size={16}/> Fläche erweitern (50)</button>
+                        <button onClick={expand} className="mt-8 bg-white border border-purple-200 text-purple-700 px-6 py-2 rounded-full shadow-sm hover:bg-purple-50 font-bold flex items-center gap-2"><Gem size={16}/> Fläche erweitern (50)</button>
                     </div>
 
                     {sel !== null && (
