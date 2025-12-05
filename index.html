@@ -6,6 +6,22 @@
     <title>Co-op Garden</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class', // Ermöglicht manuelles Umschalten per JS
+            theme: {
+                extend: {
+                    colors: {
+                        night: { 
+                            bg: '#0f172a', // Slate 900
+                            card: '#1e293b', // Slate 800
+                            text: '#f1f5f9'  // Slate 100
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
@@ -16,9 +32,16 @@
         ::-webkit-scrollbar-thumb:hover { background: #555; }
         .fade-in { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Nacht-Überlagerung für den Garten */
+        .night-overlay {
+            background-color: rgba(15, 23, 42, 0.4);
+            mix-blend-mode: multiply;
+            pointer-events: none;
+        }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-900 select-none">
+<body class="bg-gray-100 text-gray-900 dark:bg-slate-900 dark:text-slate-100 select-none transition-colors duration-700">
     
     <div id="root"></div>
 
@@ -28,7 +51,7 @@
         import { 
             Sprout, Droplet, CheckSquare, ShoppingBag, Users, Gem, Coins, 
             Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, 
-            LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History
+            LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History, Moon, Sun
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -41,7 +64,7 @@
             runTransaction, query, orderBy, limit, deleteDoc, Timestamp 
         } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-        // --- CONFIG ---
+        // --- CONFIG (HIER DEINE DATEN) ---
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -71,7 +94,6 @@
             'seed_sun': { id: 'seed_sun', name: 'Sonnenblume', type: 'plant', cost: 300, icon: '🌻', stages: 4, sellPrice: 60, sellCurrency: 'gems' },
             'seed_pumpkin': { id: 'seed_pumpkin', name: 'Kürbis', type: 'plant', cost: 600, icon: '🎃', stages: 5, sellPrice: 150, sellCurrency: 'gems' },
             'seed_tree': { id: 'seed_tree', name: 'Baum', type: 'plant', cost: 1000, icon: '🌳', stages: 6, sellPrice: 250, sellCurrency: 'gems' },
-            
             'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'decor', cost: 50, icon: '🪨', stages: 1 },
             'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'decor', cost: 50, icon: '🪵', stages: 1 },
             'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 100, icon: '🚧', stages: 1 },
@@ -90,7 +112,6 @@
             }
         }
 
-        // --- HELPER FUNCTIONS ---
         const formatDate = (timestamp) => {
             if(!timestamp) return '';
             const d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -104,12 +125,33 @@
             return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
         };
 
+        // --- NIGHT MODE LOGIC ---
+        const useNightMode = () => {
+            const [isNight, setIsNight] = useState(false);
+            useEffect(() => {
+                const checkTime = () => {
+                    const h = new Date().getHours();
+                    // 20:00 bis 06:00 Uhr
+                    const night = h >= 20 || h < 6;
+                    setIsNight(night);
+                    if (night) document.documentElement.classList.add('dark');
+                    else document.documentElement.classList.remove('dark');
+                };
+                checkTime();
+                const interval = setInterval(checkTime, 60000); // Jede Minute checken
+                return () => clearInterval(interval);
+            }, []);
+            return isNight;
+        };
+
         const App = () => {
             const [user, setUser] = useState(null);
             const [userData, setUserData] = useState(null);
             const [room, setRoom] = useState(null);
             const [tab, setTab] = useState('garden');
             const [loading, setLoading] = useState(false);
+            
+            const isNight = useNightMode(); // Hier aktivieren wir den Nachtmodus
 
             if(firebaseConfig.apiKey === "HIER_EINFÜGEN") return <div className="p-10 text-center"><b>Config fehlt!</b></div>;
 
@@ -131,19 +173,16 @@
             const googleLogin = async () => { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch(e) { alert(e.message); } };
             
             const createRoom = async (name) => {
-                if(!name) return; 
-                setLoading(true);
+                if(!name) return; setLoading(true);
                 const id = Math.random().toString(36).substr(2,6).toUpperCase();
                 const grid = {}; for(let i=0; i<16; i++) grid[i] = null;
-                
                 try {
                     await setDoc(doc(db, 'rooms', `r_${id}`), { id, name, grid, expansion: 4, owner: user.uid, members: [user.uid] });
                     const tasksRef = collection(db, 'rooms', `r_${id}`, 'tasks');
-                    // Neue Struktur für Starter Tasks
                     await addDoc(tasksRef, { txt: "👋 Sag Hallo", rew: 50, type: 'once', done: false, at: serverTimestamp() });
                     await addDoc(tasksRef, { txt: "💧 Trink Wasser", rew: 20, type: 'daily', lastDone: null, at: serverTimestamp() });
                     await updateDoc(doc(db, 'users', user.uid), { currentGarden: id });
-                } catch(e) { console.error(e); alert("Fehler beim Erstellen"); }
+                } catch(e) { console.error(e); alert("Fehler"); }
                 setLoading(false);
             };
 
@@ -175,59 +214,68 @@
             };
 
             if(!user) return (
-                <div className="h-screen flex flex-col items-center justify-center bg-green-50 p-4 text-center">
-                    <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
-                        <Sprout size={48} className="text-green-600 mx-auto mb-4"/>
-                        <h1 className="text-2xl font-bold mb-2">Unser Garten</h1>
-                        <p className="text-gray-500 mb-6">Pflanzen, Deko & Aufgaben</p>
-                        <button onClick={googleLogin} className="w-full bg-white border hover:bg-gray-50 text-gray-700 font-bold py-3 rounded-lg flex items-center justify-center">
+                <div className="h-screen flex flex-col items-center justify-center bg-green-50 dark:bg-slate-900 p-4 text-center transition-colors">
+                    <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-sm">
+                        <Sprout size={48} className="text-green-600 dark:text-green-400 mx-auto mb-4"/>
+                        <h1 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Unser Garten</h1>
+                        <p className="text-gray-500 dark:text-gray-400 mb-6">Pflanzen, Deko & Aufgaben</p>
+                        <button onClick={googleLogin} className="w-full bg-white dark:bg-slate-700 border dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600 text-gray-700 dark:text-white font-bold py-3 rounded-lg flex items-center justify-center">
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 mr-3" />Login mit Google
                         </button>
                     </div>
                 </div>
             );
 
-            if(!room) return <Lobby user={user} createRoom={createRoom} joinRoom={joinRoom} loading={loading} />;
+            if(!room) return <Lobby user={user} createRoom={createRoom} joinRoom={joinRoom} loading={loading} isNight={isNight}/>;
 
             return (
-                <div className="h-screen flex flex-col md:flex-row bg-gray-100 overflow-hidden">
-                    <div className="hidden md:flex flex-col w-64 bg-white border-r p-4 shadow-sm z-20">
-                        <div className="text-xl font-bold text-green-700 mb-8 flex items-center gap-2"><Sprout/> Unser Garten</div>
+                <div className="h-screen flex flex-col md:flex-row bg-gray-100 dark:bg-slate-950 overflow-hidden transition-colors duration-700">
+                    {/* Desktop Sidebar */}
+                    <div className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r dark:border-slate-800 p-4 shadow-sm z-20">
+                        <div className="text-xl font-bold text-green-700 dark:text-green-400 mb-8 flex items-center gap-2">
+                            <Sprout/> Unser Garten {isNight && <Moon size={16} className="text-blue-200 ml-2 animate-pulse"/>}
+                        </div>
                         <nav className="space-y-2 flex-1">
                             <SidebarBtn i={Sprout} l="Garten" a={tab==='garden'} set={()=>setTab('garden')}/>
                             <SidebarBtn i={CheckSquare} l="Aufgaben" a={tab==='tasks'} set={()=>setTab('tasks')}/>
                             <SidebarBtn i={ShoppingBag} l="Shop" a={tab==='shop'} set={()=>setTab('shop')}/>
                         </nav>
-                        <button onClick={leaveRoom} className="text-red-500 text-sm hover:bg-red-50 p-2 rounded flex gap-2"><LogOut size={16}/> Verlassen</button>
+                        <button onClick={leaveRoom} className="text-red-500 text-sm hover:bg-red-50 dark:hover:bg-slate-800 p-2 rounded flex gap-2"><LogOut size={16}/> Verlassen</button>
                     </div>
 
-                    <div className="md:hidden bg-white p-3 shadow-sm z-10 flex justify-between items-center">
-                        <span className="font-bold truncate">{room.name}</span>
+                    {/* Mobile Header */}
+                    <div className="md:hidden bg-white dark:bg-slate-900 p-3 shadow-sm z-10 flex justify-between items-center border-b dark:border-slate-800">
+                        <span className="font-bold truncate text-gray-800 dark:text-white">{room.name}</span>
                         <div className="flex gap-2 text-xs font-bold">
-                             <div className="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full flex items-center"><Coins size={12} className="mr-1"/>{userData?.coins||0}</div>
-                             <div className="bg-purple-50 text-purple-700 px-2 py-1 rounded-full flex items-center"><Gem size={12} className="mr-1"/>{userData?.gems||0}</div>
+                             <div className="bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 px-2 py-1 rounded-full flex items-center"><Coins size={12} className="mr-1"/>{userData?.coins||0}</div>
+                             <div className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-1 rounded-full flex items-center"><Gem size={12} className="mr-1"/>{userData?.gems||0}</div>
                         </div>
                         <button onClick={leaveRoom} className="text-gray-400"><LogOut size={18}/></button>
                     </div>
 
-                    <div className="flex-1 flex flex-col relative overflow-hidden bg-[#e5e7eb]">
-                        <div className="hidden md:flex justify-between items-center p-4 bg-white/60 backdrop-blur border-b">
-                            <h2 className="text-xl font-bold">{room.name}</h2>
+                    {/* Content */}
+                    <div className="flex-1 flex flex-col relative overflow-hidden bg-[#e5e7eb] dark:bg-slate-950">
+                        <div className="hidden md:flex justify-between items-center p-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur border-b dark:border-slate-800">
+                            <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                {room.name}
+                                {isNight ? <Moon size={20} className="text-blue-300"/> : <Sun size={20} className="text-orange-400"/>}
+                            </h2>
                             <div className="flex gap-4 items-center">
-                                <div className="bg-white px-3 py-1 rounded border font-bold text-yellow-600 flex items-center"><Coins size={16} className="mr-2"/>{userData?.coins||0}</div>
-                                <div className="bg-white px-3 py-1 rounded border font-bold text-purple-600 flex items-center"><Gem size={16} className="mr-2"/>{userData?.gems||0}</div>
-                                <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="text-sm text-blue-600 font-bold hover:underline flex gap-1"><UserPlus size={16}/> Code: {room.id}</button>
+                                <div className="bg-white dark:bg-slate-800 px-3 py-1 rounded border dark:border-slate-700 font-bold text-yellow-600 dark:text-yellow-400 flex items-center"><Coins size={16} className="mr-2"/>{userData?.coins||0}</div>
+                                <div className="bg-white dark:bg-slate-800 px-3 py-1 rounded border dark:border-slate-700 font-bold text-purple-600 dark:text-purple-400 flex items-center"><Gem size={16} className="mr-2"/>{userData?.gems||0}</div>
+                                <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="text-sm text-blue-600 dark:text-blue-400 font-bold hover:underline flex gap-1"><UserPlus size={16}/> Code: {room.id}</button>
                             </div>
                         </div>
 
                         <div className="flex-1 overflow-hidden relative">
-                            {tab === 'garden' && <Garden room={room} user={user} data={userData} />}
+                            {tab === 'garden' && <Garden room={room} user={user} data={userData} isNight={isNight} />}
                             {tab === 'tasks' && <Tasks rid={room.id} user={user} />}
                             {tab === 'shop' && <Shop uid={user.uid} coins={userData?.coins||0} />}
                         </div>
                     </div>
 
-                    <div className="md:hidden bg-white border-t p-2 pb-6 flex justify-around shadow-lg z-20">
+                    {/* Mobile Bottom Nav */}
+                    <div className="md:hidden bg-white dark:bg-slate-900 border-t dark:border-slate-800 p-2 pb-6 flex justify-around shadow-lg z-20">
                         <NavBtn i={Sprout} l="Garten" a={tab==='garden'} set={()=>setTab('garden')}/>
                         <NavBtn i={CheckSquare} l="Tasks" a={tab==='tasks'} set={()=>setTab('tasks')}/>
                         <NavBtn i={ShoppingBag} l="Shop" a={tab==='shop'} set={()=>setTab('shop')}/>
@@ -236,25 +284,25 @@
             );
         };
 
-        const Lobby = ({ user, createRoom, joinRoom, loading }) => (
-            <div className="min-h-screen bg-green-50 flex items-center justify-center p-6 text-center">
-                <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md space-y-6">
-                    <h2 className="text-xl font-bold">Hallo, {user.displayName?.split(' ')[0]}!</h2>
+        const Lobby = ({ user, createRoom, joinRoom, loading, isNight }) => (
+            <div className="min-h-screen bg-green-50 dark:bg-slate-900 flex items-center justify-center p-6 text-center transition-colors">
+                <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md space-y-6">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-white">Hallo, {user.displayName?.split(' ')[0]}! {isNight ? '🌙' : '☀️'}</h2>
                     <div className="space-y-4">
-                        <div className="flex gap-2"><input id="newG" placeholder="Neuer Garten Name" className="flex-1 p-3 border rounded-lg"/><button onClick={()=>createRoom(document.getElementById('newG').value)} disabled={loading} className="bg-green-600 text-white p-3 rounded-lg"><ArrowRight/></button></div>
+                        <div className="flex gap-2"><input id="newG" placeholder="Neuer Garten Name" className="flex-1 p-3 border dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-700 dark:text-white"/><button onClick={()=>createRoom(document.getElementById('newG').value)} disabled={loading} className="bg-green-600 text-white p-3 rounded-lg"><ArrowRight/></button></div>
                         <div className="text-gray-400 text-xs">- ODER -</div>
-                        <div className="flex gap-2"><input id="joinC" placeholder="Code (z.B. A1B2)" className="flex-1 p-3 border rounded-lg"/><button onClick={()=>joinRoom(document.getElementById('joinC').value)} disabled={loading} className="bg-blue-600 text-white p-3 rounded-lg">Beitreten</button></div>
+                        <div className="flex gap-2"><input id="joinC" placeholder="Code (z.B. A1B2)" className="flex-1 p-3 border dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-700 dark:text-white"/><button onClick={()=>joinRoom(document.getElementById('joinC').value)} disabled={loading} className="bg-blue-600 text-white p-3 rounded-lg">Beitreten</button></div>
                     </div>
                     <button onClick={()=>signOut(auth)} className="text-xs text-red-400">Abmelden</button>
                 </div>
             </div>
         );
 
-        const NavBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex flex-col items-center w-16 ${a?'text-green-600':'text-gray-400'}`}><I size={24} strokeWidth={a?2.5:2}/><span className="text-[10px] font-bold mt-1">{l}</span></button>;
-        const SidebarBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex items-center w-full p-3 rounded-lg gap-3 ${a?'bg-green-50 text-green-700 font-bold':'text-gray-500 hover:bg-gray-50'}`}><I size={20}/><span className="text-sm">{l}</span></button>;
+        const NavBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex flex-col items-center w-16 ${a?'text-green-600 dark:text-green-400':'text-gray-400 dark:text-slate-500'}`}><I size={24} strokeWidth={a?2.5:2}/><span className="text-[10px] font-bold mt-1">{l}</span></button>;
+        const SidebarBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex items-center w-full p-3 rounded-lg gap-3 ${a?'bg-green-50 dark:bg-slate-800 text-green-700 dark:text-green-400 font-bold':'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'}`}><I size={20}/><span className="text-sm">{l}</span></button>;
 
         // --- GARDEN LOGIC ---
-        const Garden = ({ room, user, data }) => {
+        const Garden = ({ room, user, data, isNight }) => {
             const [sel, setSel] = useState(null);
             const [moveMode, setMoveMode] = useState(false);
             const [moveSrc, setMoveSrc] = useState(null);
@@ -326,74 +374,108 @@
 
             return (
                 <div className="h-full flex flex-col">
-                    <div className="p-3 bg-yellow-50/80 backdrop-blur border-b sticky top-0 z-10 flex justify-between items-center">
+                    <div className="p-3 bg-yellow-50/80 dark:bg-slate-800/80 backdrop-blur border-b dark:border-slate-700 sticky top-0 z-10 flex justify-between items-center">
                         <div className="flex gap-2">
-                            <span className="text-xs font-bold text-yellow-800 uppercase hidden md:inline">Echtzeit-Garten</span>
-                            <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="flex items-center gap-1 text-xs bg-white border px-2 py-1 rounded text-blue-600"><UserPlus size={12}/> Einladen</button>
+                            <span className="text-xs font-bold text-yellow-800 dark:text-yellow-400 uppercase hidden md:inline">Echtzeit-Garten</span>
+                            <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="flex items-center gap-1 text-xs bg-white dark:bg-slate-700 border dark:border-slate-600 px-2 py-1 rounded text-blue-600 dark:text-blue-300"><UserPlus size={12}/> Einladen</button>
                         </div>
-                        <button onClick={() => { setMoveMode(!moveMode); setMoveSrc(null); setSel(null); }} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-full font-bold shadow-sm transition-all ${moveMode ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-white text-gray-600'}`}><Move size={14}/> {moveMode ? 'Verschieben...' : 'Umbauen'}</button>
+                        <button onClick={() => { setMoveMode(!moveMode); setMoveSrc(null); setSel(null); }} className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-full font-bold shadow-sm transition-all ${moveMode ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-white dark:bg-slate-700 text-gray-600 dark:text-gray-200'}`}><Move size={14}/> {moveMode ? 'Verschieben...' : 'Umbauen'}</button>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center">
-                        {moveMode && <div className="mb-4 bg-blue-100 text-blue-800 px-4 py-2 rounded-lg text-sm font-bold animate-pulse">Klicke Objekt, dann leeres Feld.</div>}
+                        {moveMode && <div className="mb-4 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 px-4 py-2 rounded-lg text-sm font-bold animate-pulse">Klicke Objekt, dann leeres Feld.</div>}
 
-                        <div className="grid gap-1 bg-[#dcdcdc] p-2 rounded-lg border-4 border-[#c0c0c0] shadow-lg" style={{gridTemplateColumns:`repeat(${size}, 1fr)`, width: '100%', maxWidth: '600px', aspectRatio:'1'}}>
-                            {Array.from({length:size*size}).map((_,i)=>{
-                                const c = room.grid?.[i];
-                                const item = c ? ITEMS[c.type] : null;
-                                const isMoving = moveSrc === i;
-                                return (
-                                    <div key={i} onClick={()=> c ? action(i,c) : handleEmptyClick(i)} 
-                                         className={`rounded relative flex items-center justify-center cursor-pointer transition-all ${!c ? 'bg-[#8B5E3C] hover:brightness-105' : ''} ${c && item.type === 'decor' ? 'bg-transparent' : (c ? 'bg-[#8B5E3C]' : '')} ${isMoving ? 'ring-4 ring-blue-500 z-20 scale-110' : ''} ${moveMode && !c && moveSrc !== null ? 'ring-2 ring-blue-300 bg-blue-50/20' : ''} ${sel===i ? 'ring-4 ring-green-400 z-10' : ''}`}>
-                                        {c && item.type === 'decor' && <div className="absolute inset-0 bg-[#8B5E3C] rounded -z-10"/>}
-                                        {c ? (
-                                            <div className="w-full h-full flex flex-col items-center justify-center relative group">
-                                                {item.type === 'plant' && c.stage < item.stages && !moveMode && (
-                                                    <div className={`absolute -top-2 md:-top-3 text-[9px] font-mono font-bold px-1 py-0.5 rounded shadow-sm z-20 ${now > c.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white' : 'bg-black/50 text-white'}`}>{getTimerString(c.lastWatered)}</div>
-                                                )}
-                                                <span className={`drop-shadow-md select-none ${item.type==='decor'?'text-4xl md:text-6xl':'text-3xl md:text-5xl transform hover:scale-110 transition-transform'}`}>{item.type === 'plant' && c.stage===0 ? '🌱' : item.icon}</span>
-                                                {item.type === 'plant' && item.stages > 1 && !moveMode && (<div className="absolute bottom-1 w-8 h-1 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-green-400" style={{width: `${(c.stage/item.stages)*100}%`}}></div></div>)}
-                                                {item.type === 'plant' && c.stage >= item.stages && !moveMode && <div className="absolute inset-0 bg-yellow-400/20 animate-pulse rounded border-2 border-yellow-400"/>}
-                                            </div>
-                                        ) : <div className="w-1 h-1 rounded-full bg-black/10"/>}
-                                    </div>
-                                )
-                            })}
+                        {/* GARDEN GRID CONTAINER */}
+                        <div className="relative p-2 rounded-lg shadow-2xl transition-all duration-700" 
+                             style={{
+                                 backgroundColor: isNight ? '#1e293b' : '#dcdcdc', // Slate 800 vs Light Gray
+                                 borderColor: isNight ? '#0f172a' : '#c0c0c0', 
+                                 borderWidth: '4px',
+                                 width: '100%', maxWidth: '600px', aspectRatio:'1'
+                             }}>
+                             
+                            {/* Night Overlay (Optional) */}
+                            {isNight && <div className="absolute inset-0 pointer-events-none z-0 rounded night-overlay"></div>}
+
+                            <div className="grid gap-1 w-full h-full relative z-10" style={{gridTemplateColumns:`repeat(${size}, 1fr)`}}>
+                                {Array.from({length:size*size}).map((_,i)=>{
+                                    const c = room.grid?.[i];
+                                    const item = c ? ITEMS[c.type] : null;
+                                    const isMoving = moveSrc === i;
+                                    
+                                    return (
+                                        <div key={i} onClick={()=> c ? action(i,c) : handleEmptyClick(i)} 
+                                             className={`
+                                                rounded relative flex items-center justify-center cursor-pointer transition-all
+                                                ${!c ? (isNight ? 'bg-[#4a3627]' : 'bg-[#8B5E3C]') : ''} 
+                                                ${c && item.type === 'decor' ? 'bg-transparent' : (c ? (isNight ? 'bg-[#4a3627]' : 'bg-[#8B5E3C]') : '')}
+                                                ${!c && !isNight ? 'hover:brightness-105' : ''}
+                                                ${isMoving ? 'ring-4 ring-blue-500 z-20 scale-110' : ''}
+                                                ${moveMode && !c && moveSrc !== null ? 'ring-2 ring-blue-300 bg-blue-50/20' : ''}
+                                                ${sel===i ? 'ring-4 ring-green-400 z-10' : ''}
+                                             `}>
+                                            
+                                            {c && item.type === 'decor' && <div className={`absolute inset-0 rounded -z-10 ${isNight ? 'bg-[#4a3627]' : 'bg-[#8B5E3C]'}`}/>}
+
+                                            {c ? (
+                                                <div className="w-full h-full flex flex-col items-center justify-center relative group">
+                                                    {item.type === 'plant' && c.stage < item.stages && !moveMode && (
+                                                        <div className={`absolute -top-2 md:-top-3 text-[9px] font-mono font-bold px-1 py-0.5 rounded shadow-sm z-20 ${now > c.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white' : 'bg-black/50 text-white'}`}>{getTimerString(c.lastWatered)}</div>
+                                                    )}
+                                                    <span className={`drop-shadow-md select-none ${item.type==='decor'?'text-4xl md:text-6xl':'text-3xl md:text-5xl transform hover:scale-110 transition-transform'}`}>{item.type === 'plant' && c.stage===0 ? '🌱' : item.icon}</span>
+                                                    {item.type === 'plant' && item.stages > 1 && !moveMode && (<div className="absolute bottom-1 w-8 h-1 bg-black/30 rounded-full overflow-hidden"><div className="h-full bg-green-400" style={{width: `${(c.stage/item.stages)*100}%`}}></div></div>)}
+                                                    {item.type === 'plant' && c.stage >= item.stages && !moveMode && <div className="absolute inset-0 bg-yellow-400/20 animate-pulse rounded border-2 border-yellow-400"/>}
+                                                </div>
+                                            ) : (
+                                                <div className="w-1 h-1 rounded-full bg-black/10 dark:bg-white/5"/>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
                         </div>
-                        <button onClick={expand} className="mt-8 bg-white border border-purple-200 text-purple-700 px-6 py-2 rounded-full shadow-sm hover:bg-purple-50 font-bold flex items-center gap-2"><Gem size={16}/> Fläche erweitern (50)</button>
+                        <button onClick={expand} className="mt-8 bg-white dark:bg-slate-800 border dark:border-slate-700 text-purple-700 dark:text-purple-400 px-6 py-2 rounded-full shadow-sm hover:bg-purple-50 dark:hover:bg-slate-700 font-bold flex items-center gap-2"><Gem size={16}/> Fläche erweitern (50)</button>
                     </div>
 
                     {sel !== null && (
-                        <div className="absolute bottom-0 w-full bg-white p-4 rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] animate-slide-up z-30 md:max-w-md md:left-1/2 md:-translate-x-1/2 md:mb-4 md:rounded-2xl">
-                            <div className="flex justify-between mb-4 font-bold text-gray-700"><span>{room.grid[sel] ? 'Entfernen?' : 'Platzieren'}</span><button onClick={()=>setSel(null)}><X size={20}/></button></div>
+                        <div className="absolute bottom-0 w-full bg-white dark:bg-slate-800 p-4 rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] animate-slide-up z-30 md:max-w-md md:left-1/2 md:-translate-x-1/2 md:mb-4 md:rounded-2xl">
+                            <div className="flex justify-between mb-4 font-bold text-gray-700 dark:text-white">
+                                <span>{room.grid[sel] ? 'Entfernen?' : 'Platzieren'}</span>
+                                <button onClick={()=>setSel(null)}><X size={20}/></button>
+                            </div>
+                            
                             {!room.grid[sel] && (
                                 <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                                     {Object.keys(data?.inventory||{}).map(k => (data.inventory[k]>0) && (
-                                        <button key={k} onClick={()=>plant(k)} className="bg-green-50 p-3 rounded-xl min-w-[90px] flex flex-col items-center border border-green-100 relative">
+                                        <button key={k} onClick={()=>plant(k)} className="bg-green-50 dark:bg-slate-700 p-3 rounded-xl min-w-[90px] flex flex-col items-center border border-green-100 dark:border-slate-600 relative">
                                             <span className="text-3xl mb-1">{ITEMS[k].icon}</span>
-                                            <span className="text-xs font-bold text-green-800 line-clamp-1">{ITEMS[k].name}</span>
-                                            <span className="absolute top-1 right-1 bg-green-200 text-green-900 text-[9px] px-1 rounded-full">x{data.inventory[k]}</span>
+                                            <span className="text-xs font-bold text-green-800 dark:text-green-300 line-clamp-1">{ITEMS[k].name}</span>
+                                            <span className="absolute top-1 right-1 bg-green-200 dark:bg-green-800 text-green-900 dark:text-green-200 text-[9px] px-1 rounded-full">x{data.inventory[k]}</span>
                                         </button>
                                     ))}
                                     {Object.values(data?.inventory||{}).every(v=>v<=0) && <div className="text-sm text-gray-400 w-full text-center">Inventar leer.</div>}
                                 </div>
                             )}
-                            {room.grid[sel] && <div className="flex justify-center"><button onClick={remove} className="flex items-center gap-2 bg-red-100 text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-200"><Trash2 size={20}/> Entfernen</button></div>}
+
+                            {room.grid[sel] && (
+                                <div className="flex justify-center">
+                                    <button onClick={remove} className="flex items-center gap-2 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 px-6 py-3 rounded-xl font-bold hover:bg-red-200 dark:hover:bg-red-900">
+                                        <Trash2 size={20}/> Entfernen
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
             );
         };
 
-        // --- NEW ADVANCED TASKS SYSTEM ---
         const Tasks = ({rid, user}) => {
             const [list, setList] = useState([]);
             const [showAdd, setShowAdd] = useState(false);
-            
-            // New Task Form State
             const [newTaskTxt, setNewTaskTxt] = useState('');
             const [newTaskRew, setNewTaskRew] = useState(20);
-            const [newTaskType, setNewTaskType] = useState('once'); // once, date, daily
+            const [newTaskType, setNewTaskType] = useState('once');
             const [newTaskDate, setNewTaskDate] = useState('');
 
             useEffect(()=>onSnapshot(query(collection(db,'rooms',`r_${rid}`,'tasks'), orderBy('at','desc'), limit(50)), s=>setList(s.docs.map(d=>({id:d.id,...d.data()})))), [rid]);
@@ -401,134 +483,71 @@
             const addTask = async () => {
                 if(!newTaskTxt) return;
                 await addDoc(collection(db,'rooms',`r_${rid}`,'tasks'), {
-                    txt: newTaskTxt,
-                    rew: parseInt(newTaskRew),
-                    type: newTaskType,
-                    due: newTaskType === 'date' ? newTaskDate : null,
-                    done: false,
-                    lastDone: null, // For daily
-                    at: serverTimestamp(),
-                    creator: user.displayName.split(' ')[0]
+                    txt: newTaskTxt, rew: parseInt(newTaskRew), type: newTaskType, due: newTaskType === 'date' ? newTaskDate : null,
+                    done: false, lastDone: null, at: serverTimestamp(), creator: user.displayName.split(' ')[0]
                 });
                 setNewTaskTxt(''); setShowAdd(false);
             };
 
             const completeTask = async (task) => {
                 const isDaily = task.type === 'daily';
-                // Check daily logic
-                if(isDaily && isToday(task.lastDone)) return; // Already done today
-
+                if(isDaily && isToday(task.lastDone)) return;
                 await runTransaction(db, async(tr)=>{
                     const taskRef = doc(db,'rooms',`r_${rid}`,'tasks',task.id);
                     const userRef = doc(db,'users',user.uid);
-
-                    if(isDaily) {
-                        // Daily: Update lastDone, but keep done=false (so it shows as available tomorrow)
-                        tr.update(taskRef, { 
-                            lastDone: serverTimestamp(),
-                            doneBy: user.displayName,
-                            doneAt: serverTimestamp() 
-                        });
-                    } else {
-                        // Once/Date: Mark done permanently
-                        tr.update(taskRef, { 
-                            done: true, 
-                            doneBy: user.displayName, 
-                            doneAt: serverTimestamp() 
-                        });
-                    }
+                    if(isDaily) tr.update(taskRef, { lastDone: serverTimestamp(), doneBy: user.displayName, doneAt: serverTimestamp() });
+                    else tr.update(taskRef, { done: true, doneBy: user.displayName, doneAt: serverTimestamp() });
                     tr.update(userRef, { coins: increment(task.rew) });
                 });
             };
 
-            const deleteTask = async (id) => {
-                if(confirm("Löschen?")) await deleteDoc(doc(db,'rooms',`r_${rid}`,'tasks',id));
-            }
+            const deleteTask = async (id) => { if(confirm("Löschen?")) await deleteDoc(doc(db,'rooms',`r_${rid}`,'tasks',id)); }
 
             return (
-                <div className="h-full flex flex-col max-w-2xl mx-auto w-full md:p-6 bg-gray-50/50">
-                    {/* Header with Add Button */}
-                    <div className="p-4 flex justify-between items-center bg-white shadow-sm md:rounded-xl mb-4 border-b md:border-0 sticky top-0 z-10">
-                        <h2 className="font-bold text-lg text-gray-700">Aufgaben</h2>
-                        <button onClick={()=>setShowAdd(!showAdd)} className="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1 shadow-sm">
-                            <Plus size={20}/> Neu
-                        </button>
+                <div className="h-full flex flex-col max-w-2xl mx-auto w-full md:p-6 bg-gray-50/50 dark:bg-slate-900/50">
+                    <div className="p-4 flex justify-between items-center bg-white dark:bg-slate-800 shadow-sm md:rounded-xl mb-4 border-b md:border-0 dark:border-slate-700 sticky top-0 z-10">
+                        <h2 className="font-bold text-lg text-gray-700 dark:text-gray-200">Aufgaben</h2>
+                        <button onClick={()=>setShowAdd(!showAdd)} className="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 flex items-center gap-1 shadow-sm"><Plus size={20}/> Neu</button>
                     </div>
 
-                    {/* ADD TASK FORM */}
                     {showAdd && (
-                        <div className="bg-white p-4 m-4 mt-0 rounded-xl shadow-md border border-green-100 fade-in space-y-3">
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase">Aufgabe</label>
-                                <input value={newTaskTxt} onChange={e=>setNewTaskTxt(e.target.value)} className="w-full p-2 border rounded-lg mt-1" placeholder="Was ist zu tun?"/>
-                            </div>
-                            
+                        <div className="bg-white dark:bg-slate-800 p-4 m-4 mt-0 rounded-xl shadow-md border border-green-100 dark:border-slate-700 fade-in space-y-3">
+                            <div><label className="text-xs font-bold text-gray-400 uppercase">Aufgabe</label><input value={newTaskTxt} onChange={e=>setNewTaskTxt(e.target.value)} className="w-full p-2 border dark:border-slate-600 rounded-lg mt-1 dark:bg-slate-700 dark:text-white" placeholder="Was ist zu tun?"/></div>
                             <div className="flex gap-4">
-                                <div className="flex-1">
-                                    <label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskRew}</label>
-                                    <input type="range" min="10" max="100" step="5" value={newTaskRew} onChange={e=>setNewTaskRew(e.target.value)} className="w-full mt-2 accent-green-600"/>
-                                </div>
-                                <div className="flex-1">
-                                    <label className="text-xs font-bold text-gray-400 uppercase">Typ</label>
-                                    <select value={newTaskType} onChange={e=>setNewTaskType(e.target.value)} className="w-full p-2 border rounded-lg mt-1 bg-white">
-                                        <option value="once">Einmalig</option>
-                                        <option value="daily">Täglich</option>
-                                        <option value="date">Bis Datum</option>
-                                    </select>
-                                </div>
+                                <div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskRew}</label><input type="range" min="10" max="100" step="5" value={newTaskRew} onChange={e=>setNewTaskRew(e.target.value)} className="w-full mt-2 accent-green-600"/></div>
+                                <div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e=>setNewTaskType(e.target.value)} className="w-full p-2 border dark:border-slate-600 rounded-lg mt-1 bg-white dark:bg-slate-700 dark:text-white"><option value="once">Einmalig</option><option value="daily">Täglich</option><option value="date">Bis Datum</option></select></div>
                             </div>
-
-                            {newTaskType === 'date' && (
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase">Fällig am</label>
-                                    <input type="date" value={newTaskDate} onChange={e=>setNewTaskDate(e.target.value)} className="w-full p-2 border rounded-lg mt-1"/>
-                                </div>
-                            )}
-
-                            <div className="flex justify-end gap-2 pt-2">
-                                <button onClick={()=>setShowAdd(false)} className="text-gray-400 px-3 py-1">Abbrechen</button>
-                                <button onClick={addTask} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm">Erstellen</button>
-                            </div>
+                            {newTaskType === 'date' && (<div><label className="text-xs font-bold text-gray-400 uppercase">Fällig am</label><input type="date" value={newTaskDate} onChange={e=>setNewTaskDate(e.target.value)} className="w-full p-2 border dark:border-slate-600 rounded-lg mt-1 dark:bg-slate-700 dark:text-white"/></div>)}
+                            <div className="flex justify-end gap-2 pt-2"><button onClick={()=>setShowAdd(false)} className="text-gray-400 px-3 py-1">Abbrechen</button><button onClick={addTask} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm">Erstellen</button></div>
                         </div>
                     )}
 
-                    {/* TASK LIST */}
                     <div className="flex-1 overflow-y-auto p-4 md:p-0 space-y-3 pb-20 md:pb-0">
                         {list.map(t => {
                             const isDaily = t.type === 'daily';
                             const doneToday = isDaily && isToday(t.lastDone);
                             const isDone = t.done || doneToday;
                             const isOverdue = t.type === 'date' && t.due && new Date(t.due) < new Date() && !isDone;
-
                             return (
-                                <div key={t.id} className={`p-4 rounded-xl border flex flex-col transition-all ${isDone ? 'bg-gray-50 opacity-70 border-gray-100' : 'bg-white shadow-sm border-gray-200 hover:shadow-md'}`}>
+                                <div key={t.id} className={`p-4 rounded-xl border flex flex-col transition-all ${isDone ? 'bg-gray-50 dark:bg-slate-900 opacity-70 border-gray-100 dark:border-slate-800' : 'bg-white dark:bg-slate-800 shadow-sm border-gray-200 dark:border-slate-700 hover:shadow-md'}`}>
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 mb-1">
-                                                {isDaily && <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1"><Repeat size={10}/> Täglich</span>}
+                                                {isDaily && <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1"><Repeat size={10}/> Täglich</span>}
                                                 {t.type === 'date' && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}><Calendar size={10}/> {t.due}</span>}
-                                                <span className="bg-yellow-100 text-yellow-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1"><Coins size={10}/> {t.rew}</span>
+                                                <span className="bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1"><Coins size={10}/> {t.rew}</span>
                                             </div>
-                                            <div className={`font-medium text-lg ${isDone ? 'line-through text-gray-400' : 'text-gray-800'}`}>{t.txt}</div>
+                                            <div className={`font-medium text-lg ${isDone ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-200'}`}>{t.txt}</div>
                                         </div>
-                                        
                                         <div className="flex items-center gap-2">
-                                            <button disabled={isDone} onClick={() => completeTask(t)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isDone ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 hover:bg-green-500 hover:text-white'}`}>
-                                                <CheckSquare size={20} className={isDone ? 'fill-current' : ''}/>
-                                            </button>
+                                            <button disabled={isDone} onClick={() => completeTask(t)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isDone ? 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400' : 'bg-gray-100 dark:bg-slate-700 text-gray-400 hover:bg-green-500 hover:text-white'}`}><CheckSquare size={20} className={isDone ? 'fill-current' : ''}/></button>
                                             <button onClick={()=>deleteTask(t.id)} className="p-2 text-gray-300 hover:text-red-400"><Trash2 size={16}/></button>
                                         </div>
                                     </div>
-
-                                    {/* INFO FOOTER: Wer hat es gemacht? */}
                                     {(t.doneBy || t.creator) && (
-                                        <div className="mt-3 pt-2 border-t border-gray-100 text-[10px] text-gray-400 flex justify-between">
+                                        <div className="mt-3 pt-2 border-t border-gray-100 dark:border-slate-700 text-[10px] text-gray-400 flex justify-between">
                                             <span>Erstellt von {t.creator || 'Unbekannt'}</span>
-                                            {isDone && (
-                                                <span className="flex items-center gap-1 text-green-600 font-medium">
-                                                    <History size={10}/> Erledigt von {t.doneBy} am {formatDate(t.doneAt || t.lastDone)}
-                                                </span>
-                                            )}
+                                            {isDone && (<span className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium"><History size={10}/> Erledigt von {t.doneBy} am {formatDate(t.doneAt || t.lastDone)}</span>)}
                                         </div>
                                     )}
                                 </div>
@@ -541,16 +560,16 @@
         };
 
         const Shop = ({uid, coins}) => (
-            <div className="h-full overflow-y-auto bg-gray-50 p-4 md:p-8">
+            <div className="h-full overflow-y-auto bg-gray-50 dark:bg-slate-900 p-4 md:p-8">
                 <div className="max-w-4xl mx-auto">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {Object.values(ITEMS).map(i=>(
-                            <div key={i.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md">
-                                <div className="w-16 h-16 bg-gray-50 rounded-lg flex items-center justify-center text-4xl shadow-inner">{i.icon}</div>
+                            <div key={i.id} className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex items-center gap-4 hover:shadow-md">
+                                <div className="w-16 h-16 bg-gray-50 dark:bg-slate-700 rounded-lg flex items-center justify-center text-4xl shadow-inner">{i.icon}</div>
                                 <div className="flex-1">
-                                    <div className="font-bold text-gray-800">{i.name}</div>
+                                    <div className="font-bold text-gray-800 dark:text-white">{i.name}</div>
                                     <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">{i.type === 'plant' ? 'Pflanze' : 'Deko'}</div>
-                                    <div className="text-sm font-bold text-yellow-600">{i.cost} 🪙</div>
+                                    <div className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{i.cost} 🪙</div>
                                 </div>
                                 <button onClick={() => coins >= i.cost && updateDoc(doc(db,'users',uid),{coins:increment(-i.cost), [`inventory.${i.id}`]:increment(1)})} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold active:scale-95">Kaufen</button>
                             </div>
