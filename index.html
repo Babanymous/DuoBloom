@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Co-op Garden</title>
+    <title>DuoBloom</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -12,7 +12,8 @@
             theme: {
                 extend: {
                     colors: {
-                        night: { bg: '#0f172a', card: '#1e293b', text: '#f1f5f9' }
+                        night: { bg: '#0f172a', card: '#1e293b', text: '#f1f5f9' },
+                        bloom: { 500: '#10b981', 600: '#059669' } // Custom Green
                     }
                 }
             }
@@ -41,7 +42,7 @@
         import { 
             Sprout, Droplet, CheckSquare, ShoppingBag, Users, Gem, Coins, 
             Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, 
-            LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History, Moon, Sun
+            LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History, Moon, Sun, Flower
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -69,7 +70,7 @@
         const HOURS_PER_CYCLE = 6.0; 
         const CYCLE_MS = HOURS_PER_CYCLE * 60 * 60 * 1000;
 
-        // Firebase Init (Ohne nervigen Check)
+        // Firebase Init
         let app, auth, db;
         try {
             app = initializeApp(firebaseConfig);
@@ -201,9 +202,9 @@
             if(!user) return (
                 <div className="h-screen flex flex-col items-center justify-center bg-green-50 dark:bg-slate-900 p-4 text-center transition-colors">
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-sm">
-                        <Sprout size={48} className="text-green-600 dark:text-green-400 mx-auto mb-4"/>
-                        <h1 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Unser Garten</h1>
-                        <p className="text-gray-500 dark:text-gray-400 mb-6">Pflanzen, Deko & Aufgaben</p>
+                        <Flower size={48} className="text-bloom-600 dark:text-green-400 mx-auto mb-4"/>
+                        <h1 className="text-3xl font-bold mb-2 text-gray-800 dark:text-white font-sans tracking-tight">DuoBloom</h1>
+                        <p className="text-gray-500 dark:text-gray-400 mb-6">Gemeinsam wachsen.</p>
                         <button onClick={googleLogin} className="w-full bg-white dark:bg-slate-700 border dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600 text-gray-700 dark:text-white font-bold py-3 rounded-lg flex items-center justify-center">
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 mr-3" />Login mit Google
                         </button>
@@ -216,8 +217,8 @@
             return (
                 <div className="h-screen flex flex-col md:flex-row bg-gray-100 dark:bg-slate-950 overflow-hidden transition-colors duration-700">
                     <div className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r dark:border-slate-800 p-4 shadow-sm z-20">
-                        <div className="text-xl font-bold text-green-700 dark:text-green-400 mb-8 flex items-center gap-2">
-                            <Sprout/> Unser Garten {isNight && <Moon size={16} className="text-blue-200 ml-2 animate-pulse"/>}
+                        <div className="text-2xl font-bold text-bloom-600 dark:text-green-400 mb-8 flex items-center gap-2">
+                            <Flower className="text-bloom-500"/> DuoBloom {isNight && <Moon size={16} className="text-blue-200 ml-2 animate-pulse"/>}
                         </div>
                         <nav className="space-y-2 flex-1">
                             <SidebarBtn i={Sprout} l="Garten" a={tab==='garden'} set={()=>setTab('garden')}/>
@@ -270,7 +271,7 @@
                 <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md space-y-6">
                     <h2 className="text-xl font-bold text-gray-800 dark:text-white">Hallo, {user.displayName?.split(' ')[0]}! {isNight ? '🌙' : '☀️'}</h2>
                     <div className="space-y-4">
-                        <div className="flex gap-2"><input id="newG" placeholder="Neuer Garten Name" className="flex-1 p-3 border dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-700 dark:text-white"/><button onClick={()=>createRoom(document.getElementById('newG').value)} disabled={loading} className="bg-green-600 text-white p-3 rounded-lg"><ArrowRight/></button></div>
+                        <div className="flex gap-2"><input id="newG" placeholder="Neuer Garten Name" className="flex-1 p-3 border dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-700 dark:text-white"/><button onClick={()=>createRoom(document.getElementById('newG').value)} disabled={loading} className="bg-bloom-600 text-white p-3 rounded-lg"><ArrowRight/></button></div>
                         <div className="text-gray-400 text-xs">- ODER -</div>
                         <div className="flex gap-2"><input id="joinC" placeholder="Code (z.B. A1B2)" className="flex-1 p-3 border dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-700 dark:text-white"/><button onClick={()=>joinRoom(document.getElementById('joinC').value)} disabled={loading} className="bg-blue-600 text-white p-3 rounded-lg">Beitreten</button></div>
                     </div>
@@ -279,8 +280,8 @@
             </div>
         );
 
-        const NavBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex flex-col items-center w-16 ${a?'text-green-600 dark:text-green-400':'text-gray-400 dark:text-slate-500'}`}><I size={24} strokeWidth={a?2.5:2}/><span className="text-[10px] font-bold mt-1">{l}</span></button>;
-        const SidebarBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex items-center w-full p-3 rounded-lg gap-3 ${a?'bg-green-50 dark:bg-slate-800 text-green-700 dark:text-green-400 font-bold':'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'}`}><I size={20}/><span className="text-sm">{l}</span></button>;
+        const NavBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex flex-col items-center w-16 ${a?'text-bloom-600 dark:text-green-400':'text-gray-400 dark:text-slate-500'}`}><I size={24} strokeWidth={a?2.5:2}/><span className="text-[10px] font-bold mt-1">{l}</span></button>;
+        const SidebarBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex items-center w-full p-3 rounded-lg gap-3 ${a?'bg-green-50 dark:bg-slate-800 text-bloom-600 dark:text-green-400 font-bold':'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'}`}><I size={20}/><span className="text-sm">{l}</span></button>;
 
         const Garden = ({ room, user, data, isNight }) => {
             const [sel, setSel] = useState(null);
@@ -430,14 +431,14 @@
                 <div className="h-full flex flex-col max-w-2xl mx-auto w-full md:p-6 bg-gray-50/50 dark:bg-slate-900/50">
                     <div className="p-4 flex justify-between items-center bg-white dark:bg-slate-800 shadow-sm md:rounded-xl mb-4 border-b md:border-0 dark:border-slate-700 sticky top-0 z-10">
                         <h2 className="font-bold text-lg text-gray-700 dark:text-gray-200">Aufgaben</h2>
-                        <button onClick={()=>setShowAdd(!showAdd)} className="bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 flex items-center gap-1 shadow-sm"><Plus size={20}/> Neu</button>
+                        <button onClick={()=>setShowAdd(!showAdd)} className="bg-bloom-600 text-white p-2 rounded-lg hover:bg-green-700 flex items-center gap-1 shadow-sm"><Plus size={20}/> Neu</button>
                     </div>
                     {showAdd && (
                         <div className="bg-white dark:bg-slate-800 p-4 m-4 mt-0 rounded-xl shadow-md border border-green-100 dark:border-slate-700 fade-in space-y-3">
                             <div><label className="text-xs font-bold text-gray-400 uppercase">Aufgabe</label><input value={newTaskTxt} onChange={e=>setNewTaskTxt(e.target.value)} className="w-full p-2 border dark:border-slate-600 rounded-lg mt-1 dark:bg-slate-700 dark:text-white" placeholder="Was ist zu tun?"/></div>
                             <div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskRew}</label><input type="range" min="10" max="100" step="5" value={newTaskRew} onChange={e=>setNewTaskRew(e.target.value)} className="w-full mt-2 accent-green-600"/></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e=>setNewTaskType(e.target.value)} className="w-full p-2 border dark:border-slate-600 rounded-lg mt-1 bg-white dark:bg-slate-700 dark:text-white"><option value="once">Einmalig</option><option value="daily">Täglich</option><option value="date">Bis Datum</option></select></div></div>
                             {newTaskType === 'date' && (<div><label className="text-xs font-bold text-gray-400 uppercase">Fällig am</label><input type="date" value={newTaskDate} onChange={e=>setNewTaskDate(e.target.value)} className="w-full p-2 border dark:border-slate-600 rounded-lg mt-1 dark:bg-slate-700 dark:text-white"/></div>)}
-                            <div className="flex justify-end gap-2 pt-2"><button onClick={()=>setShowAdd(false)} className="text-gray-400 px-3 py-1">Abbrechen</button><button onClick={addTask} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm">Erstellen</button></div>
+                            <div className="flex justify-end gap-2 pt-2"><button onClick={()=>setShowAdd(false)} className="text-gray-400 px-3 py-1">Abbrechen</button><button onClick={addTask} className="bg-bloom-600 text-white px-4 py-2 rounded-lg font-bold shadow-sm">Erstellen</button></div>
                         </div>
                     )}
                     <div className="flex-1 overflow-y-auto p-4 md:p-0 space-y-3 pb-20 md:pb-0">
