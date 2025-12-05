@@ -67,15 +67,19 @@
             background-image: repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 10px);
             box-shadow: inset 0 0 2px rgba(0,0,0,0.3);
         }
+        
+        /* FIX: Kieselstein-Look statt Schachbrett */
         .texture-stone {
-            background-color: #94a3b8;
+            background-color: #94a3b8; /* Slate 400 Basis */
             background-image: 
-                linear-gradient(45deg, #64748b 25%, transparent 25%, transparent 75%, #64748b 75%, #64748b),
-                linear-gradient(45deg, #64748b 25%, transparent 25%, transparent 75%, #64748b 75%, #64748b);
-            background-size: 10px 10px;
-            background-position: 0 0, 5px 5px;
-            box-shadow: inset 0 0 2px rgba(0,0,0,0.3);
+                radial-gradient(circle at 20% 20%, #64748b 15%, transparent 16%),
+                radial-gradient(circle at 80% 80%, #64748b 15%, transparent 16%),
+                radial-gradient(circle at 50% 50%, #475569 10%, transparent 11%),
+                radial-gradient(circle at 80% 20%, #475569 10%, transparent 11%);
+            background-size: 20px 20px; /* Kleinere Wiederholung */
+            box-shadow: inset 0 0 3px rgba(0,0,0,0.3);
         }
+        
         .dark .texture-stone { filter: brightness(0.7); }
         .dark .texture-wood { filter: brightness(0.7); }
 
@@ -104,7 +108,7 @@
             runTransaction, query, orderBy, limit, deleteDoc, Timestamp 
         } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-        // --- KONFIGURATION ---
+        // --- KONFIGURATION (HIER WIEDER DEINE DATEN REIN) ---
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -125,7 +129,6 @@
             db = getFirestore(app);
         } catch(e) { console.error("Firebase Init Fehler:", e); }
 
-        // --- ITEMS (Jetzt mit Textur-Klassen für Böden) ---
         const ITEMS = {
             'seed_wheat': { id: 'seed_wheat', name: 'Weizen', type: 'plant', cost: 20, icon: '🌾', stages: 2, sellPrice: 10, sellCurrency: 'gems' },
             'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icon: '🥕', stages: 3, sellPrice: 15, sellCurrency: 'gems' },
@@ -136,11 +139,9 @@
             'seed_tulip': { id: 'seed_tulip', name: 'Tulpe', type: 'plant', cost: 200, icon: '🌷', stages: 3, sellPrice: 40, sellCurrency: 'gems' },
             'seed_corn': { id: 'seed_corn', name: 'Mais', type: 'plant', cost: 80, icon: '🌽', stages: 3, sellPrice: 25, sellCurrency: 'gems' },
             
-            // Texture-based Items (kein Icon, dafür textureClass)
             'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'floor', cost: 50, textureClass: 'texture-stone', stages: 1 },
             'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'floor', cost: 50, textureClass: 'texture-wood', stages: 1 },
             
-            // Emoji Deko
             'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 100, icon: '🚧', stages: 1 },
             'deco_bush': { id: 'deco_bush', name: 'Hecke', type: 'decor', cost: 150, icon: '🌳', stages: 1 },
             'deco_bench': { id: 'deco_bench', name: 'Bank', type: 'decor', cost: 300, icon: '🪑', stages: 1 },
@@ -283,16 +284,30 @@
                             <SidebarBtn i={CheckSquare} l="Aufgaben" a={tab==='tasks'} set={()=>setTab('tasks')}/>
                             <SidebarBtn i={ShoppingBag} l="Shop" a={tab==='shop'} set={()=>setTab('shop')}/>
                         </nav>
-                        <button onClick={leaveRoom} className="text-red-500 text-sm hover:bg-red-50 dark:hover:bg-slate-800 p-3 rounded-lg flex gap-3 font-medium transition-colors"><LogOut size={18}/> Verlassen</button>
+                        <div className="border-t dark:border-slate-800 pt-4">
+                            <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Code kopiert!");}} className="w-full text-blue-500 text-sm p-2 rounded hover:bg-blue-50 dark:hover:bg-slate-800 flex items-center gap-2 mb-2 font-medium">
+                                <UserPlus size={16}/> Code: {room.id}
+                            </button>
+                            <button onClick={leaveRoom} className="w-full text-red-500 text-sm p-2 rounded hover:bg-red-50 dark:hover:bg-slate-800 flex items-center gap-2 font-medium"><LogOut size={16}/> Verlassen</button>
+                        </div>
                     </div>
 
+                    {/* MOBILE HEADER - FIX: Invite Code ist jetzt sichtbar */}
                     <div className="md:hidden bg-white/80 backdrop-blur dark:bg-slate-900/80 p-3 shadow-sm z-10 flex justify-between items-center border-b dark:border-slate-800 sticky top-0">
-                        <span className="font-bold truncate text-gray-800 dark:text-white">{room.name}</span>
+                        <div className="flex flex-col overflow-hidden max-w-[40%]">
+                            <span className="font-bold truncate text-gray-800 dark:text-white">{room.name}</span>
+                            <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Code kopiert!");}} className="text-[10px] text-blue-500 flex items-center gap-1 hover:underline">
+                               <UserPlus size={10}/> {room.id}
+                            </button>
+                        </div>
                         <div className="flex gap-2 text-xs font-bold">
                              <div className="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-400 px-2 py-1 rounded-full flex items-center"><Coins size={12} className="mr-1"/>{userData?.coins||0}</div>
                              <div className="bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-400 px-2 py-1 rounded-full flex items-center"><Gem size={12} className="mr-1"/>{userData?.gems||0}</div>
                         </div>
-                        <button onClick={leaveRoom} className="text-gray-400"><LogOut size={18}/></button>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Code kopiert!");}} className="text-blue-500"><UserPlus size={20}/></button>
+                            <button onClick={leaveRoom} className="text-gray-400"><LogOut size={20}/></button>
+                        </div>
                     </div>
 
                     <div className="flex-1 flex flex-col relative overflow-hidden bg-stone-100 dark:bg-slate-950">
@@ -304,7 +319,7 @@
                             <div className="flex gap-4 items-center">
                                 <div className="bg-white dark:bg-slate-800 px-4 py-1.5 rounded-full border border-stone-200 dark:border-slate-700 font-bold text-yellow-600 dark:text-yellow-400 flex items-center shadow-sm"><Coins size={16} className="mr-2"/>{userData?.coins||0}</div>
                                 <div className="bg-white dark:bg-slate-800 px-4 py-1.5 rounded-full border border-stone-200 dark:border-slate-700 font-bold text-purple-600 dark:text-purple-400 flex items-center shadow-sm"><Gem size={16} className="mr-2"/>{userData?.gems||0}</div>
-                                <button onClick={() => {navigator.clipboard.writeText(room.id); alert("Kopiert!");}} className="text-sm text-bloom-600 dark:text-blue-400 font-bold hover:underline flex gap-1 bg-bloom-50 dark:bg-slate-800 px-3 py-1.5 rounded-full"><UserPlus size={16}/> {room.id}</button>
+                                <div className="bg-bloom-50 dark:bg-slate-800 px-3 py-1.5 rounded-full text-sm text-bloom-600 dark:text-blue-400 font-bold flex gap-1 items-center border border-bloom-100 dark:border-slate-700">Code: {room.id}</div>
                             </div>
                         </div>
 
@@ -487,7 +502,6 @@
                                                     {item.type === 'plant' && c.stage >= item.stages && !moveMode && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-lg border-2 border-yellow-300 shadow-[0_0_15px_rgba(253,224,71,0.5)]"/>}
                                                 </div>
                                             ) : (
-                                                /* Leerer Boden = Löcher im Gitter */
                                                 <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>
                                             )}
                                         </div>
