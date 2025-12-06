@@ -96,26 +96,10 @@
         }
         .draggable-item:active { cursor: grabbing; scale: 1.1; z-index: 50; }
 
-        /* NEU: Wichtig damit Anzeigen über den Rand ragen können */
-        .tile-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            /* Kein overflow: hidden hier! */
-        }
-        .tile-background {
-            position: absolute;
-            inset: 0;
-            border-radius: 0.5rem;
-            overflow: hidden; /* Nur der Hintergrund wird abgeschnitten */
-            z-index: 0;
-        }
-        .tile-content {
-            position: absolute;
-            inset: 0;
-            z-index: 10;
-            /* Inhalte dürfen rausgucken */
-        }
+        .tile-container { position: relative; width: 100%; height: 100%; }
+        .tile-background { position: absolute; inset: 0; border-radius: 0.5rem; overflow: hidden; z-index: 0; }
+        .tile-content { position: absolute; inset: 0; z-index: 10; }
+        .status-badge { z-index: 100; pointer-events: none; }
 
     </style>
 </head>
@@ -499,27 +483,39 @@
                 });
             };
 
-            // 4. WATER / HARVEST (Context Action)
+            // 4. WATER / HARVEST (Context Action) - FIX: Logic Update
             const handleContextAction = async () => {
                 if(viewingTileIdx === null) return;
                 const cell = room.grid[viewingTileIdx];
                 const plants = cell.items.filter(it => ITEMS[it.type].type === 'plant');
                 if(plants.length === 0) return;
 
-                const p = plants[0];
-                const def = ITEMS[p.type];
-                
-                if(p.stage < def.stages) {
-                    if(now < p.lastWatered + CYCLE_MS) { alert("Pflanzen sind versorgt."); return; }
-                    const newItems = cell.items.map(it => ITEMS[it.type].type === 'plant' ? {...it, lastWatered: Date.now(), stage: it.stage + 1} : it);
-                    await updateDoc(doc(db,'rooms',`r_${room.id}`), { [`grid.${viewingTileIdx}.items`]: newItems });
-                } else {
+                // Check thirsty count
+                const thirstyPlants = plants.filter(p => now > p.lastWatered + CYCLE_MS && p.stage < ITEMS[p.type].stages);
+                const harvestablePlants = plants.filter(p => p.stage >= ITEMS[p.type].stages);
+
+                if (harvestablePlants.length > 0) {
+                    // Harvest Logic
                     await runTransaction(db, async(t)=>{
                         const rem = cell.items.filter(it => ITEMS[it.type].type !== 'plant' || it.stage < ITEMS[it.type].stages);
-                        const count = cell.items.length - rem.length;
+                        // Sum rewards
+                        harvestablePlants.forEach(p => {
+                            const def = ITEMS[p.type];
+                            t.update(doc(db,'users',user.uid), {[def.sellCurrency]: increment(def.sellPrice)});
+                        });
                         t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${viewingTileIdx}.items`]: rem});
-                        t.update(doc(db,'users',user.uid), {[def.sellCurrency]: increment(def.sellPrice * count)});
                     });
+                } else if (thirstyPlants.length > 0) {
+                    // Water Logic (Only thirsty ones)
+                    const newItems = cell.items.map(it => {
+                        if(ITEMS[it.type].type === 'plant' && now > it.lastWatered + CYCLE_MS && it.stage < ITEMS[it.type].stages) {
+                            return {...it, lastWatered: Date.now(), stage: it.stage + 1};
+                        }
+                        return it;
+                    });
+                    await updateDoc(doc(db,'rooms',`r_${room.id}`), { [`grid.${viewingTileIdx}.items`]: newItems });
+                } else {
+                    alert("Alles erledigt! Pflanzen wachsen noch.");
                 }
             };
 
@@ -546,7 +542,6 @@
 
             // RENDER HELPER FOR TILE CONTENT
             const renderTile = (i, c, large = false) => {
-                // Background Logic
                 const floorItem = c.floor ? ITEMS[c.floor] : null;
                 const plant = c.items?.find(it => ITEMS[it.type].type === 'plant');
                 const isDry = plant && now > plant.lastWatered + CYCLE_MS;
@@ -572,16 +567,15 @@
                                 
                                 return (
                                     <React.Fragment key={it.id}>
-                                        {/* STATUS BADGE - HIGH Z-INDEX */}
+                                        {/* STATUS BADGE - FIX: Visible on small tiles too */}
                                         {isPlant && it.stage < def.stages && !isEditMode && (
-                                            <div className={`status-badge absolute left-1/2 -translate-x-1/2 font-mono font-bold px-1.5 py-0.5 rounded shadow-lg border border-white/20 whitespace-nowrap 
-                                                ${large ? '-top-10 scale-100' : '-top-4 scale-50 md:scale-75'} 
+                                            <div className={`status-badge absolute left-1/2 -translate-x-1/2 -translate-y-1/2 font-mono font-bold px-1 py-0.5 rounded shadow-lg border border-white/20 whitespace-nowrap 
+                                                ${large ? '-top-10 scale-100 text-sm' : '-top-4 scale-75 text-[10px]'} 
                                                 ${now > it.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/60 text-white'}`}>
-                                                {now > it.lastWatered + CYCLE_MS ? <Droplet size={large ? 16 : 10}/> : (large ? getTimerString(it.lastWatered) : '')}
+                                                {now > it.lastWatered + CYCLE_MS ? <Droplet size={large ? 16 : 10}/> : getTimerString(it.lastWatered)}
                                             </div>
                                         )}
 
-                                        {/* ACTUAL ITEM */}
                                         <div
                                             onClick={(e) => { 
                                                 if(large && isEditMode) { e.stopPropagation(); setSelectedItemUUID(it.id); }
@@ -606,6 +600,22 @@
                 )
             };
 
+            // Smart Button Calculation
+            const getContextButton = () => {
+                if(viewingTileIdx === null) return null;
+                const cell = room.grid[viewingTileIdx];
+                const plants = cell.items.filter(it => ITEMS[it.type].type === 'plant');
+                if (plants.length === 0) return { text: "Leer", icon: Sprout, disabled: true };
+
+                const harvestable = plants.some(p => p.stage >= ITEMS[p.type].stages);
+                const thirsty = plants.some(p => now > p.lastWatered + CYCLE_MS && p.stage < ITEMS[p.type].stages);
+
+                if (harvestable) return { text: "Ernten!", icon: Shovel, color: "bg-green-600" };
+                if (thirsty) return { text: "Gießen", icon: Droplet, color: "bg-blue-500 animate-pulse" };
+                return { text: "Wächst...", icon: Clock, disabled: true };
+            };
+            const ctxBtn = getContextButton();
+
             return (
                 <div className="h-full flex flex-col bg-grass-realistic dark:bg-slate-950 transition-colors duration-700">
                     
@@ -621,8 +631,7 @@
                             </div>
 
                             <div className="flex-1 flex items-center justify-center p-8 relative overflow-hidden">
-                                <div className="w-64 h-64 shadow-2xl relative">
-                                    {/* FIX: Container ohne overflow hidden */}
+                                <div className="w-64 h-64 shadow-2xl rounded-2xl ring-4 ring-white/10 relative bg-black/20">
                                     {renderTile(viewingTileIdx, room.grid[viewingTileIdx], true)}
                                 </div>
                                 {isEditMode && !selectedItemUUID && <div className="absolute bottom-10 text-white/70 text-sm font-bold bg-black/50 px-3 py-1 rounded-full animate-bounce">Tippe ein Item an zum Bearbeiten</div>}
@@ -644,8 +653,12 @@
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3">
-                                            <button onClick={handleContextAction} className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-xl font-bold flex flex-col items-center justify-center shadow-lg active:scale-95 transition-transform">
-                                                <Droplet size={24} className="mb-1"/> Gießen / Ernten
+                                            <button 
+                                                onClick={handleContextAction} 
+                                                disabled={ctxBtn.disabled}
+                                                className={`p-4 rounded-xl font-bold flex flex-col items-center justify-center shadow-lg transition-transform active:scale-95 text-white ${ctxBtn.disabled ? 'bg-gray-400 opacity-50' : ctxBtn.color || 'bg-blue-500 hover:bg-blue-600'}`}
+                                            >
+                                                <ctxBtn.icon size={24} className="mb-1"/> {ctxBtn.text}
                                             </button>
                                             <button onClick={()=>setIsEditMode(true)} className="bg-yellow-500 hover:bg-yellow-600 text-white p-4 rounded-xl font-bold flex flex-col items-center justify-center shadow-lg active:scale-95 transition-transform">
                                                 <Hammer size={24} className="mb-1"/> Gestalten
