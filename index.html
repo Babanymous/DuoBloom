@@ -79,14 +79,14 @@
             background: #f1f5f9;
             border: 1px solid #cbd5e1;
             border-radius: 12px;
-            width: 48px; height: 48px;
+            width: 44px; height: 44px;
             display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 0 #94a3b8;
+            box-shadow: 0 3px 0 #94a3b8;
             transition: all 0.1s;
             color: #475569;
         }
-        .d-pad-btn:active { transform: translateY(4px); box-shadow: none; }
-        .dark .d-pad-btn { background: #334155; border-color: #475569; box-shadow: 0 4px 0 #1e293b; color: white; }
+        .d-pad-btn:active { transform: translateY(3px); box-shadow: none; }
+        .dark .d-pad-btn { background: #334155; border-color: #475569; box-shadow: 0 3px 0 #1e293b; color: white; }
 
     </style>
 </head>
@@ -102,7 +102,7 @@
             Shovel, ArrowRight, Share2, Clock, X, Loader2, AlertTriangle, 
             LogOut, UserPlus, Trash2, Move, Calendar, Repeat, Plus, History, Moon, Sun, Flower, Star,
             Wind, PenTool, Cloud, TreeDeciduous, Grid, Armchair, Lightbulb, Square, Circle, Package, Box,
-            ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Minimize2, Maximize2, Settings2, Edit3
+            ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Minimize2, Maximize2, Settings2, Edit3, Hammer
         } from 'https://esm.sh/lucide-react@0.294.0?deps=react@18.2.0';
 
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -138,6 +138,7 @@
 
         // --- ITEMS ---
         const ITEMS = {
+            // Pflanzen
             'seed_wheat': { id: 'seed_wheat', name: 'Weizen', type: 'plant', cost: 20, icon: '🌾', stages: 2, sellPrice: 10, sellCurrency: 'gems' },
             'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icon: '🥕', stages: 3, sellPrice: 15, sellCurrency: 'gems' },
             'seed_flower': { id: 'seed_flower', name: 'Rose', type: 'plant', cost: 150, icon: '🌹', stages: 4, sellPrice: 30, sellCurrency: 'gems' },
@@ -228,13 +229,12 @@
             const createRoom = async (name) => {
                 if(!name) return; setLoading(true);
                 const id = Math.random().toString(36).substr(2,6).toUpperCase();
-                const grid = {}; 
-                for(let i=0; i<16; i++) grid[i] = { floor: null, items: [] };
-                
+                const grid = {}; for(let i=0; i<16; i++) grid[i] = { floor: null, items: [] };
                 try {
                     await setDoc(doc(db, 'rooms', `r_${id}`), { id, name, grid, expansion: 4, owner: user.uid, members: [user.uid] });
                     const tasksRef = collection(db, 'rooms', `r_${id}`, 'tasks');
                     await addDoc(tasksRef, { txt: "👋 Sag Hallo", rew: 50, type: 'once', done: false, at: serverTimestamp() });
+                    await addDoc(tasksRef, { txt: "💧 Trink Wasser", rew: 20, type: 'daily', lastDone: null, at: serverTimestamp() });
                     await updateDoc(doc(db, 'users', user.uid), { currentGarden: id });
                 } catch(e) { console.error(e); alert("Fehler beim Erstellen"); }
                 setLoading(false);
@@ -372,42 +372,43 @@
         const NavBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex flex-col items-center w-16 transition-colors ${a?'text-bloom-600 dark:text-green-400 scale-105':'text-gray-400 dark:text-slate-500'}`}><I size={24} strokeWidth={a?2.5:2}/><span className="text-[10px] font-bold mt-1">{l}</span></button>;
         const SidebarBtn = ({i:I, l, a, set}) => <button onClick={set} className={`flex items-center w-full p-3 rounded-xl gap-3 transition-all ${a?'bg-green-50 dark:bg-slate-800 text-bloom-600 dark:text-green-400 font-bold shadow-sm':'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'}`}><I size={20}/><span className="text-sm">{l}</span></button>;
 
-        // --- UPDATED GARDEN LOGIC ---
+        // --- GARDEN LOGIC ---
         const Garden = ({ room, user, data, isNight }) => {
-            const [sel, setSel] = useState(null); // Selected Tile Index
-            const [editingMode, setEditingMode] = useState(false); // Mode "Umbauen"
-            const [editingTileIdx, setEditingTileIdx] = useState(null); // Which tile is OPEN in Full Editor
-            const [selectedItemUUID, setSelectedItemUUID] = useState(null); // Selected item inside editor
-            
+            const [viewingTileIdx, setViewingTileIdx] = useState(null); 
+            const [isEditMode, setIsEditMode] = useState(false); 
+            const [selectedItemUUID, setSelectedItemUUID] = useState(null); 
+
             const [now, setNow] = useState(Date.now());
             const size = room.expansion || 4;
             useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
-            // 1. PLACE ITEM (Logic for Main View & Editor)
+            // 1. PLACE ITEM
             const placeItem = async (itemId) => {
                 if((data.inventory?.[itemId]||0) <= 0) return;
                 const itemDef = ITEMS[itemId];
                 
-                // Target: If editing a tile, use that. If just selecting, use sel.
-                const targetIdx = editingTileIdx !== null ? editingTileIdx : sel;
+                const targetIdx = viewingTileIdx;
                 if (targetIdx === null) return;
 
                 let cell = room.grid[targetIdx];
-                if (!cell || Array.isArray(cell) || typeof cell !== 'object' || cell.type) {
-                    cell = { floor: null, items: [] };
-                }
+                if (!cell || Array.isArray(cell) || typeof cell !== 'object' || cell.type) cell = { floor: null, items: [] };
+                
+                // --- KORRIGIERTE LOGIK v3.5 ---
                 
                 if (itemDef.type === 'floor') {
+                    // Boden immer erlaubt
                     await runTransaction(db, async(t)=>{
                         if (cell.floor) t.update(doc(db,'users',user.uid), {[`inventory.${cell.floor}`]: increment(1)});
                         t.update(doc(db,'users',user.uid), {[`inventory.${itemId}`]: increment(-1)});
                         t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${targetIdx}.floor`]: itemId});
                     });
-                } else if (itemDef.type === 'plant') {
-                    if (cell.floor) { alert("Pflanzen wachsen nur auf Erde!"); return; }
+                } 
+                else if (itemDef.type === 'plant') {
+                    // Pflanze -> Nur Erde (kein floor)
+                    if (cell.floor) { alert("Pflanzen wachsen nur auf Erde (ohne Boden)!"); return; }
+                    
                     const plantCount = cell.items.filter(it => ITEMS[it.type].type === 'plant').length;
                     const sameType = cell.items.length === 0 || cell.items.every(it => it.type === itemId);
-                    
                     if (plantCount >= 3) { alert("Maximal 3 Pflanzen pro Beet!"); return; }
                     if (!sameType) { alert("Nur gleiche Pflanzen pro Beet!"); return; }
 
@@ -415,14 +416,20 @@
                         id: crypto.randomUUID(), type: itemId, stage: 0, lastWatered: 0, 
                         x: 20 + Math.random() * 60, y: 20 + Math.random() * 60, scale: 1.0, user: user.displayName 
                     };
-                    
                     await runTransaction(db, async(t)=>{
                         t.update(doc(db,'users',user.uid), {[`inventory.${itemId}`]: increment(-1)});
                         const currentItems = cell.items || [];
                         t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${targetIdx}.items`]: [...currentItems, newItem]});
                     });
-                } else if (itemDef.type === 'decor') {
-                    if (itemDef.id !== 'deco_gnome' && !cell.floor) { alert("Deko braucht einen Boden!"); return; }
+                } 
+                else if (itemDef.type === 'decor') {
+                    // Deko -> Nur auf Floor (außer Zwerg)
+                    // HIER WAR VORHER DER FEHLER: Wir prüfen jetzt strikt!
+                    if (itemDef.id !== 'deco_gnome' && !cell.floor) { 
+                        alert("Deko muss auf einen Boden (Holz/Stein) gebaut werden! Nur Zwerge mögen Erde."); 
+                        return; 
+                    }
+                    
                     const newItem = { 
                         id: crypto.randomUUID(), type: itemId, x: 50, y: 50, scale: 1.0, user: user.displayName 
                     };
@@ -432,104 +439,76 @@
                         t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${targetIdx}.items`]: [...currentItems, newItem]});
                     });
                 }
-                if (!editingTileIdx) setSel(null); // Don't close if in full editor
             };
 
-            // ITEM EDITING CONTROLS (Move & Scale)
+            // 2. MOVE / SCALE ITEM
             const updateItemPos = async (dx, dy, dScale) => {
-                if(editingTileIdx === null || !selectedItemUUID) return;
-                const cell = room.grid[editingTileIdx];
+                if(viewingTileIdx === null || !selectedItemUUID) return;
+                const cell = room.grid[viewingTileIdx];
                 const newItems = cell.items.map(it => {
                     if(it.id === selectedItemUUID) {
-                        let nx = it.x + dx;
-                        let ny = it.y + dy;
-                        let ns = (it.scale || 1.0) + dScale;
-                        // Clamp
-                        nx = Math.max(0, Math.min(100, nx));
-                        ny = Math.max(0, Math.min(100, ny));
-                        ns = Math.max(0.5, Math.min(2.0, ns));
+                        let nx = it.x + dx; let ny = it.y + dy; let ns = (it.scale || 1.0) + dScale;
+                        nx = Math.max(0, Math.min(100, nx)); ny = Math.max(0, Math.min(100, ny)); ns = Math.max(0.5, Math.min(2.0, ns));
                         return { ...it, x: nx, y: ny, scale: ns };
                     }
                     return it;
                 });
-                await updateDoc(doc(db,'rooms',`r_${room.id}`), {[`grid.${editingTileIdx}.items`]: newItems});
+                await updateDoc(doc(db,'rooms',`r_${room.id}`), {[`grid.${viewingTileIdx}.items`]: newItems});
             };
 
-            const handleTileClick = (idx) => {
-                if (editingMode) {
-                    setEditingTileIdx(idx); // Open Full Editor
-                    setSelectedItemUUID(null);
-                } else {
-                    // Regular Interaction Logic
-                    const cell = room.grid[idx];
-                    if (!cell || (!cell.item && (!cell.items || cell.items.length === 0))) {
-                        setSel(idx); // Open Plant Menu
-                    } else {
-                        // Harvest logic check
-                        // For simplicity in this version, tapping a tile tries to water/harvest ALL plants on it
-                        const plants = cell.items.filter(it => ITEMS[it.type].type === 'plant');
-                        if (plants.length > 0) {
-                            // Logic for first plant determines action for all (simplified)
-                            const p = plants[0];
-                            const def = ITEMS[p.type];
-                            if (p.stage < def.stages) {
-                                if (now > p.lastWatered + CYCLE_MS) {
-                                    // Water all
-                                    const newItems = cell.items.map(it => ITEMS[it.type].type === 'plant' ? {...it, lastWatered: Date.now(), stage: it.stage + 1} : it);
-                                    updateDoc(doc(db,'rooms',`r_${room.id}`), { [`grid.${idx}.items`]: newItems });
-                                } else {
-                                    alert("Pflanzen brauchen Ruhe!");
-                                }
-                            } else {
-                                // Harvest all ripe
-                                runTransaction(db, async(t)=>{
-                                    const cGrid = (await t.get(doc(db,'rooms',`r_${room.id}`))).data().grid;
-                                    const cItems = cGrid[idx].items || [];
-                                    const remaining = cItems.filter(it => ITEMS[it.type].type !== 'plant' || it.stage < ITEMS[it.type].stages);
-                                    const harvestedCount = cItems.length - remaining.length;
-                                    
-                                    t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${idx}.items`]: remaining});
-                                    if(harvestedCount > 0) t.update(doc(db,'users',user.uid), {[def.sellCurrency]: increment(def.sellPrice * harvestedCount)});
-                                });
-                            }
-                        } else {
-                            setSel(idx); // Show menu if only decor
-                        }
-                    }
-                }
-            };
-
+            // 3. STORE / REMOVE
             const storeSpecificItem = async () => {
-                const targetIdx = editingTileIdx !== null ? editingTileIdx : sel;
-                if(targetIdx === null || !selectedItemUUID) return;
-                const cell = room.grid[targetIdx];
+                if(viewingTileIdx === null || !selectedItemUUID) return;
+                const cell = room.grid[viewingTileIdx];
                 const item = cell.items.find(i => i.id === selectedItemUUID);
                 if(!item) return;
                 
-                await runTransaction(db, async(t)=>{
-                    const currentGrid = (await t.get(doc(db,'rooms',`r_${room.id}`))).data().grid;
-                    const currentItems = currentGrid[targetIdx].items || [];
-                    const remaining = currentItems.filter(it => it.id !== selectedItemUUID);
-                    t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${targetIdx}.items`]: remaining});
-                    t.update(doc(db,'users',user.uid), {[`inventory.${item.type}`]: increment(1)});
-                });
-                if(editingTileIdx !== null) setSelectedItemUUID(null);
-                else setSel(null);
+                if (ITEMS[item.type].type === 'plant') {
+                    if(!confirm("Pflanze entfernen? (Keine Rückerstattung)")) return;
+                    await updateDoc(doc(db,'rooms',`r_${room.id}`), { [`grid.${viewingTileIdx}.items`]: cell.items.filter(it => it.id !== selectedItemUUID) });
+                } else {
+                    await runTransaction(db, async(t)=>{
+                        t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${viewingTileIdx}.items`]: cell.items.filter(it => it.id !== selectedItemUUID)});
+                        t.update(doc(db,'users',user.uid), {[`inventory.${item.type}`]: increment(1)});
+                    });
+                }
+                setSelectedItemUUID(null);
             };
 
             const removeFloor = async () => {
-                const targetIdx = editingTileIdx !== null ? editingTileIdx : sel;
-                if(targetIdx === null) return;
-                const cell = room.grid[targetIdx];
-                if(cell.items && cell.items.length > 0) {
-                    const hasBlockingDecor = cell.items.some(it => ITEMS[it.type].type === 'decor' && ITEMS[it.type].id !== 'deco_gnome');
-                    if(hasBlockingDecor) { alert("Erst alle Möbel entfernen!"); return; }
+                if(viewingTileIdx === null) return;
+                const cell = room.grid[viewingTileIdx];
+                if(cell.items.length > 0 && cell.items.some(it => ITEMS[it.type].type === 'decor' && ITEMS[it.type].id !== 'deco_gnome')) {
+                    alert("Erst alle Möbel entfernen!"); return;
                 }
                 await runTransaction(db, async(t)=>{
-                    t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${targetIdx}.floor`]: null});
+                    t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${viewingTileIdx}.floor`]: null});
                     t.update(doc(db,'users',user.uid), {[`inventory.${cell.floor}`]: increment(1)});
                 });
-                if(editingTileIdx === null) setSel(null);
+            };
+
+            // 4. WATER / HARVEST (Context Action)
+            const handleContextAction = async () => {
+                if(viewingTileIdx === null) return;
+                const cell = room.grid[viewingTileIdx];
+                const plants = cell.items.filter(it => ITEMS[it.type].type === 'plant');
+                if(plants.length === 0) return;
+
+                const p = plants[0];
+                const def = ITEMS[p.type];
+                
+                if(p.stage < def.stages) {
+                    if(now < p.lastWatered + CYCLE_MS) { alert("Pflanzen sind versorgt."); return; }
+                    const newItems = cell.items.map(it => ITEMS[it.type].type === 'plant' ? {...it, lastWatered: Date.now(), stage: it.stage + 1} : it);
+                    await updateDoc(doc(db,'rooms',`r_${room.id}`), { [`grid.${viewingTileIdx}.items`]: newItems });
+                } else {
+                    await runTransaction(db, async(t)=>{
+                        const rem = cell.items.filter(it => ITEMS[it.type].type !== 'plant' || it.stage < ITEMS[it.type].stages);
+                        const count = cell.items.length - rem.length;
+                        t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${viewingTileIdx}.items`]: rem});
+                        t.update(doc(db,'users',user.uid), {[def.sellCurrency]: increment(def.sellPrice * count)});
+                    });
+                }
             };
 
             const expand = async () => {
@@ -552,29 +531,20 @@
                 return `${h}:${m<10?'0'+m:m}`;
             };
 
-            // RENDER SINGLE TILE CONTENT (Used in Grid and Editor)
-            const renderTileContent = (i, c, largeMode = false) => {
+            // RENDER HELPER FOR TILE CONTENT
+            const renderTile = (i, c, large = false) => {
+                // Background Logic
                 const floorItem = c.floor ? ITEMS[c.floor] : null;
                 const plant = c.items?.find(it => ITEMS[it.type].type === 'plant');
                 const isDry = plant && now > plant.lastWatered + CYCLE_MS;
-                
-                let bgClass = '';
-                let bgColor = '#5d4037'; 
-                if (plant && isDry) bgColor = '#d6b48e'; 
-                
-                if (floorItem) {
-                    bgClass = floorItem.textureClass;
-                    bgColor = undefined;
-                } else if (isNight) {
-                    bgColor = '#3e2723';
-                }
+                let bgColor = isNight ? '#3e2723' : '#5d4037';
+                if (plant && isDry) bgColor = '#d6b48e';
+                let bgClass = floorItem ? floorItem.textureClass : '';
+                if(floorItem) bgColor = undefined;
 
                 return (
-                    <div className={`relative w-full h-full rounded-lg transition-all ${!c.floor ? 'soil-inset' : ''} ${bgClass}`}
-                         style={{backgroundColor: bgColor}}
-                    >
-                        {c.floor && ITEMS[c.floor].type === 'decor' && <div className={`absolute inset-0 rounded-lg -z-10 bg-grass-realistic shadow-inner opacity-80`}/>}
-
+                    <div className={`relative w-full h-full rounded-lg overflow-hidden ${!c.floor ? 'soil-inset' : ''} ${bgClass}`} style={{backgroundColor: bgColor}}>
+                        {c.floor && ITEMS[c.floor].type === 'decor' && <div className={`absolute inset-0 -z-10 bg-grass-realistic opacity-80`}/>}
                         {c.items && c.items.map(it => {
                             const def = ITEMS[it.type];
                             const isPlant = def.type === 'plant';
@@ -582,132 +552,151 @@
                             
                             return (
                                 <div key={it.id}
-                                     onClick={(e) => {
-                                         if(largeMode) { e.stopPropagation(); setSelectedItemUUID(it.id); }
+                                     onClick={(e) => { 
+                                         if(large && isEditMode) { e.stopPropagation(); setSelectedItemUUID(it.id); }
                                      }}
-                                     className={`absolute transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center ${largeMode && isSelected ? 'z-50 ring-2 ring-blue-400 rounded-lg bg-blue-500/20' : ''}`}
+                                     className={`absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 transition-transform 
+                                        ${large && isSelected ? 'z-50 scale-110 drop-shadow-2xl' : ''} 
+                                        ${large && isEditMode ? 'cursor-pointer' : ''}`}
                                      style={{ left: `${it.x}%`, top: `${it.y}%` }}
                                 >
-                                    {isPlant && it.stage < def.stages && !largeMode && (
-                                        <div className={`absolute -top-6 scale-75 whitespace-nowrap font-mono font-bold px-1.5 py-0.5 rounded shadow-lg z-20 border border-white/20 ${now > it.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white' : 'bg-black/40 text-white'}`}>
-                                            {now > it.lastWatered + CYCLE_MS ? <Droplet size={10}/> : getTimerString(it.lastWatered)}
+                                    {isPlant && it.stage < def.stages && !isEditMode && (
+                                        <div className={`absolute -top-6 scale-75 whitespace-nowrap font-mono font-bold px-1.5 py-0.5 rounded shadow-lg z-20 border border-white/20 ${now > it.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/40 text-white'}`}>
+                                            {now > it.lastWatered + CYCLE_MS ? <Droplet size={10}/> : (large ? getTimerString(it.lastWatered) : '')}
                                         </div>
                                     )}
-
-                                    <span className={`emoji-3d select-none ${isPlant ? (largeMode?'text-6xl':'text-3xl') : (largeMode?'text-5xl':'text-2xl')} ${isPlant && !largeMode ? 'animate-sway origin-bottom' : ''}`}
-                                          style={{ fontSize: it.scale && largeMode ? `${4 * it.scale}rem` : (it.scale ? `${1.5 * it.scale}rem` : undefined) }}>
+                                    <span className={`emoji-3d select-none ${large ? 'text-6xl' : 'text-3xl'} ${isPlant && !isEditMode ? 'animate-sway origin-bottom' : ''}`}
+                                          style={{ fontSize: it.scale && large ? `${4 * it.scale}rem` : (it.scale ? `${1.5 * it.scale}rem` : undefined) }}>
                                         {def.icon}
                                     </span>
-
-                                    {isPlant && it.stage >= def.stages && !largeMode && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-full border-2 border-yellow-300"/>}
+                                    {large && isSelected && <div className="absolute inset-[-10px] border-2 border-white rounded-full animate-pulse pointer-events-none"/>}
+                                    
+                                    {isPlant && it.stage >= def.stages && !isEditMode && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-full border-2 border-yellow-300"/>}
                                 </div>
                             );
                         })}
-                        
-                        {!c.floor && (!c.items || c.items.length === 0) && (
-                            <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>
-                        )}
+                        {!c.floor && (!c.items || c.items.length === 0) && <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>}
                     </div>
                 )
             };
 
-            // RENDER MAIN
             return (
                 <div className="h-full flex flex-col bg-grass-realistic dark:bg-slate-950 transition-colors duration-700">
                     
-                    {/* FULL SCREEN EDITOR MODE */}
-                    {editingTileIdx !== null && (
-                        <div className="absolute inset-0 z-50 bg-black/80 flex flex-col">
-                            {/* Editor Header */}
+                    {/* --- DETAIL EDITOR MODAL --- */}
+                    {viewingTileIdx !== null && (
+                        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col animate-in fade-in zoom-in duration-200">
                             <div className="p-4 flex justify-between items-center text-white">
-                                <h2 className="font-bold text-xl flex items-center gap-2"><Settings2/> Feld bearbeiten</h2>
-                                <button onClick={()=>{setEditingTileIdx(null); setSelectedItemUUID(null);}} className="bg-white/20 p-2 rounded-full"><X/></button>
+                                <h2 className="font-bold text-xl flex items-center gap-2">
+                                    {isEditMode ? <Hammer className="text-yellow-400"/> : <CheckSquare/>} 
+                                    {isEditMode ? 'Gestalten' : 'Feld-Info'}
+                                </h2>
+                                <button onClick={()=>{setViewingTileIdx(null); setIsEditMode(false); setSelectedItemUUID(null);}} className="bg-white/20 hover:bg-white/30 p-2 rounded-full"><X/></button>
                             </div>
 
-                            {/* Large Preview */}
-                            <div className="flex-1 flex items-center justify-center p-8">
-                                <div className="w-64 h-64 shadow-2xl scale-125">
-                                    {renderTileContent(editingTileIdx, room.grid[editingTileIdx], true)}
+                            <div className="flex-1 flex items-center justify-center p-8 relative overflow-hidden">
+                                <div className="w-64 h-64 shadow-2xl rounded-2xl ring-4 ring-white/10 relative bg-black/20">
+                                    {renderTile(viewingTileIdx, room.grid[viewingTileIdx], true)}
                                 </div>
+                                {isEditMode && !selectedItemUUID && <div className="absolute bottom-10 text-white/70 text-sm font-bold bg-black/50 px-3 py-1 rounded-full animate-bounce">Tippe ein Item an zum Bearbeiten</div>}
                             </div>
 
-                            {/* Editor Controls */}
-                            <div className="bg-white dark:bg-slate-900 rounded-t-3xl p-6 pb-10">
-                                {selectedItemUUID ? (
-                                    <>
-                                        <div className="text-center mb-4 text-sm font-bold text-gray-500 uppercase tracking-widest">
-                                            {ITEMS[room.grid[editingTileIdx].items.find(i=>i.id===selectedItemUUID).type].name}
+                            <div className="bg-white dark:bg-slate-900 rounded-t-3xl p-6 pb-8 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transition-all">
+                                
+                                {!isEditMode ? (
+                                    <div className="space-y-4">
+                                        <div className="text-center">
+                                            <h3 className="font-bold text-lg dark:text-white mb-1">
+                                                {room.grid[viewingTileIdx].items.length > 0 
+                                                    ? `${room.grid[viewingTileIdx].items.length} Objekt(e)` 
+                                                    : (room.grid[viewingTileIdx].floor ? ITEMS[room.grid[viewingTileIdx].floor].name : 'Leere Erde')}
+                                            </h3>
+                                            <p className="text-xs text-gray-500 uppercase tracking-widest">
+                                                {room.grid[viewingTileIdx].items.some(i => ITEMS[i.type].type === 'plant') ? 'Pflanzenbeet' : 'Dekoration'}
+                                            </p>
                                         </div>
-                                        <div className="flex gap-6 justify-center items-center mb-6">
-                                            {/* D-PAD */}
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div></div>
-                                                <button onClick={()=>updateItemPos(0,-5,0)} className="d-pad-btn"><ChevronUp/></button>
-                                                <div></div>
-                                                <button onClick={()=>updateItemPos(-5,0,0)} className="d-pad-btn"><ChevronLeft/></button>
-                                                <div className="w-12 h-12 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center"><Move size={20} className="text-gray-400"/></div>
-                                                <button onClick={()=>updateItemPos(5,0,0)} className="d-pad-btn"><ChevronRight/></button>
-                                                <div></div>
-                                                <button onClick={()=>updateItemPos(0,5,0)} className="d-pad-btn"><ChevronDown/></button>
-                                                <div></div>
-                                            </div>
-                                            
-                                            {/* Tools */}
-                                            <div className="flex flex-col gap-4">
-                                                <div className="flex items-center gap-2 bg-gray-100 dark:bg-slate-800 p-2 rounded-lg">
-                                                    <Minimize2 size={16}/>
-                                                    <input type="range" min="0.5" max="2.0" step="0.1" 
-                                                        value={room.grid[editingTileIdx].items.find(i=>i.id===selectedItemUUID).scale || 1.0} 
-                                                        onChange={(e)=>updateItemPos(0,0, parseFloat(e.target.value) - (room.grid[editingTileIdx].items.find(i=>i.id===selectedItemUUID).scale || 1.0))}
-                                                        className="w-24 accent-blue-600"/>
-                                                    <Maximize2 size={16}/>
-                                                </div>
-                                                <button onClick={storeSpecificItem} className="bg-red-100 text-red-600 p-3 rounded-xl font-bold flex items-center justify-center gap-2">
-                                                    <Package size={18}/> Einlagern
-                                                </button>
-                                            </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button onClick={handleContextAction} className="bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-xl font-bold flex flex-col items-center justify-center shadow-lg active:scale-95 transition-transform">
+                                                <Droplet size={24} className="mb-1"/> Gießen / Ernten
+                                            </button>
+                                            <button onClick={()=>setIsEditMode(true)} className="bg-yellow-500 hover:bg-yellow-600 text-white p-4 rounded-xl font-bold flex flex-col items-center justify-center shadow-lg active:scale-95 transition-transform">
+                                                <Hammer size={24} className="mb-1"/> Gestalten
+                                            </button>
                                         </div>
-                                    </>
+                                    </div>
                                 ) : (
-                                    <div className="text-center text-gray-400 py-8">
-                                        Tippe auf ein Item im großen Feld,<br/>um es zu bewegen oder zu vergrößern.
+                                    <div className="space-y-4 animate-in slide-in-from-bottom-10">
+                                        
+                                        {selectedItemUUID ? (
+                                            <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-2xl flex gap-4 items-center justify-between">
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    <div/> <button onClick={()=>updateItemPos(0,-5,0)} className="d-pad-btn"><ChevronUp size={16}/></button> <div/>
+                                                    <button onClick={()=>updateItemPos(-5,0,0)} className="d-pad-btn"><ChevronLeft size={16}/></button> 
+                                                    <div className="w-10 h-10 flex items-center justify-center"><Move size={16} className="text-gray-400"/></div>
+                                                    <button onClick={()=>updateItemPos(5,0,0)} className="d-pad-btn"><ChevronRight size={16}/></button>
+                                                    <div/> <button onClick={()=>updateItemPos(0,5,0)} className="d-pad-btn"><ChevronDown size={16}/></button> <div/>
+                                                </div>
+
+                                                <div className="flex flex-col gap-3 flex-1">
+                                                    <div className="flex items-center gap-2 bg-white dark:bg-slate-700 p-2 rounded-lg border border-gray-200 dark:border-slate-600">
+                                                        <Minimize2 size={14} className="text-gray-400"/>
+                                                        <input type="range" min="0.5" max="2.0" step="0.1" 
+                                                            value={room.grid[viewingTileIdx].items.find(i=>i.id===selectedItemUUID).scale || 1.0}
+                                                            onChange={(e)=>updateItemPos(0,0, parseFloat(e.target.value) - (room.grid[viewingTileIdx].items.find(i=>i.id===selectedItemUUID).scale || 1.0))}
+                                                            className="w-full accent-blue-600 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                                        />
+                                                        <Maximize2 size={14} className="text-gray-400"/>
+                                                    </div>
+                                                    <button onClick={storeSpecificItem} className="bg-red-100 text-red-600 py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border border-red-200">
+                                                        <Package size={16}/> Einlagern
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <div className="text-xs font-bold text-gray-400 mb-2 uppercase">Hinzufügen</div>
+                                                <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
+                                                    {Object.keys(data?.inventory||{}).map(k => {
+                                                        const item = ITEMS[k];
+                                                        if(data.inventory[k]>0) return (
+                                                            <button key={k} onClick={()=>placeItem(k)} className="bg-stone-50 dark:bg-slate-800 p-3 rounded-xl min-w-[70px] flex flex-col items-center border-2 border-transparent hover:border-bloom-500 active:scale-95 transition-all relative">
+                                                                <div className="text-2xl mb-1 emoji-3d">
+                                                                    {item.textureClass ? <div className={`w-6 h-6 rounded ${item.textureClass} border border-gray-300`}></div> : item.icon}
+                                                                </div>
+                                                                <span className="text-[9px] font-bold text-gray-600 dark:text-gray-300 line-clamp-1">{item.name}</span>
+                                                                <span className="absolute -top-1 -right-1 bg-bloom-500 text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold shadow-sm">{data.inventory[k]}</span>
+                                                            </button>
+                                                        )
+                                                    })}
+                                                    {Object.values(data?.inventory||{}).every(v=>v<=0) && <div className="text-xs text-gray-400 w-full text-center py-2">Inventar leer</div>}
+                                                </div>
+                                                
+                                                {room.grid[viewingTileIdx].floor && (
+                                                    <button onClick={removeFloor} className="w-full mt-2 border border-orange-200 text-orange-600 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-orange-50">
+                                                        <Box size={16}/> Boden entfernen
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <button onClick={()=>{setIsEditMode(false); setSelectedItemUUID(null);}} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold mt-2 shadow-lg active:scale-95 transition-transform">
+                                            Fertig
+                                        </button>
                                     </div>
                                 )}
-
-                                {/* Inventory Bar in Editor */}
-                                <div className="border-t pt-4 dark:border-slate-800">
-                                    <div className="text-xs font-bold text-gray-400 mb-2">HINZUFÜGEN</div>
-                                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                                        {Object.keys(data?.inventory||{}).map(k => {
-                                            const item = ITEMS[k];
-                                            if(data.inventory[k]>0) return (
-                                                <button key={k} onClick={()=>placeItem(k)} className="bg-stone-50 dark:bg-slate-800 p-3 rounded-xl min-w-[70px] flex flex-col items-center border border-gray-200 dark:border-slate-700">
-                                                    <span className="text-2xl mb-1 emoji-3d">{item.icon}</span>
-                                                    <span className="text-[10px] font-bold">x{data.inventory[k]}</span>
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     )}
 
                     {/* MAIN GARDEN VIEW */}
                     <div className="p-4 flex justify-between items-center z-10">
-                        <div className="flex gap-2">
-                             <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-gray-700 dark:text-gray-300 shadow-sm border border-white/20">
-                                {isNight ? 'Nacht 🌙' : 'Tag ☀️'}
-                             </div>
+                        <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur px-3 py-1 rounded-full text-xs font-bold text-gray-700 dark:text-gray-300 shadow-sm border border-white/20">
+                            {isNight ? 'Nacht 🌙' : 'Tag ☀️'}
                         </div>
-                        <button onClick={() => { setEditingMode(!editingMode); setSel(null); }} className={`flex items-center gap-1 text-xs px-4 py-2 rounded-full font-bold shadow-md transition-all ${editingMode ? 'bg-blue-600 text-white scale-105 ring-2 ring-white' : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200'}`}>
-                            {editingMode ? <CheckSquare size={14}/> : <Edit3 size={14}/>} {editingMode ? 'Fertig' : 'Umbauen'}
-                        </button>
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col items-center justify-center">
-                        {editingMode && <div className="mb-4 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 px-4 py-2 rounded-lg text-sm font-bold animate-pulse shadow-md">Tippe auf ein Feld, um es im Detail zu bearbeiten.</div>}
-                        
                         <div className="relative p-3 md:p-4 rounded-2xl shadow-2xl transition-all duration-700 bg-[#8d6e63] border-4 border-[#5d4037]" style={{ width: '100%', maxWidth: '600px', aspectRatio:'1' }}>
                             <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #000 10px, #000 11px)'}}></div>
                             {isNight && <div className="absolute inset-0 pointer-events-none z-0 rounded night-overlay"></div>}
@@ -718,8 +707,8 @@
                                     if (c.item || c.type) { c = { floor: null, items: [] }; } 
                                     
                                     return (
-                                        <div key={i} onClick={()=> handleTileClick(i)} className={`rounded-lg cursor-pointer transition-all active:scale-95 ${editingMode ? 'ring-2 ring-blue-300 hover:bg-blue-500/20' : ''}`}>
-                                            {renderTileContent(i, c)}
+                                        <div key={i} onClick={()=> setViewingTileIdx(i)} className="rounded-lg cursor-pointer transition-all active:scale-95 hover:brightness-110">
+                                            {renderTile(i, c)}
                                         </div>
                                     )
                                 })}
@@ -727,33 +716,6 @@
                         </div>
                         <button onClick={expand} className="mt-8 bg-white dark:bg-slate-800 border dark:border-slate-700 text-purple-700 dark:text-purple-400 px-6 py-3 rounded-full shadow-lg hover:shadow-xl hover:bg-purple-50 dark:hover:bg-slate-700 font-bold flex items-center gap-2 transition-all"><Gem size={16}/> Fläche erweitern (50)</button>
                     </div>
-
-                    {/* QUICK PLANT DRAWER (Only when NOT editing) */}
-                    {sel !== null && !editingMode && (
-                        <div className="absolute bottom-0 w-full bg-white/95 backdrop-blur dark:bg-slate-900/95 p-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)] animate-slide-up z-30 md:max-w-md md:left-1/2 md:-translate-x-1/2 md:mb-6 md:rounded-3xl border border-gray-100 dark:border-slate-700">
-                            <div className="flex justify-between mb-4 font-bold text-gray-700 dark:text-white items-center">
-                                <span className="text-lg">Schnell-Pflanzen</span>
-                                <button onClick={()=>setSel(null)} className="bg-gray-100 dark:bg-slate-800 p-2 rounded-full"><X size={20}/></button>
-                            </div>
-                            <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
-                                {Object.keys(data?.inventory||{}).map(k => {
-                                    const item = ITEMS[k];
-                                    if(data.inventory[k]>0) return (
-                                        <button key={k} onClick={()=>placeItem(k)} className="bg-stone-50 dark:bg-slate-800 p-4 rounded-2xl min-w-[90px] flex flex-col items-center border-2 border-transparent hover:border-bloom-500 transition-all relative group">
-                                            <div className="text-3xl mb-2 emoji-3d">{item.textureClass ? <div className={`w-8 h-8 rounded ${item.textureClass}`}></div> : item.icon}</div>
-                                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300 line-clamp-1">{item.name}</span>
-                                            <span className="absolute top-2 right-2 bg-bloom-100 dark:bg-green-900 text-bloom-700 dark:text-green-300 text-[9px] px-1.5 py-0.5 rounded-full font-bold">x{data.inventory[k]}</span>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                            <div className="flex gap-2">
-                                {room.grid[sel]?.floor && (
-                                    <button onClick={removeFloor} className="flex-1 flex items-center justify-center gap-2 bg-orange-50 text-orange-700 px-4 py-3 rounded-xl font-bold hover:bg-orange-100 text-sm"><Box size={16}/> Boden entfernen</button>
-                                )}
-                            </div>
-                        </div>
-                    )}
                 </div>
             );
         };
