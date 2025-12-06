@@ -88,6 +88,20 @@
         .d-pad-btn:active { transform: translateY(3px); box-shadow: none; }
         .dark .d-pad-btn { background: #334155; border-color: #475569; box-shadow: 0 3px 0 #1e293b; color: white; }
 
+        .draggable-item {
+            touch-action: none;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+        }
+        .draggable-item:active { cursor: grabbing; scale: 1.1; z-index: 50; }
+
+        /* NEU: Badges schweben über allem */
+        .status-badge {
+            z-index: 100;
+            pointer-events: none; /* Klicks gehen durch */
+        }
+
     </style>
 </head>
 <body class="bg-stone-100 text-gray-900 dark:bg-slate-950 dark:text-slate-100 select-none transition-colors duration-700">
@@ -138,7 +152,6 @@
 
         // --- ITEMS ---
         const ITEMS = {
-            // Pflanzen
             'seed_wheat': { id: 'seed_wheat', name: 'Weizen', type: 'plant', cost: 20, icon: '🌾', stages: 2, sellPrice: 10, sellCurrency: 'gems' },
             'seed_carrot': { id: 'seed_carrot', name: 'Karotte', type: 'plant', cost: 50, icon: '🥕', stages: 3, sellPrice: 15, sellCurrency: 'gems' },
             'seed_flower': { id: 'seed_flower', name: 'Rose', type: 'plant', cost: 150, icon: '🌹', stages: 4, sellPrice: 30, sellCurrency: 'gems' },
@@ -148,11 +161,9 @@
             'seed_tulip': { id: 'seed_tulip', name: 'Tulpe', type: 'plant', cost: 200, icon: '🌷', stages: 3, sellPrice: 40, sellCurrency: 'gems' },
             'seed_corn': { id: 'seed_corn', name: 'Mais', type: 'plant', cost: 80, icon: '🌽', stages: 3, sellPrice: 25, sellCurrency: 'gems' },
             
-            // Texture-based Floors
             'deco_stone': { id: 'deco_stone', name: 'Steinweg', type: 'floor', cost: 50, textureClass: 'texture-stone', stages: 1 },
             'deco_wood': { id: 'deco_wood', name: 'Holzboden', type: 'floor', cost: 50, textureClass: 'texture-wood', stages: 1 },
             
-            // Deko
             'deco_fence': { id: 'deco_fence', name: 'Zaun', type: 'decor', cost: 100, icon: '🚧', stages: 1 },
             'deco_bush': { id: 'deco_bush', name: 'Hecke', type: 'decor', cost: 150, icon: '🌳', stages: 1 },
             'deco_bench': { id: 'deco_bench', name: 'Bank', type: 'decor', cost: 300, icon: '🪑', stages: 1 },
@@ -393,20 +404,14 @@
                 let cell = room.grid[targetIdx];
                 if (!cell || Array.isArray(cell) || typeof cell !== 'object' || cell.type) cell = { floor: null, items: [] };
                 
-                // --- KORRIGIERTE LOGIK v3.5 ---
-                
                 if (itemDef.type === 'floor') {
-                    // Boden immer erlaubt
                     await runTransaction(db, async(t)=>{
                         if (cell.floor) t.update(doc(db,'users',user.uid), {[`inventory.${cell.floor}`]: increment(1)});
                         t.update(doc(db,'users',user.uid), {[`inventory.${itemId}`]: increment(-1)});
                         t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${targetIdx}.floor`]: itemId});
                     });
-                } 
-                else if (itemDef.type === 'plant') {
-                    // Pflanze -> Nur Erde (kein floor)
-                    if (cell.floor) { alert("Pflanzen wachsen nur auf Erde (ohne Boden)!"); return; }
-                    
+                } else if (itemDef.type === 'plant') {
+                    if (cell.floor) { alert("Pflanzen wachsen nur auf Erde!"); return; }
                     const plantCount = cell.items.filter(it => ITEMS[it.type].type === 'plant').length;
                     const sameType = cell.items.length === 0 || cell.items.every(it => it.type === itemId);
                     if (plantCount >= 3) { alert("Maximal 3 Pflanzen pro Beet!"); return; }
@@ -421,15 +426,9 @@
                         const currentItems = cell.items || [];
                         t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${targetIdx}.items`]: [...currentItems, newItem]});
                     });
-                } 
-                else if (itemDef.type === 'decor') {
-                    // Deko -> Nur auf Floor (außer Zwerg)
-                    // HIER WAR VORHER DER FEHLER: Wir prüfen jetzt strikt!
-                    if (itemDef.id !== 'deco_gnome' && !cell.floor) { 
-                        alert("Deko muss auf einen Boden (Holz/Stein) gebaut werden! Nur Zwerge mögen Erde."); 
-                        return; 
-                    }
-                    
+                } else if (itemDef.type === 'decor') {
+                    // FIX: Strenge Prüfung
+                    if (itemDef.id !== 'deco_gnome' && !cell.floor) { alert("Deko muss auf einen Boden (Holz/Stein) gebaut werden! Nur Zwerge mögen Erde."); return; }
                     const newItem = { 
                         id: crypto.randomUUID(), type: itemId, x: 50, y: 50, scale: 1.0, user: user.displayName 
                     };
@@ -528,12 +527,12 @@
                 if(diff <= 0) return "Gießen!";
                 const h = Math.floor(diff / 3600000);
                 const m = Math.floor((diff % 3600000) / 60000);
-                return `${h}:${m<10?'0'+m:m}`;
+                const s = Math.floor((diff % 60000) / 1000); // FIX: Sekunden zurück
+                return `${h}:${m<10?'0'+m:m}:${s<10?'0'+s:s}`;
             };
 
             // RENDER HELPER FOR TILE CONTENT
             const renderTile = (i, c, large = false) => {
-                // Background Logic
                 const floorItem = c.floor ? ITEMS[c.floor] : null;
                 const plant = c.items?.find(it => ITEMS[it.type].type === 'plant');
                 const isDry = plant && now > plant.lastWatered + CYCLE_MS;
@@ -543,39 +542,47 @@
                 if(floorItem) bgColor = undefined;
 
                 return (
-                    <div className={`relative w-full h-full rounded-lg overflow-hidden ${!c.floor ? 'soil-inset' : ''} ${bgClass}`} style={{backgroundColor: bgColor}}>
-                        {c.floor && ITEMS[c.floor].type === 'decor' && <div className={`absolute inset-0 -z-10 bg-grass-realistic opacity-80`}/>}
+                    <div className={`relative w-full h-full rounded-lg ${!c.floor ? 'soil-inset' : ''} ${bgClass}`} style={{backgroundColor: bgColor}}>
+                        {/* FIX: Layering via z-index statt overflow:hidden */}
+                        <div className="absolute inset-0 overflow-hidden rounded-lg">
+                            {c.floor && ITEMS[c.floor].type === 'decor' && <div className={`absolute inset-0 -z-10 bg-grass-realistic opacity-80`}/>}
+                            {!c.floor && (!c.items || c.items.length === 0) && <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>}
+                        </div>
+
                         {c.items && c.items.map(it => {
                             const def = ITEMS[it.type];
                             const isPlant = def.type === 'plant';
                             const isSelected = selectedItemUUID === it.id;
                             
                             return (
-                                <div key={it.id}
-                                     onClick={(e) => { 
-                                         if(large && isEditMode) { e.stopPropagation(); setSelectedItemUUID(it.id); }
-                                     }}
-                                     className={`absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 transition-transform 
-                                        ${large && isSelected ? 'z-50 scale-110 drop-shadow-2xl' : ''} 
-                                        ${large && isEditMode ? 'cursor-pointer' : ''}`}
-                                     style={{ left: `${it.x}%`, top: `${it.y}%` }}
-                                >
+                                <React.Fragment key={it.id}>
+                                    {/* STATUS BADGE - NOW OUTSIDE CLIPPING, HIGH Z-INDEX */}
                                     {isPlant && it.stage < def.stages && !isEditMode && (
-                                        <div className={`absolute -top-6 scale-75 whitespace-nowrap font-mono font-bold px-1.5 py-0.5 rounded shadow-lg z-20 border border-white/20 ${now > it.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/40 text-white'}`}>
+                                        <div className={`status-badge absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-75 whitespace-nowrap font-mono font-bold px-1.5 py-0.5 rounded shadow-lg border border-white/20 ${now > it.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/60 text-white'}`}>
                                             {now > it.lastWatered + CYCLE_MS ? <Droplet size={10}/> : (large ? getTimerString(it.lastWatered) : '')}
                                         </div>
                                     )}
-                                    <span className={`emoji-3d select-none ${large ? 'text-6xl' : 'text-3xl'} ${isPlant && !isEditMode ? 'animate-sway origin-bottom' : ''}`}
-                                          style={{ fontSize: it.scale && large ? `${4 * it.scale}rem` : (it.scale ? `${1.5 * it.scale}rem` : undefined) }}>
-                                        {def.icon}
-                                    </span>
-                                    {large && isSelected && <div className="absolute inset-[-10px] border-2 border-white rounded-full animate-pulse pointer-events-none"/>}
-                                    
-                                    {isPlant && it.stage >= def.stages && !isEditMode && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-full border-2 border-yellow-300"/>}
-                                </div>
+
+                                    {/* ITEM CONTENT */}
+                                    <div
+                                        onClick={(e) => { 
+                                            if(large && isEditMode) { e.stopPropagation(); setSelectedItemUUID(it.id); }
+                                        }}
+                                        className={`absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 transition-transform 
+                                            ${large && isSelected ? 'z-50 scale-110 drop-shadow-2xl' : ''} 
+                                            ${large && isEditMode ? 'cursor-pointer' : ''}`}
+                                        style={{ left: `${it.x}%`, top: `${it.y}%` }}
+                                    >
+                                        <span className={`emoji-3d select-none ${large ? 'text-6xl' : 'text-3xl'} ${isPlant && !isEditMode ? 'animate-sway origin-bottom' : ''}`}
+                                            style={{ fontSize: it.scale && large ? `${4 * it.scale}rem` : (it.scale ? `${1.5 * it.scale}rem` : undefined) }}>
+                                            {def.icon}
+                                        </span>
+                                        {large && isSelected && <div className="absolute inset-[-10px] border-2 border-white rounded-full animate-pulse pointer-events-none"/>}
+                                        {isPlant && it.stage >= def.stages && !isEditMode && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-full border-2 border-yellow-300"/>}
+                                    </div>
+                                </React.Fragment>
                             );
                         })}
-                        {!c.floor && (!c.items || c.items.length === 0) && <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>}
                     </div>
                 )
             };
