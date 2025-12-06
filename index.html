@@ -96,10 +96,25 @@
         }
         .draggable-item:active { cursor: grabbing; scale: 1.1; z-index: 50; }
 
-        /* NEU: Badges schweben über allem */
-        .status-badge {
-            z-index: 100;
-            pointer-events: none; /* Klicks gehen durch */
+        /* NEU: Wichtig damit Anzeigen über den Rand ragen können */
+        .tile-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            /* Kein overflow: hidden hier! */
+        }
+        .tile-background {
+            position: absolute;
+            inset: 0;
+            border-radius: 0.5rem;
+            overflow: hidden; /* Nur der Hintergrund wird abgeschnitten */
+            z-index: 0;
+        }
+        .tile-content {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            /* Inhalte dürfen rausgucken */
         }
 
     </style>
@@ -245,7 +260,6 @@
                     await setDoc(doc(db, 'rooms', `r_${id}`), { id, name, grid, expansion: 4, owner: user.uid, members: [user.uid] });
                     const tasksRef = collection(db, 'rooms', `r_${id}`, 'tasks');
                     await addDoc(tasksRef, { txt: "👋 Sag Hallo", rew: 50, type: 'once', done: false, at: serverTimestamp() });
-                    await addDoc(tasksRef, { txt: "💧 Trink Wasser", rew: 20, type: 'daily', lastDone: null, at: serverTimestamp() });
                     await updateDoc(doc(db, 'users', user.uid), { currentGarden: id });
                 } catch(e) { console.error(e); alert("Fehler beim Erstellen"); }
                 setLoading(false);
@@ -427,7 +441,6 @@
                         t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${targetIdx}.items`]: [...currentItems, newItem]});
                     });
                 } else if (itemDef.type === 'decor') {
-                    // FIX: Strenge Prüfung
                     if (itemDef.id !== 'deco_gnome' && !cell.floor) { alert("Deko muss auf einen Boden (Holz/Stein) gebaut werden! Nur Zwerge mögen Erde."); return; }
                     const newItem = { 
                         id: crypto.randomUUID(), type: itemId, x: 50, y: 50, scale: 1.0, user: user.displayName 
@@ -527,12 +540,13 @@
                 if(diff <= 0) return "Gießen!";
                 const h = Math.floor(diff / 3600000);
                 const m = Math.floor((diff % 3600000) / 60000);
-                const s = Math.floor((diff % 60000) / 1000); // FIX: Sekunden zurück
+                const s = Math.floor((diff % 60000) / 1000);
                 return `${h}:${m<10?'0'+m:m}:${s<10?'0'+s:s}`;
             };
 
             // RENDER HELPER FOR TILE CONTENT
             const renderTile = (i, c, large = false) => {
+                // Background Logic
                 const floorItem = c.floor ? ITEMS[c.floor] : null;
                 const plant = c.items?.find(it => ITEMS[it.type].type === 'plant');
                 const isDry = plant && now > plant.lastWatered + CYCLE_MS;
@@ -542,47 +556,52 @@
                 if(floorItem) bgColor = undefined;
 
                 return (
-                    <div className={`relative w-full h-full rounded-lg ${!c.floor ? 'soil-inset' : ''} ${bgClass}`} style={{backgroundColor: bgColor}}>
-                        {/* FIX: Layering via z-index statt overflow:hidden */}
-                        <div className="absolute inset-0 overflow-hidden rounded-lg">
+                    <div className={`tile-container relative w-full h-full`}>
+                        {/* 1. LAYER: BACKGROUND (CLIPPED) */}
+                        <div className={`tile-background ${!c.floor ? 'soil-inset' : ''} ${bgClass}`} style={{backgroundColor: bgColor}}>
                             {c.floor && ITEMS[c.floor].type === 'decor' && <div className={`absolute inset-0 -z-10 bg-grass-realistic opacity-80`}/>}
                             {!c.floor && (!c.items || c.items.length === 0) && <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>}
                         </div>
 
-                        {c.items && c.items.map(it => {
-                            const def = ITEMS[it.type];
-                            const isPlant = def.type === 'plant';
-                            const isSelected = selectedItemUUID === it.id;
-                            
-                            return (
-                                <React.Fragment key={it.id}>
-                                    {/* STATUS BADGE - NOW OUTSIDE CLIPPING, HIGH Z-INDEX */}
-                                    {isPlant && it.stage < def.stages && !isEditMode && (
-                                        <div className={`status-badge absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-75 whitespace-nowrap font-mono font-bold px-1.5 py-0.5 rounded shadow-lg border border-white/20 ${now > it.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/60 text-white'}`}>
-                                            {now > it.lastWatered + CYCLE_MS ? <Droplet size={10}/> : (large ? getTimerString(it.lastWatered) : '')}
-                                        </div>
-                                    )}
+                        {/* 2. LAYER: ITEMS (NOT CLIPPED) */}
+                        <div className="tile-content">
+                            {c.items && c.items.map(it => {
+                                const def = ITEMS[it.type];
+                                const isPlant = def.type === 'plant';
+                                const isSelected = selectedItemUUID === it.id;
+                                
+                                return (
+                                    <React.Fragment key={it.id}>
+                                        {/* STATUS BADGE - HIGH Z-INDEX */}
+                                        {isPlant && it.stage < def.stages && !isEditMode && (
+                                            <div className={`status-badge absolute left-1/2 -translate-x-1/2 font-mono font-bold px-1.5 py-0.5 rounded shadow-lg border border-white/20 whitespace-nowrap 
+                                                ${large ? '-top-10 scale-100' : '-top-4 scale-50 md:scale-75'} 
+                                                ${now > it.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/60 text-white'}`}>
+                                                {now > it.lastWatered + CYCLE_MS ? <Droplet size={large ? 16 : 10}/> : (large ? getTimerString(it.lastWatered) : '')}
+                                            </div>
+                                        )}
 
-                                    {/* ITEM CONTENT */}
-                                    <div
-                                        onClick={(e) => { 
-                                            if(large && isEditMode) { e.stopPropagation(); setSelectedItemUUID(it.id); }
-                                        }}
-                                        className={`absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 transition-transform 
-                                            ${large && isSelected ? 'z-50 scale-110 drop-shadow-2xl' : ''} 
-                                            ${large && isEditMode ? 'cursor-pointer' : ''}`}
-                                        style={{ left: `${it.x}%`, top: `${it.y}%` }}
-                                    >
-                                        <span className={`emoji-3d select-none ${large ? 'text-6xl' : 'text-3xl'} ${isPlant && !isEditMode ? 'animate-sway origin-bottom' : ''}`}
-                                            style={{ fontSize: it.scale && large ? `${4 * it.scale}rem` : (it.scale ? `${1.5 * it.scale}rem` : undefined) }}>
-                                            {def.icon}
-                                        </span>
-                                        {large && isSelected && <div className="absolute inset-[-10px] border-2 border-white rounded-full animate-pulse pointer-events-none"/>}
-                                        {isPlant && it.stage >= def.stages && !isEditMode && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-full border-2 border-yellow-300"/>}
-                                    </div>
-                                </React.Fragment>
-                            );
-                        })}
+                                        {/* ACTUAL ITEM */}
+                                        <div
+                                            onClick={(e) => { 
+                                                if(large && isEditMode) { e.stopPropagation(); setSelectedItemUUID(it.id); }
+                                            }}
+                                            className={`absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 transition-transform 
+                                                ${large && isSelected ? 'z-50 scale-110 drop-shadow-2xl' : ''} 
+                                                ${large && isEditMode ? 'cursor-pointer' : ''}`}
+                                            style={{ left: `${it.x}%`, top: `${it.y}%` }}
+                                        >
+                                            <span className={`emoji-3d select-none ${large ? 'text-6xl' : 'text-3xl'} ${isPlant && !isEditMode ? 'animate-sway origin-bottom' : ''}`}
+                                                style={{ fontSize: it.scale && large ? `${4 * it.scale}rem` : (it.scale ? `${1.5 * it.scale}rem` : undefined) }}>
+                                                {def.icon}
+                                            </span>
+                                            {large && isSelected && <div className="absolute inset-[-10px] border-2 border-white rounded-full animate-pulse pointer-events-none"/>}
+                                            {isPlant && it.stage >= def.stages && !isEditMode && <div className="absolute inset-0 bg-yellow-400/30 animate-pulse rounded-full border-2 border-yellow-300"/>}
+                                        </div>
+                                    </React.Fragment>
+                                );
+                            })}
+                        </div>
                     </div>
                 )
             };
@@ -602,7 +621,8 @@
                             </div>
 
                             <div className="flex-1 flex items-center justify-center p-8 relative overflow-hidden">
-                                <div className="w-64 h-64 shadow-2xl rounded-2xl ring-4 ring-white/10 relative bg-black/20">
+                                <div className="w-64 h-64 shadow-2xl relative">
+                                    {/* FIX: Container ohne overflow hidden */}
                                     {renderTile(viewingTileIdx, room.grid[viewingTileIdx], true)}
                                 </div>
                                 {isEditMode && !selectedItemUUID && <div className="absolute bottom-10 text-white/70 text-sm font-bold bg-black/50 px-3 py-1 rounded-full animate-bounce">Tippe ein Item an zum Bearbeiten</div>}
