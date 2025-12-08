@@ -244,7 +244,6 @@
                     await setDoc(doc(db, 'rooms', `r_${id}`), { id, name, grid, expansion: 4, owner: user.uid, members: [user.uid] });
                     const tasksRef = collection(db, 'rooms', `r_${id}`, 'tasks');
                     await addDoc(tasksRef, { txt: "👋 Sag Hallo", rew: 50, type: 'once', done: false, at: serverTimestamp() });
-                    await addDoc(tasksRef, { txt: "💧 Trink Wasser", rew: 20, type: 'daily', lastDone: null, at: serverTimestamp() });
                     await updateDoc(doc(db, 'users', user.uid), { currentGarden: id });
                 } catch(e) { console.error(e); alert("Fehler beim Erstellen"); }
                 setLoading(false);
@@ -392,14 +391,11 @@
             const size = room.expansion || 4;
             useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
 
-            // 1. PLACE ITEM
             const placeItem = async (itemId) => {
                 if((data.inventory?.[itemId]||0) <= 0) return;
                 const itemDef = ITEMS[itemId];
-                
                 const targetIdx = viewingTileIdx;
                 if (targetIdx === null) return;
-
                 let cell = room.grid[targetIdx];
                 if (!cell || Array.isArray(cell) || typeof cell !== 'object' || cell.type) cell = { floor: null, items: [] };
                 
@@ -427,9 +423,7 @@
                     });
                 } else if (itemDef.type === 'decor') {
                     if (itemDef.id !== 'deco_gnome' && !cell.floor) { alert("Deko muss auf einen Boden (Holz/Stein) gebaut werden! Nur Zwerge mögen Erde."); return; }
-                    const newItem = { 
-                        id: crypto.randomUUID(), type: itemId, x: 50, y: 50, scale: 1.0, user: user.displayName 
-                    };
+                    const newItem = { id: crypto.randomUUID(), type: itemId, x: 50, y: 50, scale: 1.0, user: user.displayName };
                     await runTransaction(db, async(t)=>{
                         t.update(doc(db,'users',user.uid), {[`inventory.${itemId}`]: increment(-1)});
                         const currentItems = cell.items || [];
@@ -438,7 +432,6 @@
                 }
             };
 
-            // 2. MOVE / SCALE ITEM
             const updateItemPos = async (dx, dy, dScale) => {
                 if(viewingTileIdx === null || !selectedItemUUID) return;
                 const cell = room.grid[viewingTileIdx];
@@ -453,7 +446,6 @@
                 await updateDoc(doc(db,'rooms',`r_${room.id}`), {[`grid.${viewingTileIdx}.items`]: newItems});
             };
 
-            // 3. STORE / REMOVE
             const storeSpecificItem = async () => {
                 if(viewingTileIdx === null || !selectedItemUUID) return;
                 const cell = room.grid[viewingTileIdx];
@@ -461,12 +453,9 @@
                 if(!item) return;
                 
                 const itemType = ITEMS[item.type].type;
-
-                // BUGFIX: Safety Check & try/catch
                 try {
                     if (itemType === 'plant') {
                         if(!confirm("Pflanze wirklich entfernen? (Keine Rückerstattung!)")) return;
-                        // Plant remove logic (simple delete)
                         await runTransaction(db, async(t) => {
                              const freshGrid = (await t.get(doc(db,'rooms',`r_${room.id}`))).data().grid;
                              const freshItems = freshGrid[viewingTileIdx].items || [];
@@ -475,13 +464,10 @@
                         });
                     } else {
                         if(!confirm("Deko einlagern? (Zurück ins Inventar)")) return;
-                        // Decor store logic
                         await runTransaction(db, async(t)=>{
-                            // Read fresh
                             const freshGrid = (await t.get(doc(db,'rooms',`r_${room.id}`))).data().grid;
                             const freshItems = freshGrid[viewingTileIdx].items || [];
                             const remaining = freshItems.filter(it => it.id !== selectedItemUUID);
-                            
                             t.update(doc(db,'rooms',`r_${room.id}`), {[`grid.${viewingTileIdx}.items`]: remaining});
                             t.update(doc(db,'users',user.uid), {[`inventory.${item.type}`]: increment(1)});
                         });
@@ -505,7 +491,6 @@
                 });
             };
 
-            // 4. WATER / HARVEST (Context Action)
             const handleContextAction = async () => {
                 if(viewingTileIdx === null) return;
                 const cell = room.grid[viewingTileIdx];
@@ -571,7 +556,7 @@
                 return (
                     <div className={`tile-container relative w-full h-full`}>
                         {/* 1. LAYER: BACKGROUND (CLIPPED) */}
-                        <div className={`tile-background ${!c.floor ? 'soil-inset' : ''} ${bgClass}`} style={{backgroundColor: bgColor}}>
+                        <div className={`tile-background rounded-lg ${!c.floor ? 'soil-inset' : ''} ${bgClass}`} style={{backgroundColor: bgColor}}>
                             {c.floor && ITEMS[c.floor].type === 'decor' && <div className={`absolute inset-0 -z-10 bg-grass-realistic opacity-80`}/>}
                             {!c.floor && (!c.items || c.items.length === 0) && <div className="w-full h-full opacity-10" style={{backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '8px 8px'}}></div>}
                         </div>
@@ -585,12 +570,13 @@
                                 
                                 return (
                                     <React.Fragment key={it.id}>
-                                        {/* STATUS BADGE - HIGH Z-INDEX */}
+                                        {/* STATUS BADGE - FIX: Immer sichtbar */}
                                         {isPlant && it.stage < def.stages && !isEditMode && (
                                             <div className={`status-badge absolute left-1/2 -translate-x-1/2 -translate-y-1/2 font-mono font-bold px-1.5 py-0.5 rounded shadow-lg border border-white/20 whitespace-nowrap 
                                                 ${large ? '-top-10 scale-100 text-sm' : '-top-4 scale-75 text-[10px]'} 
-                                                ${now > it.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/60 text-white'}`}>
-                                                {now > it.lastWatered + CYCLE_MS ? <Droplet size={large ? 16 : 10}/> : (large ? getTimerString(it.lastWatered) : '')}
+                                                ${now > it.lastWatered + CYCLE_MS ? 'bg-blue-500 text-white animate-bounce' : 'bg-black/60 text-white'}`}
+                                                style={{ left: `${it.x}%`, top: `0%` }}>
+                                                {now > it.lastWatered + CYCLE_MS ? <Droplet size={large ? 16 : 10}/> : getTimerString(it.lastWatered)}
                                             </div>
                                         )}
 
@@ -618,22 +604,6 @@
                     </div>
                 )
             };
-
-            // Smart Button Calculation
-            const getContextButton = () => {
-                if(viewingTileIdx === null) return null;
-                const cell = room.grid[viewingTileIdx];
-                const plants = cell.items.filter(it => ITEMS[it.type].type === 'plant');
-                if (plants.length === 0) return { text: "Leer", icon: Sprout, disabled: true };
-
-                const harvestable = plants.some(p => p.stage >= ITEMS[p.type].stages);
-                const thirsty = plants.some(p => now > p.lastWatered + CYCLE_MS && p.stage < ITEMS[p.type].stages);
-
-                if (harvestable) return { text: "Ernten!", icon: Shovel, color: "bg-green-600" };
-                if (thirsty) return { text: "Gießen", icon: Droplet, color: "bg-blue-500 animate-pulse" };
-                return { text: "Wächst...", icon: Clock, disabled: true };
-            };
-            const ctxBtn = getContextButton();
 
             return (
                 <div className="h-full flex flex-col bg-grass-realistic dark:bg-slate-950 transition-colors duration-700">
@@ -848,5 +818,4 @@
     </script>
 </body>
 </html>
-
 
