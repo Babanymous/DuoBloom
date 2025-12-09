@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 4.0 🌷</title>
+    <title>DuoBloom 5.0 🌷</title>
     
     <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -108,121 +108,134 @@
         // --- MAIN MENU ---
         const MainMenu = ({ user, onAction, currentRoom }) => {
             const [joinCode, setJoinCode] = React.useState("");
+            const [isCreating, setIsCreating] = React.useState(false);
+            const [newGardenName, setNewGardenName] = React.useState("");
+
+            const handleCreate = () => {
+                if(!newGardenName.trim()) return alert("Bitte Namen eingeben");
+                onAction('create', null, newGardenName);
+            };
 
             return (
                 <div className="h-full bg-slate-100 flex flex-col md:flex-row max-w-5xl mx-auto shadow-xl md:rounded-3xl md:my-8 md:h-[90vh] overflow-hidden">
-                    <div className="md:w-1/3 bg-white p-8 flex flex-col items-center border-r border-gray-100">
+                    {/* Left Profile Side */}
+                    <div className="md:w-1/3 bg-white p-8 flex flex-col items-center border-r border-gray-100 shadow-sm z-10">
                         <img src={user.photoURL} className="w-24 h-24 rounded-full border-4 border-green-500 mb-4 shadow-lg" />
-                        <h1 className="text-2xl font-bold text-gray-800">{user.displayName}</h1>
-                        <button onClick={() => auth.signOut()} className="mt-auto text-red-500 font-bold hover:bg-red-50 px-4 py-2 rounded-lg transition-colors">Abmelden</button>
+                        <h1 className="text-2xl font-bold text-gray-800 text-center">{user.displayName}</h1>
+                        <p className="text-xs text-gray-400 mb-8">Gärtner ID: {user.uid.slice(0,5)}</p>
+                        
+                        <div className="w-full space-y-2 mt-auto">
+                            <button onClick={() => onAction('community')} className="w-full bg-purple-50 border border-purple-200 p-3 rounded-xl text-purple-700 font-bold flex items-center justify-center gap-2 hover:bg-purple-100 transition-colors">
+                                <i data-lucide="globe"></i> Community
+                            </button>
+                            <button onClick={() => auth.signOut()} className="w-full text-red-500 font-bold hover:bg-red-50 p-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+                                <i data-lucide="log-out"></i> Abmelden
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="flex-1 bg-[#f8fafc] p-8 flex flex-col justify-center gap-6">
-                        <h2 className="text-3xl font-bold text-gray-700">Dein Dashboard</h2>
+                    {/* Right Action Side */}
+                    <div className="flex-1 bg-[#f8fafc] p-8 flex flex-col justify-center gap-6 relative">
+                        <h2 className="text-3xl font-bold text-gray-700 mb-4">Dein Dashboard</h2>
                         
-                        {currentRoom && (
+                        {/* Resume Button */}
+                        {currentRoom ? (
                             <button onClick={() => onAction('resume', currentRoom)} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-6 rounded-2xl shadow-lg hover:shadow-xl hover:scale-[1.01] transition-all text-left flex items-center justify-between group">
                                 <div>
                                     <div className="text-green-100 text-sm font-bold uppercase mb-1">Letzte Sitzung</div>
-                                    <div className="text-2xl font-bold">Garten betreten</div>
+                                    <div className="text-2xl font-bold">Weitergärtnern</div>
                                     <div className="text-sm opacity-80 font-mono mt-1">Code: {currentRoom}</div>
                                 </div>
-                                <i data-lucide="arrow-right" className="w-8 h-8 group-hover:translate-x-2 transition-transform"></i>
+                                <div className="bg-white/20 p-3 rounded-full">
+                                    <i data-lucide="play" className="fill-white border-none w-6 h-6"></i>
+                                </div>
                             </button>
+                        ) : (
+                            <div className="bg-gray-100 p-4 rounded-xl text-center text-gray-500 italic">Du hast noch keinen Garten besucht.</div>
                         )}
 
-                        <div className="grid grid-cols-1 gap-4">
-                            <button onClick={() => onAction('create')} className="bg-white border-2 border-dashed border-gray-300 p-6 rounded-2xl text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all flex items-center gap-4">
+                        <hr className="border-gray-200" />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Create Button */}
+                            <button onClick={() => setIsCreating(true)} className="bg-white border-2 border-dashed border-gray-300 p-6 rounded-2xl text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center justify-center gap-2 h-32">
                                 <div className="bg-blue-100 p-3 rounded-full text-blue-500"><i data-lucide="plus"></i></div>
-                                <span className="font-bold text-lg">Neuen Garten erstellen</span>
+                                <span className="font-bold">Neuer Garten</span>
                             </button>
                             
-                            <div className="bg-white border border-gray-200 p-6 rounded-2xl flex flex-col justify-center">
-                                <label className="text-xs font-bold text-gray-400 uppercase mb-2">Code eingeben (Freund beitreten)</label>
+                            {/* Join Input */}
+                            <div className="bg-white border border-gray-200 p-6 rounded-2xl flex flex-col justify-center h-32">
+                                <label className="text-xs font-bold text-gray-400 uppercase mb-2">Code eingeben</label>
                                 <div className="flex gap-2">
-                                    <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="z.B. A1B2C3" className="w-full bg-gray-100 rounded-lg px-4 py-3 font-bold uppercase focus:ring-2 ring-blue-500 outline-none" />
-                                    <button onClick={() => joinCode && onAction('join', joinCode)} className="bg-blue-500 text-white px-6 rounded-lg font-bold hover:bg-blue-600 transition-colors">Go</button>
+                                    <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="CODE" className="w-full bg-gray-100 rounded-lg px-3 py-2 font-bold uppercase focus:ring-2 ring-blue-500 outline-none" />
+                                    <button onClick={() => joinCode && onAction('join', joinCode)} className="bg-blue-500 text-white px-3 rounded-lg font-bold hover:bg-blue-600 transition-colors"><i data-lucide="arrow-right"></i></button>
                                 </div>
                             </div>
-                            
-                            <button onClick={() => onAction('community')} className="bg-purple-50 border border-purple-200 p-4 rounded-2xl text-purple-700 font-bold flex items-center justify-center gap-2 hover:bg-purple-100">
-                                <i data-lucide="globe"></i> Community Gärten besuchen
-                            </button>
                         </div>
+
+                        {/* Create Modal */}
+                        {isCreating && (
+                            <Modal title="Garten benennen" onClose={() => setIsCreating(false)}>
+                                <div className="space-y-4">
+                                    <p className="text-gray-500 text-sm">Wie soll dein neues Paradies heißen?</p>
+                                    <input autoFocus value={newGardenName} onChange={e => setNewGardenName(e.target.value)} placeholder="z.B. Sonnenschein Hof" className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" />
+                                    <button onClick={handleCreate} className="w-full bg-green-500 text-white font-bold py-3 rounded-xl hover:bg-green-600">Erstellen & Starten</button>
+                                </div>
+                            </Modal>
+                        )}
                     </div>
                 </div>
             );
         };
 
-        // --- GAME APP (Playing & Spectating) ---
-        const GameApp = ({ user, roomCode, isSpectator, onLeave }) => {
+        // --- GAME APP ---
+        const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
             const [roomData, setRoomData] = React.useState(null);
             const [tab, setTab] = React.useState('garden');
             const [activeGardenIdx, setActiveGardenIdx] = React.useState(0);
             const [selectedItem, setSelectedItem] = React.useState(null);
             
-            // UI States
             const [isTaskModalOpen, setTaskModalOpen] = React.useState(false);
             const [newTaskTitle, setNewTaskTitle] = React.useState("");
-            const [isEditingName, setIsEditingName] = React.useState(false);
-            const [tempName, setTempName] = React.useState("");
             const [hasLiked, setHasLiked] = React.useState(false);
 
-            // Sync Logic
             React.useEffect(() => {
+                if(!roomCode) return;
                 const unsub = onSnapshot(doc(db, 'rooms', roomCode), (snap) => {
                     if (snap.exists()) {
                         setRoomData(snap.data());
-                    } else if (!isSpectator) {
-                        // Init new Room only if not spectating
-                        setDoc(doc(db, 'rooms', roomCode), {
-                            roomName: "Unbenannter Garten",
-                            coins: 50, gems: 0,
-                            tasks: [],
-                            inventory: {}, gardens: { 0: {} }, unlockedGardens: [0],
-                            likes: 0, createdAt: new Date().toISOString(), owner: user.uid
-                        });
+                    } else if (isSpectator) {
+                        alert("Garten existiert nicht mehr");
+                        onBackToMenu();
                     }
                 });
-                // Check if user already liked this room (localstorage check)
                 if (localStorage.getItem(`liked_${roomCode}`)) setHasLiked(true);
-                
                 return () => unsub();
             }, [roomCode, isSpectator]);
 
-            // Fix White Screen: createIcons needs to be safer
+            // Safe Icon Rendering
             React.useEffect(() => { 
-                try { lucide.createIcons(); } catch(e) {} 
-            }, [roomData, tab, isEditingName]);
+                const timer = setTimeout(() => { try { lucide.createIcons(); } catch(e) {} }, 100);
+                return () => clearTimeout(timer);
+            }, [roomData, tab]);
 
-            // --- ACTIONS ---
-
-            const updateName = async () => {
-                if(tempName.trim()) {
-                    try {
-                        await updateDoc(doc(db, 'rooms', roomCode), { roomName: tempName });
-                        setIsEditingName(false);
-                    } catch(e) { console.error(e); setIsEditingName(false); }
-                } else {
-                    setIsEditingName(false);
-                }
-            };
-
+            // Actions
             const handleLike = async () => {
-                if(hasLiked) return;
+                if(hasLiked || !isSpectator) return;
                 await updateDoc(doc(db, 'rooms', roomCode), { likes: increment(1) });
                 localStorage.setItem(`liked_${roomCode}`, 'true');
                 setHasLiked(true);
             };
 
             const handleGridClick = async (key) => {
-                if (isSpectator) return; // Spectators cant touch
+                if (isSpectator || !roomData) return;
 
                 const currentGrid = roomData.gardens[activeGardenIdx] || {};
                 const cell = currentGrid[key] || {}; 
                 const roomRef = doc(db, 'rooms', roomCode);
                 const path = `gardens.${activeGardenIdx}.${key}`;
 
+                // Tool Action
                 if (selectedItem) {
                     const itemDef = ITEMS[selectedItem];
                     const invCount = roomData.inventory[selectedItem] || 0;
@@ -236,6 +249,7 @@
                     return;
                 }
 
+                // Interact Action
                 if (cell.item) {
                     const itemDef = ITEMS[cell.item];
                     if (cell.grown) {
@@ -282,7 +296,7 @@
             return (
                 <div className={`flex h-full bg-slate-100 overflow-hidden md:max-w-7xl md:mx-auto md:my-8 md:rounded-3xl md:shadow-2xl md:border ${isSpectator ? 'border-purple-300 ring-4 ring-purple-100' : 'border-slate-200'}`}>
                     
-                    {/* NAV (Hidden if Spectator on mobile, Simplified on Desktop) */}
+                    {/* NAV */}
                     <nav className="fixed bottom-0 left-0 w-full bg-white border-t z-40 flex justify-around p-2 pb-safe md:relative md:w-64 md:flex-col md:justify-start md:border-t-0 md:border-r md:p-6 md:gap-4">
                         <div className="hidden md:block mb-8">
                             <h1 className="text-2xl font-bold text-green-600 flex items-center gap-2"><i data-lucide="sprout"></i> DuoBloom</h1>
@@ -303,12 +317,6 @@
                             </button>
                             </>
                         )}
-                        
-                        <div className="md:mt-auto pt-4 border-t md:border-t-0 flex-1 md:flex-none flex justify-center md:block">
-                            <button onClick={onLeave} className="w-full text-left p-3 rounded-xl text-gray-600 hover:bg-red-50 hover:text-red-600 flex md:flex-row flex-col items-center gap-3 font-medium">
-                                <i data-lucide="log-out"></i> <span className="text-[10px] md:text-sm">{isSpectator ? 'Zurück' : 'Verlassen'}</span>
-                            </button>
-                        </div>
                     </nav>
 
                     {/* MAIN */}
@@ -316,30 +324,25 @@
                         
                         {/* HEADER */}
                         <header className={`sticky top-0 backdrop-blur-md p-4 shadow-sm z-30 flex justify-between items-center px-6 ${isSpectator ? 'bg-purple-50/90' : 'bg-white/90'}`}>
-                            <div className="flex flex-col">
-                                {isEditingName && !isSpectator ? (
-                                    <div className="flex items-center gap-2">
-                                        <input autoFocus value={tempName} onChange={e => setTempName(e.target.value)} className="border rounded px-2 py-1 text-sm" placeholder="Name" />
-                                        <button onClick={updateName} className="bg-green-500 text-white rounded p-1"><i data-lucide="check" size={16}></i></button>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-2 group cursor-pointer" onClick={() => { if(!isSpectator){ setTempName(roomData.roomName || "Unbenannter Garten"); setIsEditingName(true); }}}>
-                                        <span className="font-bold text-gray-700 truncate max-w-[150px] md:max-w-none text-lg">{roomData.roomName || "Unbenannter Garten"}</span>
-                                        {!isSpectator && <i data-lucide="pencil" size={14} className="text-gray-300 group-hover:text-gray-500"></i>}
-                                    </div>
-                                )}
-                                <span className="text-[10px] text-gray-400 font-mono">
-                                    {isSpectator ? `Besuche: ${roomCode}` : `Code: ${roomCode}`}
-                                </span>
+                            <div className="flex items-center gap-4">
+                                <button onClick={onBackToMenu} className="bg-white border p-2 rounded-xl hover:bg-gray-100 shadow-sm" title="Zurück zum Menü">
+                                    <i data-lucide="home" className="text-gray-600"></i>
+                                </button>
+                                
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-gray-700 truncate max-w-[150px] md:max-w-none text-lg">{roomData.roomName}</span>
+                                    <span className="text-[10px] text-gray-400 font-mono">
+                                        {isSpectator ? `Besuche: ${roomCode}` : `Code: ${roomCode}`}
+                                    </span>
+                                </div>
                             </div>
                             
                             <div className="flex gap-4 ml-auto items-center">
-                                {isSpectator && (
+                                {isSpectator ? (
                                     <button onClick={handleLike} className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold transition-all ${hasLiked ? 'bg-red-100 text-red-500' : 'bg-white border hover:bg-red-50 text-gray-500'}`}>
                                         <i data-lucide="heart" className={hasLiked ? "fill-red-500" : ""}></i> {roomData.likes || 0}
                                     </button>
-                                )}
-                                {!isSpectator && (
+                                ) : (
                                     <>
                                     <div className="flex flex-col items-end">
                                         <span className="text-xs text-gray-400 font-bold uppercase">Münzen</span>
@@ -354,10 +357,10 @@
                             </div>
                         </header>
 
-                        {/* GARDEN */}
+                        {/* GARDEN VIEW */}
                         {tab === 'garden' && (
                             <div className="p-4 md:p-8 flex flex-col items-center">
-                                {/* Garden Selector */}
+                                {/* Selector */}
                                 <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">
                                     {GARDEN_UPGRADES.map(g => {
                                         const owned = roomData.unlockedGardens?.includes(g.id);
@@ -399,7 +402,7 @@
                                     </div>
                                 </div>
 
-                                {/* Inventory (Hidden for Spectator) */}
+                                {/* Inventory */}
                                 {!isSpectator && (
                                     <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100">
                                         <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3>
@@ -421,7 +424,7 @@
                             </div>
                         )}
 
-                        {/* TASKS (Read Only for Spectator, or Hidden) */}
+                        {/* TASKS VIEW */}
                         {tab === 'tasks' && !isSpectator && (
                             <div className="p-6 md:max-w-3xl md:mx-auto">
                                 <div className="flex justify-between items-center mb-6">
@@ -442,7 +445,7 @@
                             </div>
                         )}
 
-                        {/* SHOP */}
+                        {/* SHOP VIEW */}
                         {tab === 'shop' && !isSpectator && (
                             <div className="p-6 md:max-w-4xl md:mx-auto pb-24">
                                 <h3 className="font-bold text-xl text-purple-700 mb-4 flex items-center gap-2"><i data-lucide="castle"></i> Immobilien (Gems)</h3>
@@ -479,7 +482,7 @@
                         )}
                     </main>
 
-                    {/* MODALS */}
+                    {/* TASK MODAL */}
                     {isTaskModalOpen && (
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}>
                             <div className="space-y-4">
@@ -534,9 +537,10 @@
             );
         };
 
+        // --- ROOT APP ---
         const App = () => {
             const [user, setUser] = React.useState(null);
-            const [view, setView] = React.useState('loading'); // loading, login, menu, game, community, spectator
+            const [view, setView] = React.useState('loading'); 
             const [roomCode, setRoomCode] = React.useState(null);
             const [spectateCode, setSpectateCode] = React.useState(null);
 
@@ -545,7 +549,6 @@
                 const unsub = onAuthStateChanged(auth, async (u) => {
                     if (u) {
                         setUser(u);
-                        // Only fetch last room if we are not already in a view
                         if(view === 'loading') {
                             const userSnap = await getDoc(doc(db, 'users', u.uid));
                             if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom);
@@ -558,16 +561,24 @@
                 return () => unsub();
             }, []);
 
-            const handleAction = (action, code) => {
+            const handleAction = async (action, code, name) => {
                 if (action === 'resume') setView('game');
                 else if (action === 'create') {
                     const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    // Init Garden directly
+                    await setDoc(doc(db, 'rooms', newCode), {
+                        roomName: name,
+                        coins: 50, gems: 0,
+                        tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0],
+                        likes: 0, createdAt: new Date().toISOString(), owner: user.uid
+                    });
+                    
                     setRoomCode(newCode);
-                    updateDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
+                    await updateDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
                     setView('game');
                 } else if (action === 'join') {
                     setRoomCode(code);
-                    updateDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
+                    await updateDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
                     setView('game');
                 } else if (action === 'community') {
                     setView('community');
@@ -586,9 +597,9 @@
             );
 
             if (view === 'community') return <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />;
-            if (view === 'spectator') return <GameApp user={user} roomCode={spectateCode} isSpectator={true} onLeave={() => setView('community')} />;
+            if (view === 'spectator') return <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />;
             if (view === 'menu') return <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />;
-            if (view === 'game') return <GameApp user={user} roomCode={roomCode} isSpectator={false} onLeave={() => setView('menu')} />;
+            if (view === 'game') return <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />;
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
