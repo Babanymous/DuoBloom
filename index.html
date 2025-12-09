@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DuoBloom 🌷</title>
     
+    <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -12,32 +13,39 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        body { touch-action: manipulation; }
+        body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
-        .animate-pop { animation: pop 0.2s ease-out; }
+        
+        /* Animationen */
+        @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+        .animate-pop { animation: pop 0.3s ease-out; }
+        
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800 h-screen w-full overflow-hidden select-none">
+<body class="bg-[#eefcf3] text-slate-800 h-screen w-full overflow-hidden select-none font-sans">
 
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
         
-        // --- FIREBASE IMPORTS ---
+        // --- FIREBASE SETUP ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { 
-            getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc,
-            arrayUnion, arrayRemove, increment, deleteField 
+            getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs,
+            arrayUnion, arrayRemove, increment, deleteField, query, where, orderBy, limit 
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { 
             getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // ==========================================
-        // --- DEINE FIREBASE CONFIG HIER EINFÜGEN ---
-        // ==========================================
+        // =================================================================
+        // ⚠️ FÜGE HIER DEINE FIREBASE CONFIG EIN ⚠️
+        // =================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -47,93 +55,180 @@
             appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
             measurementId: "G-Z0W0LK6D88"
           };
-        // ==========================================
+        // =================================================================
 
         let app, auth, db;
         try {
-            if (firebaseConfig.apiKey !== "HIER_API_KEY_EINFUEGEN") {
+            // Check if config is replaced
+            if (firebaseConfig.apiKey !== "HIER_API_KEY") {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Firebase Init Error:", e); }
+
+        // --- SPIEL DATEN ---
+
+        // COOLDOWN: Zum Testen auf 10 Sekunden (10000ms). Für Release auf 24h (86400000) setzen!
+        const WATER_COOLDOWN = 10000; 
 
         const ITEMS = {
-            carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, icon: '🌱', growsInto: 'carrot', stages: 3, reward: 5 },
-            rose_seed: { id: 'rose_seed', name: 'Rose', type: 'seed', price: 50, icon: '🌰', growsInto: 'rose', stages: 4, reward: 15 },
-            tree_sapling: { id: 'tree_sapling', name: 'Baum', type: 'seed', price: 100, icon: '🌿', growsInto: 'tree', stages: 5, reward: 30 },
-            fence: { id: 'fence', name: 'Zaun', type: 'deco', price: 15, icon: 'fence' },
-            gnome: { id: 'gnome', name: 'Zwerg', type: 'deco', price: 200, icon: 'gnome' },
+            // Samen (Kaufbar mit Münzen, geben Gems beim Ernten)
+            carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, icon: '🥕', growsInto: 'carrot', stages: 3, reward: 5, timeDesc: 'Schnell' },
+            sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 15, timeDesc: 'Mittel' },
+            pumpkin_seed: { id: 'pumpkin_seed', name: 'Kürbis', type: 'seed', price: 120, icon: '🎃', growsInto: 'pumpkin', stages: 5, reward: 35, timeDesc: 'Langsam' },
+            money_tree: { id: 'money_tree', name: 'Geldbaum', type: 'seed', price: 500, icon: '🌳', growsInto: 'money_tree', stages: 6, reward: 150, timeDesc: 'Sehr Langsam' },
+            
+            // Deko (Kaufbar mit Münzen, kein Wachstum)
+            fence: { id: 'fence', name: 'Holzzaun', type: 'deco', price: 15, icon: '🚧' },
+            stone_path: { id: 'stone_path', name: 'Steinweg', type: 'deco', price: 10, icon: '🪨' },
+            gnome: { id: 'gnome', name: 'Gartenzwerg', type: 'deco', price: 250, icon: '🎅' },
+            fountain: { id: 'fountain', name: 'Brunnen', type: 'deco', price: 1000, icon: '⛲' },
+            bench: { id: 'bench', name: 'Parkbank', type: 'deco', price: 150, icon: '🪑' },
         };
 
-        const GROWN_ITEMS = {
-            carrot: { name: 'Karotte', icon: '🥕' },
-            rose: { name: 'Rose', icon: '🌹' },
-            tree: { name: 'Baum', icon: '🌳' },
-            fence: { name: 'Zaun', icon: '🚧' },
-            gnome: { name: 'Zwerg', icon: '🎅' },
+        const GARDEN_UPGRADES = [
+            { id: 0, name: "Start-Garten", price: 0 },
+            { id: 1, name: "Hinterhof", price: 50 },  // Preis in Gems
+            { id: 2, name: "Waldlichtung", price: 200 },
+            { id: 3, name: "Schlossgarten", price: 1000 }
+        ];
+
+        // --- HELFER FUNKTIONEN ---
+        const playSound = (type) => {
+            // Optional: Simple sound placeholders
         };
 
-        // --- COMPONENTS ---
+        // --- KOMPONENTEN ---
 
-        const LoginScreen = ({ onLogin }) => {
+        const LoginScreen = () => {
             const login = async () => {
                 const provider = new GoogleAuthProvider();
-                try {
-                    await signInWithPopup(auth, provider);
-                    // onLogin wird via onAuthStateChanged im Main App getriggert
-                } catch (error) {
-                    alert("Login Fehler: " + error.message);
-                }
+                try { await signInWithPopup(auth, provider); } 
+                catch (error) { alert("Login Fehler: " + error.message); }
             };
 
             return (
-                <div className="flex flex-col items-center justify-center h-full p-6 bg-green-50">
-                    <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm text-center">
-                        <h1 className="text-4xl font-bold text-green-600 mb-2">DuoBloom 🌷</h1>
-                        <p className="text-gray-500 mb-8">Euer gemeinsamer Garten.</p>
+                <div className="flex flex-col items-center justify-center h-full p-6 bg-gradient-to-br from-green-400 to-teal-500 relative overflow-hidden">
+                    <div className="absolute top-10 left-10 text-6xl opacity-20 animate-float">☁️</div>
+                    <div className="absolute bottom-20 right-10 text-8xl opacity-20 animate-float" style={{animationDelay: '1s'}}>🌱</div>
+                    
+                    <div className="bg-white/95 backdrop-blur-md p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center z-10">
+                        <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-teal-600 mb-2">DuoBloom</h1>
+                        <p className="text-gray-500 mb-8 font-medium">Baue Träume. Gemeinsam.</p>
                         
-                        <button onClick={login} className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm">
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" />
-                            Mit Google anmelden
+                        <button onClick={login} className="w-full bg-white border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-700 font-bold py-4 px-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm group">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                            Mit Google starten
                         </button>
                     </div>
                 </div>
             );
         };
 
-        const RoomSelectScreen = ({ onJoin, userName }) => {
+        const LobbyScreen = ({ user, onJoin, onBrowse }) => {
             const [code, setCode] = React.useState('');
-            
+            const [isJoining, setIsJoining] = React.useState(false);
+
             const createNew = () => {
-                const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-                onJoin(newCode);
+                const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                onJoin(newCode, true); // true = isCreating
             };
 
             return (
-                <div className="flex flex-col items-center justify-center h-full p-6 bg-green-50">
-                    <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-sm text-center">
-                        <h2 className="text-xl font-bold text-gray-700 mb-1">Hallo, {userName}! 👋</h2>
-                        <p className="text-gray-400 text-sm mb-6">Tritt einem Garten bei.</p>
-                        
-                        <button onClick={createNew} className="w-full bg-green-500 text-white font-bold py-3 rounded-xl mb-4 shadow-lg hover:bg-green-600">
-                            Neuen Garten anlegen
-                        </button>
-                        
-                        <div className="flex items-center gap-2 mb-4">
-                            <hr className="flex-1" /><span className="text-gray-400 text-sm">ODER</span><hr className="flex-1" />
+                <div className="flex flex-col h-full bg-[#f4fbf7]">
+                    <div className="p-6 bg-white rounded-b-3xl shadow-sm z-10">
+                        <div className="flex items-center gap-3 mb-6">
+                            <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-green-500" />
+                            <div>
+                                <h2 className="text-lg font-bold text-gray-800">Hallo, {user.displayName?.split(' ')[0]}!</h2>
+                                <p className="text-xs text-gray-500">Bereit zu gärtnern?</p>
+                            </div>
+                            <button onClick={() => auth.signOut()} className="ml-auto text-xs bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold">Logout</button>
                         </div>
 
-                        <div className="flex gap-2">
-                            <input 
-                                value={code} onChange={e => setCode(e.target.value.toUpperCase())}
-                                placeholder="CODE EINGEBEN"
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2 font-bold text-center tracking-widest uppercase focus:border-green-500 outline-none"
-                            />
-                            <button onClick={() => code && onJoin(code)} className="bg-blue-500 text-white px-4 rounded-xl font-bold">Go</button>
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                            <button onClick={createNew} className="bg-green-500 text-white p-4 rounded-2xl shadow-lg shadow-green-200 hover:scale-[1.02] transition-transform flex flex-col items-center">
+                                <i data-lucide="plus-circle" className="mb-2"></i>
+                                <span className="font-bold">Neu erstellen</span>
+                            </button>
+                            <button onClick={() => setIsJoining(!isJoining)} className="bg-blue-500 text-white p-4 rounded-2xl shadow-lg shadow-blue-200 hover:scale-[1.02] transition-transform flex flex-col items-center">
+                                <i data-lucide="users" className="mb-2"></i>
+                                <span className="font-bold">Beitreten</span>
+                            </button>
                         </div>
-                        
-                        <button onClick={() => auth.signOut()} className="mt-8 text-xs text-red-400 underline">Abmelden</button>
+
+                        {isJoining && (
+                            <div className="animate-pop mb-6">
+                                <div className="flex gap-2">
+                                    <input 
+                                        value={code} onChange={e => setCode(e.target.value.toUpperCase())}
+                                        placeholder="CODE EINGEBEN"
+                                        className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 font-bold text-center tracking-widest uppercase focus:ring-2 focus:ring-green-400 outline-none"
+                                    />
+                                    <button onClick={() => code && onJoin(code, false)} className="bg-green-600 text-white px-6 rounded-xl font-bold">
+                                        Go
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex-1 p-6 overflow-y-auto">
+                        <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                            <i data-lucide="globe" size={16}></i> Community Gärten
+                        </h3>
+                        <div className="space-y-3">
+                            <div onClick={onBrowse} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between cursor-pointer hover:bg-gray-50">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-500">🏆</div>
+                                    <div>
+                                        <p className="font-bold text-gray-700">Top Gärten ansehen</p>
+                                        <p className="text-xs text-gray-400">Lass dich inspirieren & verteile Likes</p>
+                                    </div>
+                                </div>
+                                <i data-lucide="chevron-right" className="text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const CommunityBrowser = ({ onBack, onVisit }) => {
+            const [gardens, setGardens] = React.useState([]);
+
+            React.useEffect(() => {
+                const q = query(collection(db, 'rooms'), orderBy('likes', 'desc'), limit(10));
+                getDocs(q).then(snap => {
+                    const list = [];
+                    snap.forEach(d => list.push({id: d.id, ...d.data()}));
+                    setGardens(list);
+                });
+            }, []);
+
+            return (
+                <div className="flex flex-col h-full bg-slate-50">
+                    <div className="p-4 bg-white shadow-sm flex items-center gap-3 z-10">
+                        <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><i data-lucide="arrow-left"></i></button>
+                        <h2 className="font-bold text-lg">Community</h2>
+                    </div>
+                    <div className="p-4 overflow-y-auto space-y-3">
+                        {gardens.map(g => (
+                            <div key={g.id} onClick={() => onVisit(g.id)} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h3 className="font-bold text-gray-800">Garten {g.id}</h3>
+                                    <span className="bg-red-50 text-red-500 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+                                        ❤️ {g.likes || 0}
+                                    </span>
+                                </div>
+                                <div className="flex gap-2 text-xs text-gray-500">
+                                    <span className="bg-yellow-50 text-yellow-600 px-2 py-1 rounded">💰 {g.coins}</span>
+                                    <span className="bg-purple-50 text-purple-600 px-2 py-1 rounded">💎 {g.gems}</span>
+                                    <span>Gärten: {g.unlockedGardens?.length || 1}</span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             );
@@ -141,217 +236,423 @@
 
         const App = () => {
             const [user, setUser] = React.useState(null);
-            const [room, setRoom] = React.useState(null);
-            const [data, setData] = React.useState(null);
+            const [roomCode, setRoomCode] = React.useState(null);
+            const [roomData, setRoomData] = React.useState(null);
+            const [mode, setMode] = React.useState('lobby'); // lobby, playing, browsing
             const [tab, setTab] = React.useState('garden');
+            const [activeGardenIdx, setActiveGardenIdx] = React.useState(0);
             const [selectedSeed, setSelectedSeed] = React.useState(null);
             const [loading, setLoading] = React.useState(true);
 
-            // 1. Auth & Auto-Join Logic
+            // Auth Logic
             React.useEffect(() => {
                 if (!auth) return;
                 const unsub = onAuthStateChanged(auth, async (u) => {
                     setUser(u);
                     if (u) {
-                        // Check if user has a saved room in their profile
-                        const userRef = doc(db, 'users', u.uid);
-                        const userSnap = await getDoc(userRef);
-                        if (userSnap.exists() && userSnap.data().currentRoom) {
-                            setRoom(userSnap.data().currentRoom);
+                        const userSnap = await getDoc(doc(db, 'users', u.uid));
+                        if (userSnap.exists() && userSnap.data().lastRoom) {
+                            setRoomCode(userSnap.data().lastRoom);
+                            setMode('playing');
                         }
-                    } else {
-                        setRoom(null);
                     }
                     setLoading(false);
                 });
                 return () => unsub();
             }, []);
 
-            // 2. Room Data Sync
+            // Room Sync Logic
             React.useEffect(() => {
-                if (!user || !room || !db) return;
+                if (!roomCode || !db) return;
                 
-                // Save room to user profile for next time
-                setDoc(doc(db, 'users', user.uid), { currentRoom: room }, { merge: true });
-
-                const unsub = onSnapshot(doc(db, 'rooms', room), (snap) => {
+                const unsub = onSnapshot(doc(db, 'rooms', roomCode), (snap) => {
                     if (snap.exists()) {
-                        setData(snap.data());
-                    } else {
-                        // Create new room
-                        setDoc(doc(db, 'rooms', room), {
-                            coins: 50, gems: 0,
-                            tasks: [{ id: '1', title: 'Erste Aufgabe!', reward: 20, done: false }],
-                            inventory: {}, grid: {},
+                        setRoomData(snap.data());
+                    } else if (mode === 'playing') {
+                        // Create room if playing (not browsing)
+                        const initialData = {
+                            coins: 0, 
+                            gems: 0,
+                            tasks: [
+                                { id: 'quest_1', title: 'Tutorial: Erstelle deine erste Aufgabe', reward: 50, done: false, isSystem: true }
+                            ],
+                            inventory: {}, 
+                            gardens: { 0: {} }, // Multi-Garden Support
+                            unlockedGardens: [0],
+                            likes: 0,
                             createdAt: new Date().toISOString(),
-                            owner: user.uid
-                        });
+                            owner: user?.uid
+                        };
+                        setDoc(doc(db, 'rooms', roomCode), initialData);
                     }
                 });
                 return () => unsub();
-            }, [user, room]);
+            }, [roomCode, mode]);
 
-            React.useEffect(() => { lucide.createIcons(); }, [data, tab]);
+            // Icons Refresh
+            React.useEffect(() => { lucide.createIcons(); }, [roomData, tab, mode, activeGardenIdx]);
 
-            // --- UI RENDER LOGIC ---
-            if (!auth) return <div className="p-10 text-center text-red-500 font-bold">FEHLER: Du musst die Firebase Config im Code einfügen!</div>;
-            if (loading) return <div className="flex items-center justify-center h-full text-green-600 animate-pulse font-bold">Lade DuoBloom...</div>;
-            if (!user) return <LoginScreen />;
-            if (!room) return <RoomSelectScreen userName={user.displayName?.split(' ')[0] || 'Gärtner'} onJoin={setRoom} />;
-            if (!data) return <div className="flex items-center justify-center h-full">Betrete Garten...</div>;
+            // ACTIONS
+            const joinRoom = (code, isCreating) => {
+                setRoomCode(code);
+                setMode('playing');
+                if (user) {
+                    setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
+                }
+            };
 
-            // --- GAME ACTIONS ---
+            const handleLike = async () => {
+                if (!roomCode || mode !== 'browsing') return;
+                // Simple local storage check to prevent spamming
+                const likedKey = `liked_${roomCode}`;
+                if (localStorage.getItem(likedKey)) return alert("Du hast schon geliked!");
+                
+                await updateDoc(doc(db, 'rooms', roomCode), { likes: increment(1) });
+                localStorage.setItem(likedKey, 'true');
+                alert("Garten geliked! ❤️");
+            };
+
             const handleGridClick = async (key) => {
-                const cell = data.grid[key];
-                const roomRef = doc(db, 'rooms', room);
+                if (mode !== 'playing') return; // Spectator
+                
+                // key is relative to current garden index e.g. "3,4"
+                // in DB stored as gardens: { "0": { "3,4": {...} } }
+                const currentGrid = roomData.gardens?.[activeGardenIdx] || {};
+                const cell = currentGrid[key];
+                const roomRef = doc(db, 'rooms', roomCode);
 
+                // 1. Ernten
                 if (cell && cell.grown) {
                     const item = ITEMS[cell.source];
-                    await updateDoc(roomRef, { [`grid.${key}`]: deleteField(), gems: increment(item.reward || 0) });
+                    // Delete from map via dot notation
+                    await updateDoc(roomRef, {
+                        [`gardens.${activeGardenIdx}.${key}`]: deleteField(),
+                        gems: increment(item.reward || 0)
+                    });
+                    // Visual feedback could be added here
                     return;
                 }
+
+                // 2. Gießen
                 if (cell && !cell.grown && ITEMS[cell.source].type === 'seed') {
                     const item = ITEMS[cell.source];
-                    const newStage = (cell.stage || 0) + 1;
-                    await updateDoc(roomRef, { [`grid.${key}.stage`]: newStage, [`grid.${key}.grown`]: newStage >= item.stages });
+                    const now = Date.now();
+                    const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
+                    
+                    if (now - lastWatered > WATER_COOLDOWN) {
+                        const newStage = (cell.stage || 0) + 1;
+                        await updateDoc(roomRef, {
+                            [`gardens.${activeGardenIdx}.${key}.stage`]: newStage,
+                            [`gardens.${activeGardenIdx}.${key}.grown`]: newStage >= item.stages,
+                            [`gardens.${activeGardenIdx}.${key}.lastWatered`]: new Date().toISOString()
+                        });
+                    } else {
+                        alert("Pflanze ist noch nass! Warte kurz.");
+                    }
                     return;
                 }
-                if (!cell && selectedSeed && (data.inventory[selectedSeed] || 0) > 0) {
+
+                // 3. Pflanzen
+                if (!cell && selectedSeed && (roomData.inventory[selectedSeed] || 0) > 0) {
                     const item = ITEMS[selectedSeed];
                     await updateDoc(roomRef, {
-                        [`grid.${key}`]: { source: selectedSeed, stage: 0, grown: item.type === 'deco', plantedAt: new Date().toISOString() },
+                        [`gardens.${activeGardenIdx}.${key}`]: {
+                            source: selectedSeed,
+                            stage: 0,
+                            grown: item.type === 'deco',
+                            plantedAt: new Date().toISOString(),
+                            lastWatered: 0 // Needs water immediately
+                        },
                         [`inventory.${selectedSeed}`]: increment(-1)
                     });
-                    if (data.inventory[selectedSeed] <= 1) setSelectedSeed(null);
+                    if (roomData.inventory[selectedSeed] <= 1) setSelectedSeed(null);
                 }
             };
 
-            const buy = async (id) => {
+            const buyItem = async (id) => {
+                if (mode !== 'playing') return;
                 const item = ITEMS[id];
-                if (data.coins >= item.price) {
-                    await updateDoc(doc(db, 'rooms', room), { coins: increment(-item.price), [`inventory.${id}`]: increment(1) });
+                if (roomData.coins >= item.price) {
+                    await updateDoc(doc(db, 'rooms', roomCode), {
+                        coins: increment(-item.price),
+                        [`inventory.${id}`]: increment(1)
+                    });
                 }
             };
 
-            const addTask = async (e) => {
-                e.preventDefault();
-                const title = e.target.elements.title.value;
-                if(!title) return;
-                e.target.reset();
-                await updateDoc(doc(db, 'rooms', room), { tasks: arrayUnion({ id: Date.now().toString(), title, reward: 15, done: false }) });
-            };
-
-            const finishTask = async (task) => {
-                await updateDoc(doc(db, 'rooms', room), { tasks: arrayRemove(task), coins: increment(task.reward) });
-            };
-
-            const leaveGarden = () => {
-                if(confirm("Garten verlassen und anderen Code eingeben?")) {
-                    setRoom(null);
-                    // Optional: Remove from user profile if you want strict logout from room
-                    // updateDoc(doc(db, 'users', user.uid), { currentRoom: deleteField() });
+            const buyGarden = async (gardenId) => {
+                if (mode !== 'playing') return;
+                const gardenDef = GARDEN_UPGRADES.find(g => g.id === gardenId);
+                if (roomData.gems >= gardenDef.price) {
+                    await updateDoc(doc(db, 'rooms', roomCode), {
+                        gems: increment(-gardenDef.price),
+                        unlockedGardens: arrayUnion(gardenId),
+                        [`gardens.${gardenId}`]: {} // Init empty
+                    });
                 }
+            };
+
+            const taskAction = async (action, task) => {
+                if (mode !== 'playing') return;
+                const ref = doc(db, 'rooms', roomCode);
+                if (action === 'add') {
+                    const title = task; // task is string here
+                    await updateDoc(ref, { 
+                        tasks: arrayUnion({ id: Date.now().toString(), title, reward: 10, done: false }) 
+                    });
+                    // Check tutorial quest
+                    const tutorial = roomData.tasks.find(t => t.id === 'quest_1');
+                    if(tutorial && !tutorial.done) {
+                        await updateDoc(ref, { 
+                            tasks: arrayRemove(tutorial),
+                            coins: increment(tutorial.reward)
+                        });
+                    }
+                } else if (action === 'finish') {
+                    await updateDoc(ref, { 
+                        tasks: arrayRemove(task), 
+                        coins: increment(task.reward) 
+                    });
+                }
+            };
+
+            const leaveRoom = () => {
+                setRoomCode(null);
+                setRoomData(null);
+                setMode('lobby');
+                updateDoc(doc(db, 'users', user.uid), { lastRoom: deleteField() });
+            };
+
+            // RENDER LOGIC
+            if (!firebaseConfig.apiKey.includes("HIER")) {
+               if (loading) return <div className="h-full flex items-center justify-center bg-[#eefcf3] text-green-600 font-bold animate-pulse">Lade DuoBloom...</div>;
+               if (!user) return <LoginScreen />;
+               if (mode === 'lobby') return <LobbyScreen user={user} onJoin={joinRoom} onBrowse={() => setMode('browsing_list')} />;
+               if (mode === 'browsing_list') return <CommunityBrowser onBack={() => setMode('lobby')} onVisit={(code) => { setRoomCode(code); setMode('browsing'); }} />;
+               if (!roomData) return <div className="h-full flex items-center justify-center">Lade Garten...</div>;
+            } else {
+                return <div className="p-10 text-red-600 font-bold text-center">FEHLER: Du hast die Firebase Config im Code noch nicht eingetragen!</div>
             }
+
+            const currentGrid = roomData.gardens?.[activeGardenIdx] || {};
+            const isOwner = mode === 'playing';
 
             return (
                 <div className="flex flex-col h-full max-w-md mx-auto bg-white shadow-2xl overflow-hidden relative">
-                    <header className="bg-white p-3 shadow-sm z-10 flex justify-between items-center border-b">
-                        <button onClick={leaveGarden} className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded hover:bg-red-100 hover:text-red-500 transition-colors" title="Garten verlassen">
-                            {room} 🚪
+                    
+                    {/* Header */}
+                    <header className="bg-white/90 backdrop-blur-sm p-3 shadow-sm z-20 flex justify-between items-center border-b border-gray-100">
+                        <button onClick={leaveRoom} className="text-xs font-mono text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors flex items-center gap-1">
+                            <i data-lucide="door-open" size={14}></i> {mode === 'playing' ? 'Exit' : 'Zurück'}
                         </button>
-                        <div className="flex gap-3">
-                            <span className="flex items-center gap-1 text-yellow-600 font-bold bg-yellow-50 px-2 rounded-full text-sm">💰 {data.coins}</span>
-                            <span className="flex items-center gap-1 text-purple-600 font-bold bg-purple-50 px-2 rounded-full text-sm">💎 {data.gems}</span>
-                        </div>
-                        <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
-                             <img src={user.photoURL} alt="User" />
+                        
+                        {mode === 'playing' ? (
+                            <button className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100" onClick={() => {navigator.clipboard.writeText(roomCode); alert("Code kopiert: " + roomCode)}}>
+                                Code: {roomCode} ❐
+                            </button>
+                        ) : (
+                             <button onClick={handleLike} className="bg-red-50 text-red-500 px-3 py-1 rounded-full text-xs font-bold border border-red-100 active:scale-90 transition-transform">
+                                ❤️ Liken ({roomData.likes || 0})
+                            </button>
+                        )}
+
+                        <div className="flex gap-2">
+                            <div className="flex items-center gap-1 text-yellow-600 font-bold bg-yellow-50 px-2 py-1 rounded-lg text-xs border border-yellow-100">
+                                💰 {roomData.coins}
+                            </div>
+                            <div className="flex items-center gap-1 text-purple-600 font-bold bg-purple-50 px-2 py-1 rounded-lg text-xs border border-purple-100">
+                                💎 {roomData.gems}
+                            </div>
                         </div>
                     </header>
 
-                    <main className="flex-1 overflow-y-auto bg-slate-50 relative">
+                    {/* Main Content */}
+                    <main className="flex-1 overflow-y-auto bg-[#f0f9f4] relative">
+                        
+                        {/* GARDEN VIEW */}
                         {tab === 'garden' && (
-                            <div className="p-4 flex flex-col items-center min-h-full">
-                                <div className="grid grid-cols-5 gap-2 bg-green-900/10 p-3 rounded-xl border-4 border-green-800/20 mb-20">
-                                    {Array.from({ length: 25 }).map((_, i) => {
-                                        const key = `${i % 5},${Math.floor(i / 5)}`;
-                                        const cell = data.grid[key];
-                                        const item = cell ? ITEMS[cell.source] : null;
+                            <div className="flex flex-col items-center min-h-full pb-32">
+                                
+                                {/* Garden Selector */}
+                                <div className="flex gap-2 p-4 w-full overflow-x-auto no-scrollbar">
+                                    {GARDEN_UPGRADES.map(g => {
+                                        const unlocked = roomData.unlockedGardens?.includes(g.id);
                                         return (
-                                            <div key={i} onClick={() => handleGridClick(key)}
-                                                className={`w-12 h-12 sm:w-16 sm:h-16 rounded-lg flex items-center justify-center text-2xl cursor-pointer relative transition-all active:scale-90 ${cell ? 'bg-green-300' : 'bg-green-200 hover:bg-green-300'} ${selectedSeed && !cell ? 'animate-pulse ring-2 ring-blue-400' : ''}`}>
-                                                {cell && (
-                                                    <div className="w-full h-full flex items-center justify-center">
-                                                        {cell.grown ? (
-                                                            <span className="scale-125 drop-shadow">{GROWN_ITEMS[item.growsInto || item.id].icon}</span>
-                                                        ) : (
-                                                            <div className="flex flex-col items-center">
-                                                                <span>{item.icon}</span>
-                                                                <div className="absolute bottom-1 w-8 h-1 bg-gray-400 rounded-full overflow-hidden">
-                                                                    <div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/item.stages)*100}%`}}></div>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                <div className="absolute bottom-4 left-4 right-4 bg-white p-2 rounded-2xl shadow-lg border border-gray-100 flex gap-2 overflow-x-auto no-scrollbar">
-                                    {Object.entries(data.inventory).map(([id, count]) => {
-                                        if (count <= 0) return null;
-                                        return (
-                                            <button key={id} onClick={() => setSelectedSeed(selectedSeed === id ? null : id)}
-                                                className={`flex-shrink-0 flex flex-col items-center p-2 rounded-xl border-2 w-16 ${selectedSeed === id ? 'border-blue-500 bg-blue-50' : 'border-transparent'}`}>
-                                                <span className="text-xl">{ITEMS[id].icon}</span>
-                                                <span className="text-xs font-bold text-gray-600">x{count}</span>
+                                            <button key={g.id} 
+                                                onClick={() => unlocked ? setActiveGardenIdx(g.id) : null}
+                                                className={`
+                                                    flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all
+                                                    ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500 shadow-lg' : 
+                                                      unlocked ? 'bg-white text-green-700 border-green-200' : 'bg-gray-200 text-gray-400 border-gray-300'}
+                                                `}
+                                            >
+                                                {g.name} {!unlocked && '🔒'}
                                             </button>
-                                        );
+                                        )
                                     })}
-                                    {Object.values(data.inventory).every(c => c <= 0) && <p className="text-xs text-gray-400 w-full text-center py-2">Leer... Ab in den Shop!</p>}
                                 </div>
+
+                                {/* The Grid */}
+                                <div className="bg-white p-3 rounded-2xl shadow-xl border-4 border-[#8b5a2b] relative mx-4">
+                                    <div className="grid grid-cols-5 gap-1 sm:gap-2">
+                                        {Array.from({ length: 25 }).map((_, i) => {
+                                            const key = `${i % 5},${Math.floor(i / 5)}`;
+                                            const cell = currentGrid[key];
+                                            const item = cell ? ITEMS[cell.source] : null;
+                                            const isWaterable = cell && !cell.grown && item.type === 'seed';
+                                            const needsWater = isWaterable && (Date.now() - (cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0) > WATER_COOLDOWN);
+
+                                            return (
+                                                <div key={i} onClick={() => handleGridClick(key)}
+                                                    className={`
+                                                        w-12 h-12 sm:w-16 sm:h-16 rounded-md flex items-center justify-center text-2xl relative transition-all select-none
+                                                        ${cell ? 'bg-[#a3d9a5]' : 'bg-[#e2e8e3]'}
+                                                        ${isOwner ? 'cursor-pointer active:scale-95' : ''}
+                                                        ${selectedSeed && !cell && isOwner ? 'animate-pulse ring-2 ring-blue-400 bg-blue-50' : ''}
+                                                        border border-black/5 shadow-inner
+                                                    `}>
+                                                    {cell && (
+                                                        <div className="w-full h-full flex items-center justify-center relative">
+                                                            {cell.grown || item.type === 'deco' ? (
+                                                                <span className="scale-125 drop-shadow-md filter">{GARDEN_UPGRADES[activeGardenIdx].id === 3 ? '👑' : ''}{item.growsInto ? ITEMS[item.growsInto]?.icon || item.icon : item.icon}</span>
+                                                            ) : (
+                                                                <div className="flex flex-col items-center">
+                                                                    <span className="text-xl opacity-80">{item.icon}</span>
+                                                                    {/* Growth Bar */}
+                                                                    <div className="absolute bottom-1 w-8 h-1 bg-black/10 rounded-full overflow-hidden">
+                                                                        <div className="h-full bg-blue-500 transition-all duration-500" style={{width: `${(cell.stage/item.stages)*100}%`}}></div>
+                                                                    </div>
+                                                                    {/* Water Needs Indicator */}
+                                                                    {needsWater && isOwner && (
+                                                                        <div className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full p-1 shadow-lg animate-bounce z-10">
+                                                                            <i data-lucide="droplets" width="10" height="10"></i>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Inventory Bar (Only visible if Playing) */}
+                                {isOwner && (
+                                    <div className="fixed bottom-20 left-4 right-4 bg-white/95 backdrop-blur p-3 rounded-2xl shadow-xl border border-gray-100 flex gap-2 overflow-x-auto no-scrollbar z-20">
+                                        {Object.entries(roomData.inventory).map(([id, count]) => {
+                                            if (count <= 0) return null;
+                                            return (
+                                                <button key={id} onClick={() => setSelectedSeed(selectedSeed === id ? null : id)}
+                                                    className={`flex-shrink-0 flex flex-col items-center p-2 rounded-xl border-2 w-16 h-20 justify-center transition-all ${selectedSeed === id ? 'border-blue-500 bg-blue-50 scale-105' : 'border-gray-100'}`}>
+                                                    <span className="text-2xl mb-1">{ITEMS[id].icon}</span>
+                                                    <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 rounded-full">x{count}</span>
+                                                </button>
+                                            );
+                                        })}
+                                        {Object.values(roomData.inventory).every(c => c <= 0) && (
+                                            <div onClick={() => setTab('shop')} className="w-full text-center py-2 text-gray-400 text-sm italic cursor-pointer">
+                                                Dein Rucksack ist leer. <span className="underline text-green-500">Zum Shop</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
+
+                        {/* TASKS VIEW */}
                         {tab === 'tasks' && (
-                            <div className="p-6">
-                                <h2 className="text-xl font-bold mb-4 text-gray-700">Aufgaben</h2>
-                                <form onSubmit={addTask} className="flex gap-2 mb-6">
-                                    <input name="title" placeholder="Neue Aufgabe..." className="flex-1 border rounded-xl px-4 py-2 focus:ring-2 ring-blue-500 outline-none" autoComplete="off" />
-                                    <button className="bg-blue-500 text-white px-4 rounded-xl font-bold">+</button>
-                                </form>
+                            <div className="p-6 pb-24">
+                                <div className="bg-gradient-to-r from-blue-500 to-blue-400 p-6 rounded-3xl shadow-lg mb-6 text-white relative overflow-hidden">
+                                    <h2 className="text-2xl font-bold z-10 relative">Aufgaben</h2>
+                                    <p className="opacity-90 z-10 relative">Erledige Tasks für Münzen!</p>
+                                    <i data-lucide="check-circle-2" className="absolute -right-4 -bottom-4 w-32 h-32 opacity-20 rotate-12"></i>
+                                </div>
+
+                                {isOwner && (
+                                    <form onSubmit={(e) => { e.preventDefault(); taskAction('add', e.target.title.value); e.target.reset(); }} className="flex gap-2 mb-6">
+                                        <input name="title" placeholder="Neue Aufgabe..." className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 ring-blue-500 outline-none shadow-sm" autoComplete="off" />
+                                        <button className="bg-blue-500 hover:bg-blue-600 text-white w-12 rounded-xl font-bold shadow-md flex items-center justify-center">
+                                            <i data-lucide="plus"></i>
+                                        </button>
+                                    </form>
+                                )}
+
                                 <div className="space-y-3">
-                                    {data.tasks.map(task => (
-                                        <div key={task.id} className="bg-white p-4 rounded-xl shadow-sm border flex justify-between items-center">
-                                            <span>{task.title}</span>
-                                            <button onClick={() => finishTask(task)} className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-sm font-bold hover:bg-green-500 hover:text-white transition-colors">+{task.reward} 💰</button>
+                                    {roomData.tasks.map(task => (
+                                        <div key={task.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center group">
+                                            <div>
+                                                <span className={`font-medium text-gray-700 ${task.isSystem ? 'text-blue-600' : ''}`}>{task.title}</span>
+                                                {task.isSystem && <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1 rounded uppercase font-bold">Quest</span>}
+                                            </div>
+                                            {isOwner && (
+                                                <button onClick={() => taskAction('finish', task)} className="bg-green-100 text-green-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-500 hover:text-white transition-all shadow-sm flex items-center gap-1">
+                                                    <i data-lucide="coins" size={14}></i> {task.reward}
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
-                                    {data.tasks.length === 0 && <p className="text-center text-gray-400">Alles erledigt!</p>}
+                                    {roomData.tasks.length === 0 && <div className="text-center py-10 text-gray-400 opacity-50 flex flex-col items-center gap-2"><i data-lucide="coffee" size={40}></i>Alles erledigt!</div>}
                                 </div>
                             </div>
                         )}
+
+                        {/* SHOP VIEW */}
                         {tab === 'shop' && (
-                            <div className="p-6 grid grid-cols-2 gap-4 pb-20">
-                                {Object.values(ITEMS).map(item => (
-                                    <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border flex flex-col items-center relative">
-                                        <span className="text-4xl mb-2">{item.icon}</span>
-                                        <span className="font-bold">{item.name}</span>
-                                        <span className="text-xs text-gray-400 mb-2">{item.type === 'seed' ? 'Pflanze' : 'Deko'}</span>
-                                        <button onClick={() => buy(item.id)} disabled={data.coins < item.price}
-                                            className={`w-full py-2 rounded-lg text-sm font-bold ${data.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
-                                            {item.price} 💰
-                                        </button>
-                                    </div>
-                                ))}
+                            <div className="p-6 pb-24">
+                                {/* Immobilien Abteilung */}
+                                <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2 mt-2"><i data-lucide="map"></i> Immobilien (Gems)</h3>
+                                <div className="flex gap-4 overflow-x-auto no-scrollbar mb-8 pb-2">
+                                    {GARDEN_UPGRADES.filter(g => g.id > 0).map(g => {
+                                        const owned = roomData.unlockedGardens?.includes(g.id);
+                                        return (
+                                            <div key={g.id} className={`flex-shrink-0 w-40 p-4 rounded-2xl border-2 ${owned ? 'border-green-200 bg-green-50 opacity-50' : 'border-purple-200 bg-white shadow-sm'}`}>
+                                                <div className="text-3xl mb-2 text-center">{owned ? '🏡' : '🏞️'}</div>
+                                                <div className="font-bold text-gray-700 text-center text-sm">{g.name}</div>
+                                                <button 
+                                                    onClick={() => !owned && buyGarden(g.id)}
+                                                    disabled={owned || roomData.gems < g.price || !isOwner}
+                                                    className={`mt-3 w-full py-1 rounded-lg text-xs font-bold flex justify-center items-center gap-1 ${owned ? 'bg-gray-200 text-gray-500' : 'bg-purple-500 text-white'}`}
+                                                >
+                                                    {owned ? 'Besitz' : <>{g.price} 💎</>}
+                                                </button>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+
+                                <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="sprout"></i> Markt (Münzen)</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {Object.values(ITEMS).map(item => (
+                                        <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center relative overflow-hidden group">
+                                            <div className="absolute top-2 right-2 text-[10px] text-gray-400 font-mono">{item.type === 'seed' ? item.timeDesc : '∞'}</div>
+                                            <span className="text-4xl mb-2 group-hover:scale-110 transition-transform">{item.icon}</span>
+                                            <span className="font-bold text-gray-700 text-sm">{item.name}</span>
+                                            <button onClick={() => buyItem(item.id)} disabled={roomData.coins < item.price || !isOwner}
+                                                className={`mt-2 w-full py-2 rounded-xl text-sm font-bold flex justify-center items-center gap-1 transition-all ${roomData.coins >= item.price && isOwner ? 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white' : 'bg-gray-100 text-gray-400 grayscale'}`}>
+                                                {item.price} 💰
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </main>
 
-                    <nav className="bg-white border-t p-2 flex justify-around pb-6">
-                        <button onClick={() => setTab('garden')} className={`p-2 rounded-xl transition-colors ${tab === 'garden' ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}><i data-lucide="sprout"></i></button>
-                        <button onClick={() => setTab('tasks')} className={`p-2 rounded-xl transition-colors ${tab === 'tasks' ? 'text-blue-600 bg-blue-50' : 'text-gray-400'}`}><i data-lucide="check-circle-2"></i></button>
-                        <button onClick={() => setTab('shop')} className={`p-2 rounded-xl transition-colors ${tab === 'shop' ? 'text-orange-600 bg-orange-50' : 'text-gray-400'}`}><i data-lucide="shopping-bag"></i></button>
+                    {/* Bottom Nav */}
+                    <nav className="bg-white border-t border-gray-100 p-2 flex justify-around pb-6 pt-3 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-30">
+                        <button onClick={() => setTab('garden')} className={`flex flex-col items-center gap-1 transition-colors ${tab === 'garden' ? 'text-green-600' : 'text-gray-400'}`}>
+                            <div className={`p-2 rounded-2xl ${tab === 'garden' ? 'bg-green-50' : ''}`}><i data-lucide="flower-2"></i></div>
+                        </button>
+                        <button onClick={() => setTab('tasks')} className={`flex flex-col items-center gap-1 transition-colors ${tab === 'tasks' ? 'text-blue-600' : 'text-gray-400'}`}>
+                            <div className={`p-2 rounded-2xl ${tab === 'tasks' ? 'bg-blue-50' : ''}`}><i data-lucide="list-todo"></i></div>
+                        </button>
+                        <button onClick={() => setTab('shop')} className={`flex flex-col items-center gap-1 transition-colors ${tab === 'shop' ? 'text-purple-600' : 'text-gray-400'}`}>
+                            <div className={`p-2 rounded-2xl ${tab === 'shop' ? 'bg-purple-50' : ''}`}><i data-lucide="store"></i></div>
+                        </button>
                     </nav>
+
                 </div>
             );
         };
