@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 6.1 🌷</title>
+    <title>DuoBloom 6.2 🌷</title>
     
     <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,13 +13,12 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        /* WICHTIG: dvh (dynamic viewport height) fixt Mobile-Browser Probleme */
         body { 
             height: 100dvh; 
             width: 100%;
             touch-action: manipulation; 
             -webkit-tap-highlight-color: transparent; 
-            overflow: hidden; /* Prevent body scroll, handle inside app */
+            overflow: hidden; 
         }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -80,7 +79,10 @@
             }
         } catch (e) { console.error(e); }
 
-        const WATER_COOLDOWN = 5000;
+        // ZEIT EINSTELLUNG: 6 STUNDEN
+        // 6 Stunden * 60 Minuten * 60 Sekunden * 1000 Millisekunden
+        const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
+        // const WATER_COOLDOWN = 5000; // Unkommentieren zum Testen (5 Sekunden)
 
         const ITEMS = {
             carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, icon: '🥕', growsInto: 'carrot', stages: 3, reward: 5 },
@@ -129,7 +131,6 @@
 
             return (
                 <div className="h-full bg-slate-100 flex flex-col md:flex-row max-w-5xl mx-auto shadow-xl md:rounded-3xl md:my-8 overflow-hidden">
-                    {/* Left Profile Side - Fixed Height on Mobile, Scrollable Content */}
                     <div className="bg-white p-6 flex flex-col items-center border-b md:border-b-0 md:border-r border-gray-100 shadow-sm z-10 md:w-1/3">
                         <div className="flex items-center gap-4 w-full md:flex-col">
                             <img src={user.photoURL} className="w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-green-500 shadow-lg" />
@@ -147,11 +148,9 @@
                         </div>
                     </div>
 
-                    {/* Right Action Side - Scrollable! */}
                     <div className="flex-1 bg-[#f8fafc] p-6 flex flex-col gap-6 overflow-y-auto">
                         <h2 className="text-2xl font-bold text-gray-700">Dein Dashboard</h2>
                         
-                        {/* Resume Button */}
                         {currentRoom ? (
                             <button onClick={() => onAction('resume', currentRoom)} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-6 rounded-2xl shadow-lg hover:shadow-xl hover:scale-[1.01] transition-all text-left flex items-center justify-between group flex-shrink-0">
                                 <div>
@@ -170,13 +169,11 @@
                         <hr className="border-gray-200" />
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-20">
-                            {/* Create Button */}
                             <button onClick={() => setIsCreating(true)} className="bg-white border-2 border-dashed border-gray-300 p-6 rounded-2xl text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center justify-center gap-2 h-32 flex-shrink-0">
                                 <div className="bg-blue-100 p-3 rounded-full text-blue-500"><i data-lucide="plus"></i></div>
                                 <span className="font-bold">Neuer Garten</span>
                             </button>
                             
-                            {/* Join Input */}
                             <div className="bg-white border border-gray-200 p-6 rounded-2xl flex flex-col justify-center h-32 flex-shrink-0">
                                 <label className="text-xs font-bold text-gray-400 uppercase mb-2">Code eingeben</label>
                                 <div className="flex gap-2">
@@ -191,7 +188,6 @@
                         </div>
                     </div>
 
-                    {/* Create Modal */}
                     {isCreating && (
                         <Modal title="Garten benennen" onClose={() => !isBusy && setIsCreating(false)}>
                             <div className="space-y-4">
@@ -214,13 +210,13 @@
             const [activeGardenIdx, setActiveGardenIdx] = React.useState(0);
             const [selectedItem, setSelectedItem] = React.useState(null);
             
-            // Task States
             const [isTaskModalOpen, setTaskModalOpen] = React.useState(false);
             const [newTaskTitle, setNewTaskTitle] = React.useState("");
             const [newTaskReward, setNewTaskReward] = React.useState(15);
             const [newTaskType, setNewTaskType] = React.useState("once");
             const [newTaskDeadline, setNewTaskDeadline] = React.useState("");
-
+            
+            const [now, setNow] = React.useState(Date.now()); // Für den Timer
             const [hasLiked, setHasLiked] = React.useState(false);
 
             React.useEffect(() => {
@@ -236,6 +232,12 @@
                 if (localStorage.getItem(`liked_${roomCode}`)) setHasLiked(true);
                 return () => unsub();
             }, [roomCode, isSpectator]);
+
+            // Timer Tick
+            React.useEffect(() => {
+                const timer = setInterval(() => setNow(Date.now()), 1000);
+                return () => clearInterval(timer);
+            }, []);
 
             // Safe Icon Rendering
             React.useEffect(() => { 
@@ -259,7 +261,6 @@
                 const roomRef = doc(db, 'rooms', roomCode);
                 const path = `gardens.${activeGardenIdx}.${key}`;
 
-                // Tool Action
                 if (selectedItem) {
                     const itemDef = ITEMS[selectedItem];
                     const invCount = roomData.inventory[selectedItem] || 0;
@@ -273,15 +274,14 @@
                     return;
                 }
 
-                // Interact Action
                 if (cell.item) {
                     const itemDef = ITEMS[cell.item];
                     if (cell.grown) {
                          await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) });
                     } else if (itemDef.type === 'seed') {
-                        const now = Date.now();
+                        const nowTS = Date.now();
                         const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
-                        if (now - lastWatered > WATER_COOLDOWN) {
+                        if (nowTS - lastWatered > WATER_COOLDOWN) {
                              const newStage = (cell.stage || 0) + 1;
                              await updateDoc(roomRef, { [`${path}.stage`]: newStage, [`${path}.grown`]: newStage >= itemDef.stages, [`${path}.lastWatered`]: new Date().toISOString() });
                         }
@@ -306,15 +306,9 @@
             const toggleTask = async (task) => {
                 if (isSpectator) return;
                 const today = new Date().toISOString().split('T')[0];
-                
                 if (!task.done) {
                     await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayRemove(task), coins: increment(task.reward) });
-                    
-                    if (task.type === 'daily') {
-                        await updateDoc(doc(db, 'rooms', roomCode), { 
-                            tasks: arrayUnion({ ...task, done: true, lastDone: today }) 
-                        });
-                    }
+                    if (task.type === 'daily') await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayUnion({ ...task, done: true, lastDone: today }) });
                 }
             };
 
@@ -322,15 +316,19 @@
                 if (isSpectator) return;
                 if(isGarden) {
                     const g = GARDEN_UPGRADES.find(x => x.id === id);
-                    if(roomData.gems >= g.price) {
-                        await updateDoc(doc(db, 'rooms', roomCode), { gems: increment(-g.price), unlockedGardens: arrayUnion(id), [`gardens.${id}`]: {} });
-                    }
+                    if(roomData.gems >= g.price) await updateDoc(doc(db, 'rooms', roomCode), { gems: increment(-g.price), unlockedGardens: arrayUnion(id), [`gardens.${id}`]: {} });
                 } else {
                     const item = ITEMS[id];
-                    if (roomData.coins >= item.price) {
-                        await updateDoc(doc(db, 'rooms', roomCode), { coins: increment(-item.price), [`inventory.${id}`]: increment(1) });
-                    }
+                    if (roomData.coins >= item.price) await updateDoc(doc(db, 'rooms', roomCode), { coins: increment(-item.price), [`inventory.${id}`]: increment(1) });
                 }
+            };
+
+            const formatTime = (ms) => {
+                if (ms < 0) return "Bereit";
+                const h = Math.floor(ms / 3600000);
+                const m = Math.floor((ms % 3600000) / 60000);
+                const s = Math.floor((ms % 60000) / 1000);
+                return `${h}:${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
             };
 
             if (!roomData) return <div className="h-full flex items-center justify-center">Lade Garten...</div>;
@@ -370,7 +368,6 @@
                                 <button onClick={onBackToMenu} className="bg-white border p-2 rounded-xl hover:bg-gray-100 shadow-sm" title="Zurück zum Menü">
                                     <i data-lucide="home" className="text-gray-600"></i>
                                 </button>
-                                
                                 <div className="flex flex-col">
                                     <span className="font-bold text-gray-700 truncate max-w-[150px] md:max-w-none text-lg">{roomData.roomName}</span>
                                     <span className="text-[10px] text-gray-400 font-mono">
@@ -402,7 +399,6 @@
                         {/* GARDEN VIEW */}
                         {tab === 'garden' && (
                             <div className="p-4 md:p-8 flex flex-col items-center">
-                                {/* Selector */}
                                 <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">
                                     {GARDEN_UPGRADES.map(g => {
                                         const owned = roomData.unlockedGardens?.includes(g.id);
@@ -416,7 +412,6 @@
                                     })}
                                 </div>
 
-                                {/* Grid */}
                                 <div className="bg-[#5c4033] p-4 rounded-xl shadow-2xl relative inline-block">
                                     <div className="grid grid-cols-5 gap-0 border-2 border-[#3e2b22]">
                                         {Array.from({ length: 25 }).map((_, i) => {
@@ -424,6 +419,18 @@
                                             const cell = (roomData.gardens[activeGardenIdx] || {})[key] || {};
                                             const floorItem = cell.floor ? ITEMS[cell.floor] : null;
                                             const objectItem = cell.item ? ITEMS[cell.item] : null;
+
+                                            // Calc Timer
+                                            let timeLeft = null;
+                                            let showTimer = false;
+                                            if (objectItem && objectItem.type === 'seed' && !cell.grown) {
+                                                const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
+                                                const diff = now - lastWatered;
+                                                if (diff < WATER_COOLDOWN) {
+                                                    timeLeft = WATER_COOLDOWN - diff;
+                                                    showTimer = true;
+                                                }
+                                            }
 
                                             return (
                                                 <div key={key} onClick={() => handleGridClick(key)}
@@ -433,7 +440,23 @@
                                                         <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
                                                             {cell.grown || objectItem.type === 'deco' 
                                                                 ? <span className="text-3xl md:text-4xl drop-shadow-md">{objectItem.icon}</span>
-                                                                : <div className="flex flex-col items-center"><span className="text-xl">{objectItem.icon}</span><div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden"><div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} /></div></div>
+                                                                : (
+                                                                    <div className="flex flex-col items-center relative">
+                                                                        <span className="text-xl">{objectItem.icon}</span>
+                                                                        
+                                                                        {showTimer ? (
+                                                                            <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">
+                                                                                {formatTime(timeLeft)}
+                                                                            </div>
+                                                                        ) : (
+                                                                             !isSpectator && <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>
+                                                                        )}
+
+                                                                        <div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden">
+                                                                            <div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} />
+                                                                        </div>
+                                                                    </div>
+                                                                )
                                                             }
                                                         </div>
                                                     )}
@@ -444,7 +467,6 @@
                                     </div>
                                 </div>
 
-                                {/* Inventory */}
                                 {!isSpectator && (
                                     <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100">
                                         <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3>
