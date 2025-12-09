@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 5.0 🌷</title>
+    <title>DuoBloom 5.1 🌷</title>
     
     <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,6 +11,7 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/date-fns@2.30.0/dist/date_fns.min.js"></script>
 
     <style>
         body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -195,8 +196,13 @@
             const [activeGardenIdx, setActiveGardenIdx] = React.useState(0);
             const [selectedItem, setSelectedItem] = React.useState(null);
             
+            // Task States
             const [isTaskModalOpen, setTaskModalOpen] = React.useState(false);
             const [newTaskTitle, setNewTaskTitle] = React.useState("");
+            const [newTaskReward, setNewTaskReward] = React.useState(15);
+            const [newTaskType, setNewTaskType] = React.useState("once");
+            const [newTaskDeadline, setNewTaskDeadline] = React.useState("");
+
             const [hasLiked, setHasLiked] = React.useState(false);
 
             React.useEffect(() => {
@@ -267,13 +273,31 @@
 
             const createTask = async () => {
                 if (!newTaskTitle.trim()) return;
-                await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayUnion({ id: Date.now().toString(), title: newTaskTitle, reward: 15, done: false }) });
-                setTaskModalOpen(false); setNewTaskTitle("");
+                const task = {
+                    id: Date.now().toString(), 
+                    title: newTaskTitle, 
+                    reward: parseInt(newTaskReward), 
+                    type: newTaskType,
+                    deadline: newTaskDeadline || null,
+                    done: false
+                };
+                await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayUnion(task) });
+                setTaskModalOpen(false); setNewTaskTitle(""); setNewTaskDeadline(""); setNewTaskReward(15);
             };
 
             const toggleTask = async (task) => {
                 if (isSpectator) return;
-                if (!task.done) await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayRemove(task), coins: increment(task.reward) });
+                const today = new Date().toISOString().split('T')[0];
+                
+                if (!task.done) {
+                    await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayRemove(task), coins: increment(task.reward) });
+                    
+                    if (task.type === 'daily') {
+                        await updateDoc(doc(db, 'rooms', roomCode), { 
+                            tasks: arrayUnion({ ...task, done: true, lastDone: today }) 
+                        });
+                    }
+                }
             };
 
             const buy = async (id, isGarden) => {
@@ -432,15 +456,25 @@
                                     <button onClick={() => setTaskModalOpen(true)} className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><i data-lucide="plus"></i> Neu</button>
                                 </div>
                                 <div className="space-y-3">
-                                    {roomData.tasks.filter(t => !t.done).map(task => (
-                                        <div key={task.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
-                                            <div>
-                                                <div className="font-bold text-lg text-gray-800">{task.title}</div>
-                                                <div className="text-xs text-green-600 font-bold mt-1">+{task.reward} Münzen</div>
+                                    {roomData.tasks.filter(t => !t.done || t.type === 'daily').map(task => {
+                                        const isDoneToday = task.type === 'daily' && task.done && task.lastDone === new Date().toISOString().split('T')[0];
+                                        if (isDoneToday) return null;
+                                        return (
+                                            <div key={task.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-lg text-gray-800">{task.title}</span>
+                                                        {task.type === 'daily' && <span className="text-blue-500"><i data-lucide="repeat" size={14}></i></span>}
+                                                    </div>
+                                                    <div className="flex gap-3 text-xs">
+                                                        <span className="text-green-600 font-bold">+{task.reward} Münzen</span>
+                                                        {task.deadline && <span className="text-red-400 font-bold flex items-center gap-1"><i data-lucide="calendar" size={10}></i> {task.deadline}</span>}
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => toggleTask(task)} className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors"><i data-lucide="check" className="text-transparent hover:text-green-500 w-4 h-4"></i></button>
                                             </div>
-                                            <button onClick={() => toggleTask(task)} className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors"><i data-lucide="check" className="text-transparent hover:text-green-500 w-4 h-4"></i></button>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -486,8 +520,30 @@
                     {isTaskModalOpen && (
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}>
                             <div className="space-y-4">
-                                <input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" />
-                                <button onClick={createTask} className="w-full bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400 uppercase">Titel</label>
+                                    <input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" />
+                                </div>
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label>
+                                        <input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" />
+                                    </div>
+                                </div>
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="text-xs font-bold text-gray-400 uppercase">Typ</label>
+                                        <select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1">
+                                            <option value="once">Einmalig</option>
+                                            <option value="daily">Täglich</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="text-xs font-bold text-gray-400 uppercase">Frist</label>
+                                        <input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" />
+                                    </div>
+                                </div>
+                                <button onClick={createTask} className="w-full bg-blue-500 text-white font-bold py-3 rounded-xl mt-2">Erstellen</button>
                             </div>
                         </Modal>
                     )}
@@ -565,7 +621,6 @@
                 if (action === 'resume') setView('game');
                 else if (action === 'create') {
                     const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    // Init Garden directly
                     await setDoc(doc(db, 'rooms', newCode), {
                         roomName: name,
                         coins: 50, gems: 0,
