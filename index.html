@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 🌷</title>
+    <title>DuoBloom 2.0 🌷</title>
     
     <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,33 +11,42 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/date-fns@2.30.0/dist/date_fns.min.js"></script>
 
     <style>
         body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Animationen */
-        @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
-        .animate-pop { animation: pop 0.3s ease-out; }
+        /* CSS Textures for Floors */
+        .texture-stone {
+            background-color: #d1d5db;
+            background-image: radial-gradient(circle, #9ca3af 20%, transparent 20%), radial-gradient(circle, #9ca3af 20%, transparent 20%);
+            background-size: 10px 10px;
+            background-position: 0 0, 5px 5px;
+            border: 1px solid #9ca3af;
+        }
+        .texture-wood {
+            background-color: #78350f;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.1) 5px, rgba(255,255,255,0.1) 10px);
+            border: 1px solid #451a03;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
         
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
-        .animate-float { animation: float 3s ease-in-out infinite; }
-
-        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); }
+        .animate-pop { animation: pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
     </style>
 </head>
-<body class="bg-[#eefcf3] text-slate-800 h-screen w-full overflow-hidden select-none font-sans">
+<body class="bg-slate-50 text-slate-800 h-screen w-full overflow-hidden select-none font-sans">
 
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
         
-        // --- FIREBASE SETUP ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { 
             getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs,
-            arrayUnion, arrayRemove, increment, deleteField, query, where, orderBy, limit 
+            arrayUnion, arrayRemove, increment, deleteField, query, orderBy, limit 
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { 
             getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut
@@ -59,478 +68,372 @@
 
         let app, auth, db;
         try {
-            // Check if config is replaced
-            if (firebaseConfig.apiKey !== "HIER_API_KEY") {
+            if (firebaseConfig.apiKey !== "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg") {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
             }
-        } catch (e) { console.error("Firebase Init Error:", e); }
+        } catch (e) { console.error(e); }
 
-        // --- SPIEL DATEN ---
-
-        // COOLDOWN: Zum Testen auf 10 Sekunden (10000ms). Für Release auf 24h (86400000) setzen!
-        const WATER_COOLDOWN = 10000; 
+        // --- CONSTANTS ---
+        const WATER_COOLDOWN = 5000; // 5 seconds for testing (set to 86400000 for 24h)
 
         const ITEMS = {
-            // Samen (Kaufbar mit Münzen, geben Gems beim Ernten)
+            // Seeds (Pflanzen - nur auf Erde)
             carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, icon: '🥕', growsInto: 'carrot', stages: 3, reward: 5, timeDesc: 'Schnell' },
             sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 15, timeDesc: 'Mittel' },
-            pumpkin_seed: { id: 'pumpkin_seed', name: 'Kürbis', type: 'seed', price: 120, icon: '🎃', growsInto: 'pumpkin', stages: 5, reward: 35, timeDesc: 'Langsam' },
-            money_tree: { id: 'money_tree', name: 'Geldbaum', type: 'seed', price: 500, icon: '🌳', growsInto: 'money_tree', stages: 6, reward: 150, timeDesc: 'Sehr Langsam' },
             
-            // Deko (Kaufbar mit Münzen, kein Wachstum)
-            fence: { id: 'fence', name: 'Holzzaun', type: 'deco', price: 15, icon: '🚧' },
-            stone_path: { id: 'stone_path', name: 'Steinweg', type: 'deco', price: 10, icon: '🪨' },
-            gnome: { id: 'gnome', name: 'Gartenzwerg', type: 'deco', price: 250, icon: '🎅' },
-            fountain: { id: 'fountain', name: 'Brunnen', type: 'deco', price: 1000, icon: '⛲' },
-            bench: { id: 'bench', name: 'Parkbank', type: 'deco', price: 150, icon: '🪑' },
+            // Floors (Böden - Blockieren Pflanzen, erlauben Deko)
+            stone_floor: { id: 'stone_floor', name: 'Steinweg', type: 'floor', price: 10, css: 'texture-stone', icon: '🪨' },
+            wood_floor: { id: 'wood_floor', name: 'Holzboden', type: 'floor', price: 25, css: 'texture-wood', icon: '🪵' },
+
+            // Deco (Kann auf Erde ODER Boden)
+            fence: { id: 'fence', name: 'Zaun', type: 'deco', price: 15, icon: '🚧' },
+            bench: { id: 'bench', name: 'Bank', type: 'deco', price: 150, icon: '🪑' },
+            gnome: { id: 'gnome', name: 'Zwerg', type: 'deco', price: 250, icon: '🎅' },
         };
 
         const GARDEN_UPGRADES = [
             { id: 0, name: "Start-Garten", price: 0 },
-            { id: 1, name: "Hinterhof", price: 50 },  // Preis in Gems
-            { id: 2, name: "Waldlichtung", price: 200 },
-            { id: 3, name: "Schlossgarten", price: 1000 }
+            { id: 1, name: "Großer Hof", price: 100 },
         ];
 
-        // --- HELFER FUNKTIONEN ---
-        const playSound = (type) => {
-            // Optional: Simple sound placeholders
-        };
+        // --- COMPONENTS ---
 
-        // --- KOMPONENTEN ---
-
-        const LoginScreen = () => {
-            const login = async () => {
-                const provider = new GoogleAuthProvider();
-                try { await signInWithPopup(auth, provider); } 
-                catch (error) { alert("Login Fehler: " + error.message); }
-            };
-
-            return (
-                <div className="flex flex-col items-center justify-center h-full p-6 bg-gradient-to-br from-green-400 to-teal-500 relative overflow-hidden">
-                    <div className="absolute top-10 left-10 text-6xl opacity-20 animate-float">☁️</div>
-                    <div className="absolute bottom-20 right-10 text-8xl opacity-20 animate-float" style={{animationDelay: '1s'}}>🌱</div>
-                    
-                    <div className="bg-white/95 backdrop-blur-md p-8 rounded-3xl shadow-2xl w-full max-w-sm text-center z-10">
-                        <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-teal-600 mb-2">DuoBloom</h1>
-                        <p className="text-gray-500 mb-8 font-medium">Baue Träume. Gemeinsam.</p>
-                        
-                        <button onClick={login} className="w-full bg-white border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 text-gray-700 font-bold py-4 px-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-sm group">
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                            Mit Google starten
-                        </button>
+        const Modal = ({ children, onClose, title }) => (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-pop">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
+                    <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                        <h3 className="font-bold text-lg">{title}</h3>
+                        <button onClick={onClose}><i data-lucide="x" className="text-gray-500 hover:text-red-500"></i></button>
                     </div>
+                    <div className="p-4 overflow-y-auto">{children}</div>
                 </div>
-            );
-        };
+            </div>
+        );
 
-        const LobbyScreen = ({ user, onJoin, onBrowse }) => {
-            const [code, setCode] = React.useState('');
-            const [isJoining, setIsJoining] = React.useState(false);
-
-            const createNew = () => {
-                const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                onJoin(newCode, true); // true = isCreating
-            };
-
-            return (
-                <div className="flex flex-col h-full bg-[#f4fbf7]">
-                    <div className="p-6 bg-white rounded-b-3xl shadow-sm z-10">
-                        <div className="flex items-center gap-3 mb-6">
-                            <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-green-500" />
-                            <div>
-                                <h2 className="text-lg font-bold text-gray-800">Hallo, {user.displayName?.split(' ')[0]}!</h2>
-                                <p className="text-xs text-gray-500">Bereit zu gärtnern?</p>
-                            </div>
-                            <button onClick={() => auth.signOut()} className="ml-auto text-xs bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold">Logout</button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 mb-6">
-                            <button onClick={createNew} className="bg-green-500 text-white p-4 rounded-2xl shadow-lg shadow-green-200 hover:scale-[1.02] transition-transform flex flex-col items-center">
-                                <i data-lucide="plus-circle" className="mb-2"></i>
-                                <span className="font-bold">Neu erstellen</span>
-                            </button>
-                            <button onClick={() => setIsJoining(!isJoining)} className="bg-blue-500 text-white p-4 rounded-2xl shadow-lg shadow-blue-200 hover:scale-[1.02] transition-transform flex flex-col items-center">
-                                <i data-lucide="users" className="mb-2"></i>
-                                <span className="font-bold">Beitreten</span>
-                            </button>
-                        </div>
-
-                        {isJoining && (
-                            <div className="animate-pop mb-6">
-                                <div className="flex gap-2">
-                                    <input 
-                                        value={code} onChange={e => setCode(e.target.value.toUpperCase())}
-                                        placeholder="CODE EINGEBEN"
-                                        className="flex-1 bg-gray-100 border-none rounded-xl px-4 py-3 font-bold text-center tracking-widest uppercase focus:ring-2 focus:ring-green-400 outline-none"
-                                    />
-                                    <button onClick={() => code && onJoin(code, false)} className="bg-green-600 text-white px-6 rounded-xl font-bold">
-                                        Go
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex-1 p-6 overflow-y-auto">
-                        <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
-                            <i data-lucide="globe" size={16}></i> Community Gärten
-                        </h3>
-                        <div className="space-y-3">
-                            <div onClick={onBrowse} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between cursor-pointer hover:bg-gray-50">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-500">🏆</div>
-                                    <div>
-                                        <p className="font-bold text-gray-700">Top Gärten ansehen</p>
-                                        <p className="text-xs text-gray-400">Lass dich inspirieren & verteile Likes</p>
-                                    </div>
-                                </div>
-                                <i data-lucide="chevron-right" className="text-gray-300"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const CommunityBrowser = ({ onBack, onVisit }) => {
-            const [gardens, setGardens] = React.useState([]);
+        // --- MAIN MENU (DASHBOARD) ---
+        const MainMenu = ({ user, onAction, currentRoom }) => {
+            const [stats, setStats] = React.useState({ tasksDone: 0, totalCoins: 0 });
+            const [joinCode, setJoinCode] = React.useState("");
 
             React.useEffect(() => {
-                const q = query(collection(db, 'rooms'), orderBy('likes', 'desc'), limit(10));
-                getDocs(q).then(snap => {
-                    const list = [];
-                    snap.forEach(d => list.push({id: d.id, ...d.data()}));
-                    setGardens(list);
-                });
-            }, []);
+                // Fetch simple user stats (optional, could be stored in user doc)
+                if(user) getDoc(doc(db, 'users', user.uid)).then(s => s.exists() && setStats(s.data().stats || {tasksDone: 0, totalCoins: 0}));
+            }, [user]);
 
             return (
-                <div className="flex flex-col h-full bg-slate-50">
-                    <div className="p-4 bg-white shadow-sm flex items-center gap-3 z-10">
-                        <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><i data-lucide="arrow-left"></i></button>
-                        <h2 className="font-bold text-lg">Community</h2>
+                <div className="h-full bg-slate-100 flex flex-col md:flex-row max-w-6xl mx-auto shadow-2xl overflow-hidden md:rounded-3xl md:my-8 md:h-[90vh]">
+                    {/* Left Panel: Profile */}
+                    <div className="md:w-1/3 bg-white p-8 flex flex-col items-center border-r">
+                        <img src={user.photoURL} className="w-24 h-24 rounded-full border-4 border-green-500 mb-4 shadow-lg" />
+                        <h1 className="text-2xl font-bold text-gray-800">{user.displayName}</h1>
+                        <p className="text-gray-500 mb-8">Meistergärtner Level {Math.floor(stats.tasksDone / 10) + 1}</p>
+                        
+                        <div className="w-full grid grid-cols-2 gap-4 mb-8">
+                            <div className="bg-blue-50 p-4 rounded-xl text-center">
+                                <div className="text-2xl font-bold text-blue-600">{stats.tasksDone || 0}</div>
+                                <div className="text-xs text-blue-400 font-bold uppercase">Tasks</div>
+                            </div>
+                            <div className="bg-yellow-50 p-4 rounded-xl text-center">
+                                <div className="text-2xl font-bold text-yellow-600">{stats.totalCoins || 0}</div>
+                                <div className="text-xs text-yellow-400 font-bold uppercase">Münzen</div>
+                            </div>
+                        </div>
+
+                        <button onClick={() => auth.signOut()} className="mt-auto text-red-500 font-bold hover:underline">Abmelden</button>
                     </div>
-                    <div className="p-4 overflow-y-auto space-y-3">
-                        {gardens.map(g => (
-                            <div key={g.id} onClick={() => onVisit(g.id)} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-bold text-gray-800">Garten {g.id}</h3>
-                                    <span className="bg-red-50 text-red-500 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
-                                        ❤️ {g.likes || 0}
-                                    </span>
+
+                    {/* Right Panel: Actions */}
+                    <div className="flex-1 bg-slate-50 p-8 flex flex-col justify-center gap-6">
+                        <h2 className="text-3xl font-bold text-gray-700 mb-2">Willkommen zurück! 👋</h2>
+                        
+                        {currentRoom && (
+                            <button onClick={() => onAction('resume', currentRoom)} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-6 rounded-2xl shadow-lg shadow-green-200 hover:scale-[1.01] transition-all text-left flex items-center justify-between group">
+                                <div>
+                                    <div className="text-green-100 text-sm font-bold uppercase mb-1">Letzte Sitzung</div>
+                                    <div className="text-2xl font-bold">Weitergärtnern</div>
+                                    <div className="text-sm opacity-80">Raum: {currentRoom}</div>
                                 </div>
-                                <div className="flex gap-2 text-xs text-gray-500">
-                                    <span className="bg-yellow-50 text-yellow-600 px-2 py-1 rounded">💰 {g.coins}</span>
-                                    <span className="bg-purple-50 text-purple-600 px-2 py-1 rounded">💎 {g.gems}</span>
-                                    <span>Gärten: {g.unlockedGardens?.length || 1}</span>
+                                <i data-lucide="arrow-right" className="w-8 h-8 group-hover:translate-x-2 transition-transform"></i>
+                            </button>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button onClick={() => onAction('create')} className="bg-white border-2 border-dashed border-gray-300 p-6 rounded-2xl text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center justify-center gap-2 h-40">
+                                <i data-lucide="plus-circle" className="w-8 h-8"></i>
+                                <span className="font-bold">Neuen Garten bauen</span>
+                            </button>
+                            
+                            <div className="bg-white border border-gray-200 p-6 rounded-2xl flex flex-col justify-center h-40">
+                                <label className="text-xs font-bold text-gray-400 uppercase mb-2">Freund beitreten</label>
+                                <div className="flex gap-2">
+                                    <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="CODE" className="w-full bg-gray-100 rounded-lg px-3 py-2 font-bold uppercase focus:ring-2 ring-blue-500 outline-none" />
+                                    <button onClick={() => joinCode && onAction('join', joinCode)} className="bg-blue-500 text-white px-4 rounded-lg font-bold"><i data-lucide="arrow-right"></i></button>
                                 </div>
                             </div>
-                        ))}
+                        </div>
                     </div>
                 </div>
             );
         };
 
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [roomCode, setRoomCode] = React.useState(null);
+        // --- GAME INTERFACE ---
+        const GameApp = ({ user, roomCode, onLeave }) => {
             const [roomData, setRoomData] = React.useState(null);
-            const [mode, setMode] = React.useState('lobby'); // lobby, playing, browsing
             const [tab, setTab] = React.useState('garden');
             const [activeGardenIdx, setActiveGardenIdx] = React.useState(0);
-            const [selectedSeed, setSelectedSeed] = React.useState(null);
-            const [loading, setLoading] = React.useState(true);
+            const [selectedItem, setSelectedItem] = React.useState(null);
+            
+            // Task Creation State
+            const [isTaskModalOpen, setTaskModalOpen] = React.useState(false);
+            const [newTaskTitle, setNewTaskTitle] = React.useState("");
+            const [newTaskReward, setNewTaskReward] = React.useState(15);
+            const [newTaskType, setNewTaskType] = React.useState("once"); // once, daily
 
-            // Auth Logic
-            React.useEffect(() => {
-                if (!auth) return;
-                const unsub = onAuthStateChanged(auth, async (u) => {
-                    setUser(u);
-                    if (u) {
-                        const userSnap = await getDoc(doc(db, 'users', u.uid));
-                        if (userSnap.exists() && userSnap.data().lastRoom) {
-                            setRoomCode(userSnap.data().lastRoom);
-                            setMode('playing');
-                        }
-                    }
-                    setLoading(false);
-                });
-                return () => unsub();
-            }, []);
+            // Community State
+            const [showCommunity, setShowCommunity] = React.useState(false);
+            const [communityGardens, setCommunityGardens] = React.useState([]);
 
-            // Room Sync Logic
+            // Sync Logic
             React.useEffect(() => {
-                if (!roomCode || !db) return;
-                
                 const unsub = onSnapshot(doc(db, 'rooms', roomCode), (snap) => {
                     if (snap.exists()) {
                         setRoomData(snap.data());
-                    } else if (mode === 'playing') {
-                        // Create room if playing (not browsing)
-                        const initialData = {
-                            coins: 0, 
-                            gems: 0,
-                            tasks: [
-                                { id: 'quest_1', title: 'Tutorial: Erstelle deine erste Aufgabe', reward: 50, done: false, isSystem: true }
-                            ],
-                            inventory: {}, 
-                            gardens: { 0: {} }, // Multi-Garden Support
-                            unlockedGardens: [0],
-                            likes: 0,
-                            createdAt: new Date().toISOString(),
-                            owner: user?.uid
-                        };
-                        setDoc(doc(db, 'rooms', roomCode), initialData);
+                        // Daily Reset Logic Check
+                        const now = new Date();
+                        const today = now.toISOString().split('T')[0];
+                        if (snap.data().lastDailyReset !== today) {
+                            // Reset daily tasks logic would go here (requires logic to iterate tasks)
+                            // For prototype, we just update the timestamp
+                            updateDoc(doc(db, 'rooms', roomCode), { lastDailyReset: today });
+                        }
+                    } else {
+                        // Create Room
+                        setDoc(doc(db, 'rooms', roomCode), {
+                            coins: 50, gems: 0,
+                            tasks: [],
+                            inventory: {}, gardens: { 0: {} }, unlockedGardens: [0],
+                            likes: 0, createdAt: new Date().toISOString(), owner: user.uid,
+                            lastDailyReset: new Date().toISOString().split('T')[0]
+                        });
                     }
                 });
                 return () => unsub();
-            }, [roomCode, mode]);
+            }, [roomCode]);
 
-            // Icons Refresh
-            React.useEffect(() => { lucide.createIcons(); }, [roomData, tab, mode, activeGardenIdx]);
+            React.useEffect(() => { lucide.createIcons(); }, [roomData, tab, showCommunity]);
 
-            // ACTIONS
-            const joinRoom = (code, isCreating) => {
-                setRoomCode(code);
-                setMode('playing');
-                if (user) {
-                    setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
-                }
-            };
-
-            const handleLike = async () => {
-                if (!roomCode || mode !== 'browsing') return;
-                // Simple local storage check to prevent spamming
-                const likedKey = `liked_${roomCode}`;
-                if (localStorage.getItem(likedKey)) return alert("Du hast schon geliked!");
-                
-                await updateDoc(doc(db, 'rooms', roomCode), { likes: increment(1) });
-                localStorage.setItem(likedKey, 'true');
-                alert("Garten geliked! ❤️");
-            };
+            // --- ACTIONS ---
 
             const handleGridClick = async (key) => {
-                if (mode !== 'playing') return; // Spectator
-                
-                // key is relative to current garden index e.g. "3,4"
-                // in DB stored as gardens: { "0": { "3,4": {...} } }
-                const currentGrid = roomData.gardens?.[activeGardenIdx] || {};
-                const cell = currentGrid[key];
+                const currentGrid = roomData.gardens[activeGardenIdx] || {};
+                const cell = currentGrid[key] || {}; // { floor: 'wood', item: 'carrot', stage: 1 }
                 const roomRef = doc(db, 'rooms', roomCode);
+                const path = `gardens.${activeGardenIdx}.${key}`;
 
-                // 1. Ernten
-                if (cell && cell.grown) {
-                    const item = ITEMS[cell.source];
-                    // Delete from map via dot notation
-                    await updateDoc(roomRef, {
-                        [`gardens.${activeGardenIdx}.${key}`]: deleteField(),
-                        gems: increment(item.reward || 0)
-                    });
-                    // Visual feedback could be added here
-                    return;
-                }
-
-                // 2. Gießen
-                if (cell && !cell.grown && ITEMS[cell.source].type === 'seed') {
-                    const item = ITEMS[cell.source];
-                    const now = Date.now();
-                    const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
+                // 1. Tool Selection Logic
+                if (selectedItem) {
+                    const itemDef = ITEMS[selectedItem];
+                    const invCount = roomData.inventory[selectedItem] || 0;
                     
-                    if (now - lastWatered > WATER_COOLDOWN) {
-                        const newStage = (cell.stage || 0) + 1;
-                        await updateDoc(roomRef, {
-                            [`gardens.${activeGardenIdx}.${key}.stage`]: newStage,
-                            [`gardens.${activeGardenIdx}.${key}.grown`]: newStage >= item.stages,
-                            [`gardens.${activeGardenIdx}.${key}.lastWatered`]: new Date().toISOString()
-                        });
-                    } else {
-                        alert("Pflanze ist noch nass! Warte kurz.");
+                    if (invCount > 0) {
+                        // Place Floor
+                        if (itemDef.type === 'floor') {
+                            await updateDoc(roomRef, { [`${path}.floor`]: selectedItem, [`inventory.${selectedItem}`]: increment(-1) });
+                        }
+                        // Place Seed (Only if NO floor)
+                        else if (itemDef.type === 'seed') {
+                            if (!cell.floor && !cell.item) {
+                                await updateDoc(roomRef, { 
+                                    [`${path}.item`]: selectedItem, [`${path}.stage`]: 0, [`${path}.plantedAt`]: new Date().toISOString(),
+                                    [`inventory.${selectedItem}`]: increment(-1) 
+                                });
+                            } else { alert("Pflanzen brauchen Erde (keinen Boden) und freien Platz!"); }
+                        }
+                        // Place Deco (Anywhere free of other items)
+                        else if (itemDef.type === 'deco') {
+                            if (!cell.item) {
+                                await updateDoc(roomRef, { [`${path}.item`]: selectedItem, [`inventory.${selectedItem}`]: increment(-1) });
+                            }
+                        }
+                        // Check Inventory Empty
+                        if (invCount - 1 <= 0) setSelectedItem(null);
                     }
                     return;
                 }
 
-                // 3. Pflanzen
-                if (!cell && selectedSeed && (roomData.inventory[selectedSeed] || 0) > 0) {
-                    const item = ITEMS[selectedSeed];
-                    await updateDoc(roomRef, {
-                        [`gardens.${activeGardenIdx}.${key}`]: {
-                            source: selectedSeed,
-                            stage: 0,
-                            grown: item.type === 'deco',
-                            plantedAt: new Date().toISOString(),
-                            lastWatered: 0 // Needs water immediately
-                        },
-                        [`inventory.${selectedSeed}`]: increment(-1)
-                    });
-                    if (roomData.inventory[selectedSeed] <= 1) setSelectedSeed(null);
+                // 2. Interaction Logic (No tool selected)
+                if (cell.item) {
+                    const itemDef = ITEMS[cell.item];
+                    
+                    // Harvest
+                    if (cell.grown) {
+                         await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) });
+                         return;
+                    }
+
+                    // Water
+                    if (itemDef.type === 'seed' && !cell.grown) {
+                        const now = Date.now();
+                        const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
+                        if (now - lastWatered > WATER_COOLDOWN) {
+                             const newStage = (cell.stage || 0) + 1;
+                             await updateDoc(roomRef, {
+                                [`${path}.stage`]: newStage,
+                                [`${path}.grown`]: newStage >= itemDef.stages,
+                                [`${path}.lastWatered`]: new Date().toISOString()
+                             });
+                        } else { alert("Zu früh! Warte noch kurz."); }
+                    }
                 }
             };
 
-            const buyItem = async (id) => {
-                if (mode !== 'playing') return;
+            const createTask = async () => {
+                if (!newTaskTitle.trim()) return;
+                const newTask = {
+                    id: Date.now().toString(),
+                    title: newTaskTitle,
+                    reward: parseInt(newTaskReward),
+                    type: newTaskType,
+                    done: false,
+                    lastDone: null
+                };
+                await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayUnion(newTask) });
+                setTaskModalOpen(false); setNewTaskTitle("");
+            };
+
+            const toggleTask = async (task) => {
+                const roomRef = doc(db, 'rooms', roomCode);
+                const today = new Date().toISOString().split('T')[0];
+
+                if (!task.done) {
+                    // Complete Task
+                    await updateDoc(roomRef, { 
+                        tasks: arrayRemove(task), 
+                        coins: increment(task.reward)
+                    });
+                    // Re-add if daily/recurring with updated status
+                    if (task.type === 'daily') {
+                        await updateDoc(roomRef, { 
+                            tasks: arrayUnion({ ...task, done: true, lastDone: today }) 
+                        });
+                    }
+                    // If 'once', it's just gone (handled by arrayRemove)
+                } else if (task.type === 'daily' && task.lastDone !== today) {
+                    // Reset daily task manually if needed (or rely on server/onload logic)
+                }
+            };
+
+            const loadCommunity = async () => {
+                setShowCommunity(true);
+                const q = query(collection(db, 'rooms'), orderBy('likes', 'desc'), limit(10));
+                const snap = await getDocs(q);
+                setCommunityGardens(snap.docs.map(d => ({id: d.id, ...d.data()})));
+            };
+
+            const buy = async (id) => {
                 const item = ITEMS[id];
                 if (roomData.coins >= item.price) {
-                    await updateDoc(doc(db, 'rooms', roomCode), {
-                        coins: increment(-item.price),
-                        [`inventory.${id}`]: increment(1)
-                    });
+                    await updateDoc(doc(db, 'rooms', roomCode), { coins: increment(-item.price), [`inventory.${id}`]: increment(1) });
                 }
             };
 
-            const buyGarden = async (gardenId) => {
-                if (mode !== 'playing') return;
-                const gardenDef = GARDEN_UPGRADES.find(g => g.id === gardenId);
-                if (roomData.gems >= gardenDef.price) {
-                    await updateDoc(doc(db, 'rooms', roomCode), {
-                        gems: increment(-gardenDef.price),
-                        unlockedGardens: arrayUnion(gardenId),
-                        [`gardens.${gardenId}`]: {} // Init empty
-                    });
-                }
-            };
-
-            const taskAction = async (action, task) => {
-                if (mode !== 'playing') return;
-                const ref = doc(db, 'rooms', roomCode);
-                if (action === 'add') {
-                    const title = task; // task is string here
-                    await updateDoc(ref, { 
-                        tasks: arrayUnion({ id: Date.now().toString(), title, reward: 10, done: false }) 
-                    });
-                    // Check tutorial quest
-                    const tutorial = roomData.tasks.find(t => t.id === 'quest_1');
-                    if(tutorial && !tutorial.done) {
-                        await updateDoc(ref, { 
-                            tasks: arrayRemove(tutorial),
-                            coins: increment(tutorial.reward)
-                        });
-                    }
-                } else if (action === 'finish') {
-                    await updateDoc(ref, { 
-                        tasks: arrayRemove(task), 
-                        coins: increment(task.reward) 
-                    });
-                }
-            };
-
-            const leaveRoom = () => {
-                setRoomCode(null);
-                setRoomData(null);
-                setMode('lobby');
-                updateDoc(doc(db, 'users', user.uid), { lastRoom: deleteField() });
-            };
-
-            // RENDER LOGIC
-            if (!firebaseConfig.apiKey.includes("HIER")) {
-               if (loading) return <div className="h-full flex items-center justify-center bg-[#eefcf3] text-green-600 font-bold animate-pulse">Lade DuoBloom...</div>;
-               if (!user) return <LoginScreen />;
-               if (mode === 'lobby') return <LobbyScreen user={user} onJoin={joinRoom} onBrowse={() => setMode('browsing_list')} />;
-               if (mode === 'browsing_list') return <CommunityBrowser onBack={() => setMode('lobby')} onVisit={(code) => { setRoomCode(code); setMode('browsing'); }} />;
-               if (!roomData) return <div className="h-full flex items-center justify-center">Lade Garten...</div>;
-            } else {
-                return <div className="p-10 text-red-600 font-bold text-center">FEHLER: Du hast die Firebase Config im Code noch nicht eingetragen!</div>
-            }
-
-            const currentGrid = roomData.gardens?.[activeGardenIdx] || {};
-            const isOwner = mode === 'playing';
+            if (!roomData) return <div className="h-full flex items-center justify-center">Lade Garten...</div>;
 
             return (
-                <div className="flex flex-col h-full max-w-md mx-auto bg-white shadow-2xl overflow-hidden relative">
+                <div className="flex h-full bg-slate-100 overflow-hidden md:max-w-7xl md:mx-auto md:my-8 md:rounded-3xl md:shadow-2xl md:border border-slate-200">
                     
-                    {/* Header */}
-                    <header className="bg-white/90 backdrop-blur-sm p-3 shadow-sm z-20 flex justify-between items-center border-b border-gray-100">
-                        <button onClick={leaveRoom} className="text-xs font-mono text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors flex items-center gap-1">
-                            <i data-lucide="door-open" size={14}></i> {mode === 'playing' ? 'Exit' : 'Zurück'}
+                    {/* SIDEBAR (Desktop) / BOTTOM BAR (Mobile) */}
+                    <nav className="
+                        fixed bottom-0 left-0 w-full bg-white border-t z-40 flex justify-around p-2 pb-safe
+                        md:relative md:w-64 md:flex-col md:justify-start md:border-t-0 md:border-r md:p-6 md:gap-4
+                    ">
+                        <div className="hidden md:block mb-8">
+                            <h1 className="text-2xl font-bold text-green-600 flex items-center gap-2"><i data-lucide="sprout"></i> DuoBloom</h1>
+                            <div className="text-xs text-gray-400 mt-1">Raum: {roomCode}</div>
+                        </div>
+
+                        <button onClick={() => setTab('garden')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'garden' ? 'bg-green-50 text-green-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}>
+                            <i data-lucide="flower-2"></i> <span className="text-[10px] md:text-sm">Garten</span>
+                        </button>
+                        <button onClick={() => setTab('tasks')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'tasks' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}>
+                            <i data-lucide="check-square"></i> <span className="text-[10px] md:text-sm">Aufgaben</span>
+                        </button>
+                        <button onClick={() => setTab('shop')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'shop' ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}>
+                            <i data-lucide="shopping-cart"></i> <span className="text-[10px] md:text-sm">Shop</span>
                         </button>
                         
-                        {mode === 'playing' ? (
-                            <button className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100" onClick={() => {navigator.clipboard.writeText(roomCode); alert("Code kopiert: " + roomCode)}}>
-                                Code: {roomCode} ❐
+                        <div className="md:mt-auto hidden md:block pt-4 border-t">
+                            <button onClick={loadCommunity} className="w-full text-left p-3 rounded-xl text-gray-600 hover:bg-purple-50 hover:text-purple-600 flex items-center gap-3 font-medium">
+                                <i data-lucide="globe"></i> Community
                             </button>
-                        ) : (
-                             <button onClick={handleLike} className="bg-red-50 text-red-500 px-3 py-1 rounded-full text-xs font-bold border border-red-100 active:scale-90 transition-transform">
-                                ❤️ Liken ({roomData.likes || 0})
+                            <button onClick={onLeave} className="w-full text-left p-3 rounded-xl text-gray-600 hover:bg-red-50 hover:text-red-600 flex items-center gap-3 font-medium mt-2">
+                                <i data-lucide="log-out"></i> Verlassen
                             </button>
-                        )}
-
-                        <div className="flex gap-2">
-                            <div className="flex items-center gap-1 text-yellow-600 font-bold bg-yellow-50 px-2 py-1 rounded-lg text-xs border border-yellow-100">
-                                💰 {roomData.coins}
-                            </div>
-                            <div className="flex items-center gap-1 text-purple-600 font-bold bg-purple-50 px-2 py-1 rounded-lg text-xs border border-purple-100">
-                                💎 {roomData.gems}
-                            </div>
                         </div>
-                    </header>
+                    </nav>
 
-                    {/* Main Content */}
-                    <main className="flex-1 overflow-y-auto bg-[#f0f9f4] relative">
+                    {/* MAIN CONTENT AREA */}
+                    <main className="flex-1 overflow-y-auto bg-[#eefcf3] relative pb-20 md:pb-0">
                         
-                        {/* GARDEN VIEW */}
-                        {tab === 'garden' && (
-                            <div className="flex flex-col items-center min-h-full pb-32">
-                                
-                                {/* Garden Selector */}
-                                <div className="flex gap-2 p-4 w-full overflow-x-auto no-scrollbar">
-                                    {GARDEN_UPGRADES.map(g => {
-                                        const unlocked = roomData.unlockedGardens?.includes(g.id);
-                                        return (
-                                            <button key={g.id} 
-                                                onClick={() => unlocked ? setActiveGardenIdx(g.id) : null}
-                                                className={`
-                                                    flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all
-                                                    ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500 shadow-lg' : 
-                                                      unlocked ? 'bg-white text-green-700 border-green-200' : 'bg-gray-200 text-gray-400 border-gray-300'}
-                                                `}
-                                            >
-                                                {g.name} {!unlocked && '🔒'}
-                                            </button>
-                                        )
-                                    })}
+                        {/* HEADER (Mobile & Desktop) */}
+                        <header className="sticky top-0 bg-white/90 backdrop-blur-md p-4 shadow-sm z-30 flex justify-between items-center px-6">
+                            <div className="md:hidden font-bold text-gray-700">Code: {roomCode}</div>
+                            
+                            <div className="flex gap-4 ml-auto">
+                                <div className="flex flex-col items-end">
+                                    <span className="text-xs text-gray-400 font-bold uppercase">Münzen</span>
+                                    <span className="font-bold text-yellow-600 text-lg flex items-center gap-1">💰 {roomData.coins}</span>
                                 </div>
+                                <div className="flex flex-col items-end">
+                                    <span className="text-xs text-gray-400 font-bold uppercase">Gems</span>
+                                    <span className="font-bold text-purple-600 text-lg flex items-center gap-1">💎 {roomData.gems}</span>
+                                </div>
+                            </div>
+                             {/* Mobile Menu Button Replacement */}
+                            <button onClick={loadCommunity} className="md:hidden ml-4 p-2 bg-gray-100 rounded-full"><i data-lucide="globe"></i></button>
+                            <button onClick={onLeave} className="md:hidden ml-2 p-2 bg-red-50 text-red-500 rounded-full"><i data-lucide="log-out"></i></button>
+                        </header>
 
-                                {/* The Grid */}
-                                <div className="bg-white p-3 rounded-2xl shadow-xl border-4 border-[#8b5a2b] relative mx-4">
-                                    <div className="grid grid-cols-5 gap-1 sm:gap-2">
+                        {/* GARDEN TAB */}
+                        {tab === 'garden' && (
+                            <div className="p-4 md:p-8 flex flex-col items-center">
+                                {/* Grid */}
+                                <div className="bg-[#5c4033] p-4 rounded-xl shadow-2xl relative inline-block">
+                                    <div className="grid grid-cols-5 gap-0 border-2 border-[#3e2b22]">
                                         {Array.from({ length: 25 }).map((_, i) => {
                                             const key = `${i % 5},${Math.floor(i / 5)}`;
-                                            const cell = currentGrid[key];
-                                            const item = cell ? ITEMS[cell.source] : null;
-                                            const isWaterable = cell && !cell.grown && item.type === 'seed';
-                                            const needsWater = isWaterable && (Date.now() - (cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0) > WATER_COOLDOWN);
+                                            const cell = (roomData.gardens[activeGardenIdx] || {})[key] || {};
+                                            const floorItem = cell.floor ? ITEMS[cell.floor] : null;
+                                            const objectItem = cell.item ? ITEMS[cell.item] : null;
 
                                             return (
-                                                <div key={i} onClick={() => handleGridClick(key)}
+                                                <div key={key} onClick={() => handleGridClick(key)}
                                                     className={`
-                                                        w-12 h-12 sm:w-16 sm:h-16 rounded-md flex items-center justify-center text-2xl relative transition-all select-none
-                                                        ${cell ? 'bg-[#a3d9a5]' : 'bg-[#e2e8e3]'}
-                                                        ${isOwner ? 'cursor-pointer active:scale-95' : ''}
-                                                        ${selectedSeed && !cell && isOwner ? 'animate-pulse ring-2 ring-blue-400 bg-blue-50' : ''}
-                                                        border border-black/5 shadow-inner
-                                                    `}>
-                                                    {cell && (
-                                                        <div className="w-full h-full flex items-center justify-center relative">
-                                                            {cell.grown || item.type === 'deco' ? (
-                                                                <span className="scale-125 drop-shadow-md filter">{GARDEN_UPGRADES[activeGardenIdx].id === 3 ? '👑' : ''}{item.growsInto ? ITEMS[item.growsInto]?.icon || item.icon : item.icon}</span>
-                                                            ) : (
-                                                                <div className="flex flex-col items-center">
-                                                                    <span className="text-xl opacity-80">{item.icon}</span>
-                                                                    {/* Growth Bar */}
-                                                                    <div className="absolute bottom-1 w-8 h-1 bg-black/10 rounded-full overflow-hidden">
-                                                                        <div className="h-full bg-blue-500 transition-all duration-500" style={{width: `${(cell.stage/item.stages)*100}%`}}></div>
-                                                                    </div>
-                                                                    {/* Water Needs Indicator */}
-                                                                    {needsWater && isOwner && (
-                                                                        <div className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full p-1 shadow-lg animate-bounce z-10">
-                                                                            <i data-lucide="droplets" width="10" height="10"></i>
+                                                        w-14 h-14 md:w-20 md:h-20 relative cursor-pointer
+                                                        ${floorItem ? floorItem.css : 'bg-[#8fbc8f] border border-black/5'} 
+                                                    `}
+                                                >
+                                                    {/* Render Item Layer */}
+                                                    {objectItem && (
+                                                        <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
+                                                            {cell.grown || objectItem.type === 'deco' 
+                                                                ? <span className="text-3xl md:text-4xl drop-shadow-md">{objectItem.icon}</span>
+                                                                : (
+                                                                    <div className="flex flex-col items-center">
+                                                                        <span className="text-xl">{objectItem.icon}</span>
+                                                                        <div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden">
+                                                                            <div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} />
                                                                         </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
+                                                                    </div>
+                                                                )
+                                                            }
                                                         </div>
+                                                    )}
+                                                    {/* Selection Highlight */}
+                                                    {selectedItem && !objectItem && !floorItem && (
+                                                        <div className="absolute inset-0 hover:bg-white/20" />
                                                     )}
                                                 </div>
                                             );
@@ -538,123 +441,213 @@
                                     </div>
                                 </div>
 
-                                {/* Inventory Bar (Only visible if Playing) */}
-                                {isOwner && (
-                                    <div className="fixed bottom-20 left-4 right-4 bg-white/95 backdrop-blur p-3 rounded-2xl shadow-xl border border-gray-100 flex gap-2 overflow-x-auto no-scrollbar z-20">
+                                {/* Inventory Bar */}
+                                <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100">
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Dein Inventar (Werkzeug wählen)</h3>
+                                    <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
                                         {Object.entries(roomData.inventory).map(([id, count]) => {
                                             if (count <= 0) return null;
                                             return (
-                                                <button key={id} onClick={() => setSelectedSeed(selectedSeed === id ? null : id)}
-                                                    className={`flex-shrink-0 flex flex-col items-center p-2 rounded-xl border-2 w-16 h-20 justify-center transition-all ${selectedSeed === id ? 'border-blue-500 bg-blue-50 scale-105' : 'border-gray-100'}`}>
+                                                <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)}
+                                                    className={`
+                                                        flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px]
+                                                        ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}
+                                                    `}
+                                                >
                                                     <span className="text-2xl mb-1">{ITEMS[id].icon}</span>
-                                                    <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 rounded-full">x{count}</span>
+                                                    <span className="text-xs font-bold text-gray-600">{count}x</span>
                                                 </button>
-                                            );
+                                            )
                                         })}
-                                        {Object.values(roomData.inventory).every(c => c <= 0) && (
-                                            <div onClick={() => setTab('shop')} className="w-full text-center py-2 text-gray-400 text-sm italic cursor-pointer">
-                                                Dein Rucksack ist leer. <span className="underline text-green-500">Zum Shop</span>
-                                            </div>
-                                        )}
+                                        {Object.values(roomData.inventory).every(c => c <= 0) && <div className="text-gray-400 text-sm">Leer. Besuche den Shop!</div>}
                                     </div>
-                                )}
+                                </div>
                             </div>
                         )}
 
-                        {/* TASKS VIEW */}
+                        {/* TASKS TAB */}
                         {tab === 'tasks' && (
-                            <div className="p-6 pb-24">
-                                <div className="bg-gradient-to-r from-blue-500 to-blue-400 p-6 rounded-3xl shadow-lg mb-6 text-white relative overflow-hidden">
-                                    <h2 className="text-2xl font-bold z-10 relative">Aufgaben</h2>
-                                    <p className="opacity-90 z-10 relative">Erledige Tasks für Münzen!</p>
-                                    <i data-lucide="check-circle-2" className="absolute -right-4 -bottom-4 w-32 h-32 opacity-20 rotate-12"></i>
+                            <div className="p-6 md:max-w-3xl md:mx-auto">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-bold text-gray-700">Aufgabenliste</h2>
+                                    <button onClick={() => setTaskModalOpen(true)} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2">
+                                        <i data-lucide="plus"></i> Neu
+                                    </button>
                                 </div>
-
-                                {isOwner && (
-                                    <form onSubmit={(e) => { e.preventDefault(); taskAction('add', e.target.title.value); e.target.reset(); }} className="flex gap-2 mb-6">
-                                        <input name="title" placeholder="Neue Aufgabe..." className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 ring-blue-500 outline-none shadow-sm" autoComplete="off" />
-                                        <button className="bg-blue-500 hover:bg-blue-600 text-white w-12 rounded-xl font-bold shadow-md flex items-center justify-center">
-                                            <i data-lucide="plus"></i>
-                                        </button>
-                                    </form>
-                                )}
 
                                 <div className="space-y-3">
-                                    {roomData.tasks.map(task => (
-                                        <div key={task.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center group">
-                                            <div>
-                                                <span className={`font-medium text-gray-700 ${task.isSystem ? 'text-blue-600' : ''}`}>{task.title}</span>
-                                                {task.isSystem && <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1 rounded uppercase font-bold">Quest</span>}
-                                            </div>
-                                            {isOwner && (
-                                                <button onClick={() => taskAction('finish', task)} className="bg-green-100 text-green-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-500 hover:text-white transition-all shadow-sm flex items-center gap-1">
-                                                    <i data-lucide="coins" size={14}></i> {task.reward}
+                                    {roomData.tasks.filter(t => !t.done || t.type === 'daily').map(task => {
+                                        const isDoneToday = task.type === 'daily' && task.done && task.lastDone === new Date().toISOString().split('T')[0];
+                                        if (isDoneToday) return null; // Hide finished daily tasks for cleanliness
+
+                                        return (
+                                            <div key={task.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center group hover:shadow-md transition-shadow">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-lg text-gray-800">{task.title}</span>
+                                                        {task.type === 'daily' && <span className="bg-blue-100 text-blue-600 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Täglich</span>}
+                                                    </div>
+                                                    <div className="text-xs text-green-600 font-bold mt-1 flex items-center gap-1">
+                                                        +{task.reward} Münzen
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => toggleTask(task)} className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors">
+                                                    <i data-lucide="check" className="text-transparent hover:text-green-500 w-4 h-4"></i>
                                                 </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {roomData.tasks.length === 0 && <div className="text-center py-10 text-gray-400 opacity-50 flex flex-col items-center gap-2"><i data-lucide="coffee" size={40}></i>Alles erledigt!</div>}
+                                            </div>
+                                        );
+                                    })}
+                                    {roomData.tasks.length === 0 && <div className="text-center py-10 text-gray-400">Keine Aufgaben. Genieß die Ruhe!</div>}
                                 </div>
                             </div>
                         )}
 
-                        {/* SHOP VIEW */}
+                        {/* SHOP TAB */}
                         {tab === 'shop' && (
-                            <div className="p-6 pb-24">
-                                {/* Immobilien Abteilung */}
-                                <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2 mt-2"><i data-lucide="map"></i> Immobilien (Gems)</h3>
-                                <div className="flex gap-4 overflow-x-auto no-scrollbar mb-8 pb-2">
-                                    {GARDEN_UPGRADES.filter(g => g.id > 0).map(g => {
-                                        const owned = roomData.unlockedGardens?.includes(g.id);
-                                        return (
-                                            <div key={g.id} className={`flex-shrink-0 w-40 p-4 rounded-2xl border-2 ${owned ? 'border-green-200 bg-green-50 opacity-50' : 'border-purple-200 bg-white shadow-sm'}`}>
-                                                <div className="text-3xl mb-2 text-center">{owned ? '🏡' : '🏞️'}</div>
-                                                <div className="font-bold text-gray-700 text-center text-sm">{g.name}</div>
-                                                <button 
-                                                    onClick={() => !owned && buyGarden(g.id)}
-                                                    disabled={owned || roomData.gems < g.price || !isOwner}
-                                                    className={`mt-3 w-full py-1 rounded-lg text-xs font-bold flex justify-center items-center gap-1 ${owned ? 'bg-gray-200 text-gray-500' : 'bg-purple-500 text-white'}`}
-                                                >
-                                                    {owned ? 'Besitz' : <>{g.price} 💎</>}
-                                                </button>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-
-                                <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><i data-lucide="sprout"></i> Markt (Münzen)</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    {Object.values(ITEMS).map(item => (
-                                        <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center relative overflow-hidden group">
-                                            <div className="absolute top-2 right-2 text-[10px] text-gray-400 font-mono">{item.type === 'seed' ? item.timeDesc : '∞'}</div>
-                                            <span className="text-4xl mb-2 group-hover:scale-110 transition-transform">{item.icon}</span>
-                                            <span className="font-bold text-gray-700 text-sm">{item.name}</span>
-                                            <button onClick={() => buyItem(item.id)} disabled={roomData.coins < item.price || !isOwner}
-                                                className={`mt-2 w-full py-2 rounded-xl text-sm font-bold flex justify-center items-center gap-1 transition-all ${roomData.coins >= item.price && isOwner ? 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white' : 'bg-gray-100 text-gray-400 grayscale'}`}>
+                            <div className="p-6 md:max-w-4xl md:mx-auto grid grid-cols-2 md:grid-cols-3 gap-4">
+                                {Object.values(ITEMS).map(item => (
+                                    <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 bg-gray-100 px-2 py-1 rounded-bl-xl text-[10px] font-bold text-gray-500 uppercase">
+                                            {item.type === 'seed' ? 'Pflanze' : item.type === 'floor' ? 'Boden' : 'Deko'}
+                                        </div>
+                                        <div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>
+                                            {item.icon}
+                                        </div>
+                                        <h3 className="font-bold text-gray-700">{item.name}</h3>
+                                        <div className="mt-auto pt-4 w-full">
+                                            <button 
+                                                onClick={() => buy(item.id)} 
+                                                disabled={roomData.coins < item.price}
+                                                className={`w-full py-2 rounded-xl font-bold text-sm transition-all ${roomData.coins >= item.price ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-md' : 'bg-gray-200 text-gray-400'}`}
+                                            >
                                                 {item.price} 💰
                                             </button>
                                         </div>
-                                    ))}
-                                </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </main>
 
-                    {/* Bottom Nav */}
-                    <nav className="bg-white border-t border-gray-100 p-2 flex justify-around pb-6 pt-3 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] z-30">
-                        <button onClick={() => setTab('garden')} className={`flex flex-col items-center gap-1 transition-colors ${tab === 'garden' ? 'text-green-600' : 'text-gray-400'}`}>
-                            <div className={`p-2 rounded-2xl ${tab === 'garden' ? 'bg-green-50' : ''}`}><i data-lucide="flower-2"></i></div>
-                        </button>
-                        <button onClick={() => setTab('tasks')} className={`flex flex-col items-center gap-1 transition-colors ${tab === 'tasks' ? 'text-blue-600' : 'text-gray-400'}`}>
-                            <div className={`p-2 rounded-2xl ${tab === 'tasks' ? 'bg-blue-50' : ''}`}><i data-lucide="list-todo"></i></div>
-                        </button>
-                        <button onClick={() => setTab('shop')} className={`flex flex-col items-center gap-1 transition-colors ${tab === 'shop' ? 'text-purple-600' : 'text-gray-400'}`}>
-                            <div className={`p-2 rounded-2xl ${tab === 'shop' ? 'bg-purple-50' : ''}`}><i data-lucide="store"></i></div>
-                        </button>
-                    </nav>
+                    {/* MODALS & OVERLAYS */}
+                    
+                    {/* Task Creator Modal */}
+                    {isTaskModalOpen && (
+                        <Modal title="Neue Aufgabe erstellen" onClose={() => setTaskModalOpen(false)}>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Titel</label>
+                                    <input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="z.B. 30 min lesen" className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" />
+                                </div>
+                                
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Belohnung ({newTaskReward})</label>
+                                        <input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Wiederholung</label>
+                                        <select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 outline-none bg-white">
+                                            <option value="once">Einmalig</option>
+                                            <option value="daily">Täglich</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <button onClick={createTask} className="w-full bg-blue-500 text-white font-bold py-3 rounded-xl mt-2">Erstellen</button>
+                            </div>
+                        </Modal>
+                    )}
+
+                    {/* Community Overlay */}
+                    {showCommunity && (
+                        <Modal title="Community Gärten" onClose={() => setShowCommunity(false)}>
+                            <div className="space-y-3">
+                                {communityGardens.map(g => (
+                                    <div key={g.id} className="border p-3 rounded-xl flex justify-between items-center bg-gray-50">
+                                        <div>
+                                            <div className="font-bold text-gray-700">Garten {g.id.substring(0,6)}...</div>
+                                            <div className="text-xs text-gray-400">Level {g.unlockedGardens?.length || 1} • {g.likes || 0} Likes</div>
+                                        </div>
+                                        <button className="text-xs bg-white border px-3 py-1 rounded-full font-bold">Besuchen</button>
+                                    </div>
+                                ))}
+                                {communityGardens.length === 0 && <div className="text-center text-gray-400">Lade Community...</div>}
+                            </div>
+                        </Modal>
+                    )}
 
                 </div>
             );
+        };
+
+        // --- ROOT APP ---
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const [loading, setLoading] = React.useState(true);
+            const [view, setView] = React.useState('login'); // login, menu, game
+            const [roomCode, setRoomCode] = React.useState(null);
+
+            React.useEffect(() => {
+                if(!auth) return;
+                const unsub = onAuthStateChanged(auth, async (u) => {
+                    setUser(u);
+                    if (u) {
+                        // Check last room from user profile
+                        const userSnap = await getDoc(doc(db, 'users', u.uid));
+                        if(userSnap.exists() && userSnap.data().lastRoom) {
+                            setRoomCode(userSnap.data().lastRoom);
+                        }
+                        setView('menu');
+                    } else {
+                        setView('login');
+                    }
+                    setLoading(false);
+                });
+                return () => unsub();
+            }, []);
+
+            const handleMenuAction = (action, code) => {
+                if (action === 'resume' && code) {
+                    setView('game');
+                } else if (action === 'create') {
+                    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    setRoomCode(newCode);
+                    updateDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
+                    setView('game');
+                } else if (action === 'join' && code) {
+                    setRoomCode(code);
+                    updateDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
+                    setView('game');
+                }
+            };
+
+            const handleLogin = async () => {
+                try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch(e) { alert(e.message); }
+            };
+
+            if (loading) return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
+
+            if (view === 'login') {
+                return (
+                    <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center">
+                        <h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1>
+                        <p className="text-xl mb-10 opacity-90">Produktivität trifft auf Pixel-Garten.</p>
+                        <button onClick={handleLogin} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" />
+                            Los geht's
+                        </button>
+                    </div>
+                );
+            }
+
+            if (view === 'menu') {
+                return <MainMenu user={user} currentRoom={roomCode} onAction={handleMenuAction} />;
+            }
+
+            if (view === 'game') {
+                return <GameApp user={user} roomCode={roomCode} onLeave={() => setView('menu')} />;
+            }
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -662,5 +655,4 @@
     </script>
 </body>
 </html>
-
 
