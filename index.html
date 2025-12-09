@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 5.1 🌷</title>
+    <title>DuoBloom 6.0 🌷</title>
     
     <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -11,7 +11,6 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/date-fns@2.30.0/dist/date_fns.min.js"></script>
 
     <style>
         body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -111,10 +110,14 @@
             const [joinCode, setJoinCode] = React.useState("");
             const [isCreating, setIsCreating] = React.useState(false);
             const [newGardenName, setNewGardenName] = React.useState("");
+            const [isBusy, setIsBusy] = React.useState(false);
 
-            const handleCreate = () => {
+            const handleCreate = async () => {
                 if(!newGardenName.trim()) return alert("Bitte Namen eingeben");
-                onAction('create', null, newGardenName);
+                setIsBusy(true);
+                await onAction('create', null, newGardenName);
+                setIsBusy(false);
+                setIsCreating(false);
             };
 
             return (
@@ -176,11 +179,13 @@
 
                         {/* Create Modal */}
                         {isCreating && (
-                            <Modal title="Garten benennen" onClose={() => setIsCreating(false)}>
+                            <Modal title="Garten benennen" onClose={() => !isBusy && setIsCreating(false)}>
                                 <div className="space-y-4">
                                     <p className="text-gray-500 text-sm">Wie soll dein neues Paradies heißen?</p>
-                                    <input autoFocus value={newGardenName} onChange={e => setNewGardenName(e.target.value)} placeholder="z.B. Sonnenschein Hof" className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" />
-                                    <button onClick={handleCreate} className="w-full bg-green-500 text-white font-bold py-3 rounded-xl hover:bg-green-600">Erstellen & Starten</button>
+                                    <input autoFocus value={newGardenName} onChange={e => setNewGardenName(e.target.value)} placeholder="z.B. Sonnenschein Hof" className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" disabled={isBusy} />
+                                    <button onClick={handleCreate} disabled={isBusy} className={`w-full text-white font-bold py-3 rounded-xl transition-all ${isBusy ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'}`}>
+                                        {isBusy ? 'Erstelle...' : 'Erstellen & Starten'}
+                                    </button>
                                 </div>
                             </Modal>
                         )}
@@ -621,6 +626,7 @@
                 if (action === 'resume') setView('game');
                 else if (action === 'create') {
                     const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    // Set Doc for user profile and garden
                     await setDoc(doc(db, 'rooms', newCode), {
                         roomName: name,
                         coins: 50, gems: 0,
@@ -629,11 +635,11 @@
                     });
                     
                     setRoomCode(newCode);
-                    await updateDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
+                    await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
                     setView('game');
                 } else if (action === 'join') {
                     setRoomCode(code);
-                    await updateDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
+                    await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
                     setView('game');
                 } else if (action === 'community') {
                     setView('community');
