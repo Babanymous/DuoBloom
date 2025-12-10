@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 7.4 🌷</title>
+    <title>DuoBloom</title>
     
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
@@ -77,7 +77,7 @@
 
         let app, auth, db;
         try {
-            if (firebaseConfig.apiKey !== "HIERd_API_KEY") {
+            if (firebaseConfig.apiKey !== "HIER_API_KEY") {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
@@ -102,41 +102,6 @@
             { id: 2, name: "Waldlichtung", price: 500 },
         ];
 
-        // --- ERROR BOUNDARY ---
-        class ErrorBoundary extends React.Component {
-            constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-            static getDerivedStateFromError(error) { return { hasError: true, error }; }
-            
-            async handleReset() {
-                // Hard Reset for the room structure
-                if(this.props.roomCode && db) {
-                    if(confirm("Dies setzt die Struktur des Raumes zurück (Geld/Items bleiben erhalten). Fortfahren?")) {
-                        const roomRef = doc(db, 'rooms', this.props.roomCode);
-                        await setDoc(roomRef, {
-                            gardens: { 0: {} }, unlockedGardens: [0], inventory: {}, tasks: []
-                        }, { merge: true });
-                        window.location.reload();
-                    }
-                } else { window.location.reload(); }
-            }
-
-            render() {
-                if (this.state.hasError) {
-                    return (
-                        <div className="h-screen w-full flex flex-col items-center justify-center bg-red-50 p-6 text-center">
-                            <h1 className="text-2xl font-bold text-red-600 mb-2">Ups, ein Fehler! 🥀</h1>
-                            <p className="text-gray-600 mb-6 text-sm font-mono bg-white p-2 rounded border border-red-200">{this.state.error?.message || "Unbekannter Fehler"}</p>
-                            <button onClick={() => this.handleReset()} className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-red-600 transition-colors">
-                                Garten Notfall-Reparatur 🛠️
-                            </button>
-                            <button onClick={() => window.location.reload()} className="mt-4 text-gray-500 text-sm underline">Seite neu laden</button>
-                        </div>
-                    );
-                }
-                return this.props.children; 
-            }
-        }
-
         // --- COMPONENTS ---
 
         const Modal = ({ children, onClose, title }) => (
@@ -151,6 +116,42 @@
             </div>
         );
 
+        // --- INSTALLATION HELP MODAL ---
+        const InstallHelpModal = ({ onClose }) => {
+            const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+            
+            return (
+                <Modal title="Als App installieren" onClose={onClose}>
+                    <div className="space-y-4 text-center">
+                        <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-green-600 mb-2">
+                            <i data-lucide="download" size={32}></i>
+                        </div>
+                        
+                        {isIOS ? (
+                            <>
+                                <p className="text-gray-600">Installiere DuoBloom auf deinem iPhone/iPad für den Vollbild-Modus:</p>
+                                <ol className="text-left bg-gray-50 p-4 rounded-xl space-y-2 text-sm text-gray-700 border border-gray-200">
+                                    <li className="flex items-center gap-2">1. Tippe unten auf <strong className="text-blue-500 flex items-center gap-1">Teilen <i data-lucide="share" size={14}/></strong></li>
+                                    <li className="flex items-center gap-2">2. Scrolle runter zu <strong>"Zum Home-Bildschirm"</strong></li>
+                                    <li className="flex items-center gap-2">3. Tippe oben rechts auf <strong>"Hinzufügen"</strong></li>
+                                </ol>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-gray-600">So installierst du die App manuell:</p>
+                                <p className="text-gray-600">(kann sich bei jedem Browser unterscheiden)</p>
+                                <ol className="text-left bg-gray-50 p-4 rounded-xl space-y-2 text-sm text-gray-700 border border-gray-200">
+                                    <li className="flex items-center gap-2">1. Tippe auf das <strong>Browser-Menü</strong> (drei Punkte)</li>
+                                    <li className="flex items-center gap-2">2. Wähle <strong>"Web-App installieren"</strong></li>
+                                </ol>
+                            </>
+                        )}
+                        <button onClick={onClose} className="w-full bg-gray-200 text-gray-700 font-bold py-3 rounded-xl mt-4">Verstanden</button>
+                    </div>
+                </Modal>
+            );
+        };
+
         // --- MAIN MENU ---
         const MainMenu = ({ user, onAction, currentRoom }) => {
             const [joinCode, setJoinCode] = React.useState("");
@@ -158,11 +159,18 @@
             const [newGardenName, setNewGardenName] = React.useState("");
             const [isBusy, setIsBusy] = React.useState(false);
             
+            // Installation State
             const [installPrompt, setInstallPrompt] = React.useState(null);
+            const [showInstallHelp, setShowInstallHelp] = React.useState(false);
 
             React.useEffect(() => { 
                 lucide.createIcons();
-                window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
+                
+                // PWA Install Event Listener
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    setInstallPrompt(e);
+                });
             }, []);
 
             const handleCreate = async () => {
@@ -176,9 +184,13 @@
             const handleInstallClick = () => {
                 if (installPrompt) {
                     installPrompt.prompt();
-                    installPrompt.userChoice.then((res) => { if (res.outcome === 'accepted') setInstallPrompt(null); });
+                    installPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            setInstallPrompt(null);
+                        }
+                    });
                 } else {
-                    alert("Installiere diese Seite über dein Browser-Menü: 'Zum Startbildschirm hinzufügen' (Android) oder 'Teilen' > 'Zum Home-Bildschirm' (iOS).");
+                    setShowInstallHelp(true);
                 }
             };
 
@@ -193,12 +205,13 @@
                             </div>
                             <button onClick={() => auth.signOut()} className="ml-auto md:ml-0 md:mt-auto text-red-500 font-bold bg-red-50 p-2 rounded-lg"><i data-lucide="log-out"></i></button>
                         </div>
+                        
                         <div className="hidden md:flex flex-col w-full space-y-2 mt-8">
                             <button onClick={() => onAction('community')} className="w-full bg-purple-50 border border-purple-200 p-3 rounded-xl text-purple-700 font-bold flex items-center justify-center gap-2 hover:bg-purple-100 transition-colors">
                                 <i data-lucide="globe"></i> Community
                             </button>
                             <button onClick={handleInstallClick} className="w-full bg-green-50 border border-green-200 p-3 rounded-xl text-green-700 font-bold flex items-center justify-center gap-2 hover:bg-green-100 transition-colors">
-                                <i data-lucide="plus-square"></i> App installieren
+                                <i data-lucide="download"></i> App installieren
                             </button>
                         </div>
                     </div>
@@ -237,12 +250,12 @@
                                 </div>
                             </div>
 
+                            {/* Mobile Buttons */}
                             <button onClick={() => onAction('community')} className="md:hidden bg-purple-50 border border-purple-200 p-4 rounded-2xl text-purple-700 font-bold flex items-center justify-center gap-2 hover:bg-purple-100 flex-shrink-0">
                                 <i data-lucide="globe"></i> Community
                             </button>
-                            
                             <button onClick={handleInstallClick} className="md:hidden bg-green-50 border border-green-200 p-4 rounded-2xl text-green-700 font-bold flex items-center justify-center gap-2 hover:bg-green-100 flex-shrink-0">
-                                <i data-lucide="plus-square"></i> App installieren
+                                <i data-lucide="download"></i> App installieren
                             </button>
                         </div>
                     </div>
@@ -257,6 +270,8 @@
                             </div>
                         </Modal>
                     )}
+
+                    {showInstallHelp && <InstallHelpModal onClose={() => setShowInstallHelp(false)} />}
                 </div>
             );
         };
@@ -267,12 +282,14 @@
             const [tab, setTab] = React.useState('garden');
             const [activeGardenIdx, setActiveGardenIdx] = React.useState(0);
             const [selectedItem, setSelectedItem] = React.useState(null);
+            
             const [isTaskModalOpen, setTaskModalOpen] = React.useState(false);
             const [taskFilter, setTaskFilter] = React.useState('active'); 
             const [newTaskTitle, setNewTaskTitle] = React.useState("");
             const [newTaskReward, setNewTaskReward] = React.useState(15);
             const [newTaskType, setNewTaskType] = React.useState("once");
             const [newTaskDeadline, setNewTaskDeadline] = React.useState("");
+            
             const [now, setNow] = React.useState(Date.now());
             const [hasLiked, setHasLiked] = React.useState(false);
 
@@ -280,54 +297,45 @@
                 if(!roomCode) return;
                 const unsub = onSnapshot(doc(db, 'rooms', roomCode), (snap) => {
                     if (snap.exists()) {
-                        let data = snap.data();
+                        const data = snap.data();
                         
-                        // --- SAFETY REPAIR ---
-                        // Ensure critical arrays/objects exist to prevent crashes
-                        if(!Array.isArray(data.tasks)) data.tasks = [];
-                        if(!data.inventory || typeof data.inventory !== 'object') data.inventory = {};
-                        if(!data.gardens || typeof data.gardens !== 'object') data.gardens = { 0: {} };
-                        if(!Array.isArray(data.unlockedGardens)) data.unlockedGardens = [0];
-
                         const todayStr = new Date().toISOString().split('T')[0];
-                        
-                        if (!isSpectator) {
-                            // Filter valid tasks safely
-                            const validTasks = data.tasks.filter(t => {
-                                if(!t || typeof t !== 'object') return false; // Filter corrupt items
-                                if (t.type === 'once' && t.deadline && !t.done && t.deadline < todayStr) return false;
-                                return true;
-                            });
-                            
-                            // Only update if changes found
-                            if (validTasks.length !== data.tasks.length) {
-                                updateDoc(doc(db, 'rooms', roomCode), { tasks: validTasks });
+                        let needsUpdate = false;
+                        const validTasks = (data.tasks || []).filter(t => {
+                            if (t.type === 'once' && t.deadline && !t.done && t.deadline < todayStr) {
+                                needsUpdate = true; 
+                                return false; 
                             }
-                            if (data.lastDailyReset !== todayStr) {
-                                updateDoc(doc(db, 'rooms', roomCode), { lastDailyReset: todayStr });
-                            }
+                            return true;
+                        });
+
+                        if (needsUpdate && !isSpectator) {
+                             updateDoc(doc(db, 'rooms', roomCode), { tasks: validTasks });
                         }
+                        
+                        if (data.lastDailyReset !== todayStr) {
+                             if (!isSpectator) updateDoc(doc(db, 'rooms', roomCode), { lastDailyReset: todayStr });
+                        }
+
                         setRoomData(data);
                     } else if (isSpectator) {
                         alert("Garten existiert nicht mehr");
                         onBackToMenu();
                     }
-                }, (error) => {
-                    console.error("Firestore Error:", error);
-                    // Handle Permission Denied or other sync errors gently
                 });
                 if (localStorage.getItem(`liked_${roomCode}`)) setHasLiked(true);
                 return () => unsub();
             }, [roomCode, isSpectator]);
 
-            React.useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-            React.useEffect(() => { const t = setTimeout(() => { try { lucide.createIcons(); } catch(e) {} }, 100); return () => clearTimeout(t); }, [roomData, tab, taskFilter]);
+            React.useEffect(() => {
+                const timer = setInterval(() => setNow(Date.now()), 1000);
+                return () => clearInterval(timer);
+            }, []);
 
-            // Robust Accessors
-            const getGardens = () => roomData?.gardens || { 0: {} };
-            const getCurrentGrid = () => (getGardens()[activeGardenIdx] || {});
-            const getInventory = () => roomData?.inventory || {};
-            const getTasks = () => Array.isArray(roomData?.tasks) ? roomData.tasks : [];
+            React.useEffect(() => { 
+                const timer = setTimeout(() => { try { lucide.createIcons(); } catch(e) {} }, 100);
+                return () => clearTimeout(timer);
+            }, [roomData, tab, taskFilter]);
 
             const handleLike = async () => {
                 if(hasLiked || !isSpectator) return;
@@ -338,13 +346,15 @@
 
             const handleGridClick = async (key) => {
                 if (isSpectator || !roomData) return;
-                const cell = getCurrentGrid()[key] || {};
+
+                const currentGrid = roomData.gardens[activeGardenIdx] || {};
+                const cell = currentGrid[key] || {}; 
                 const roomRef = doc(db, 'rooms', roomCode);
                 const path = `gardens.${activeGardenIdx}.${key}`;
 
                 if (selectedItem) {
                     const itemDef = ITEMS[selectedItem];
-                    const invCount = getInventory()[selectedItem] || 0;
+                    const invCount = roomData.inventory[selectedItem] || 0;
                     if (invCount > 0) {
                         if (itemDef.type === 'floor') {
                             if (cell.item) return alert("Boden kann nicht auf Pflanze gebaut werden! Erst entfernen.");
@@ -360,7 +370,6 @@
 
                 if (cell.item) {
                     const itemDef = ITEMS[cell.item];
-                    if(!itemDef) return; 
                     if (cell.grown) {
                          await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) });
                     } else if (itemDef.type === 'seed') {
@@ -375,7 +384,10 @@
 
             const createTask = async () => {
                 if (!newTaskTitle.trim()) return;
-                const task = { id: Date.now().toString(), title: newTaskTitle, reward: parseInt(newTaskReward), type: newTaskType, deadline: newTaskDeadline || null, done: false, lastDone: null, completedBy: null, completedAt: null };
+                const task = {
+                    id: Date.now().toString(), title: newTaskTitle, reward: parseInt(newTaskReward), type: newTaskType,
+                    deadline: newTaskDeadline || null, done: false, lastDone: null, completedBy: null, completedAt: null
+                };
                 await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayUnion(task) });
                 setTaskModalOpen(false); setNewTaskTitle(""); setNewTaskDeadline(""); setNewTaskReward(15);
             };
@@ -384,14 +396,18 @@
                 if (isSpectator) return;
                 const today = new Date().toISOString().split('T')[0];
                 const nowStr = new Date().toLocaleString('de-DE');
-                const updatedTasks = getTasks().map(t => {
+                
+                const updatedTasks = roomData.tasks.map(t => {
                     if (t.id === task.id) {
-                        return t.type === 'daily' 
-                            ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr }
-                            : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr };
+                        if (t.type === 'daily') {
+                            return { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr };
+                        } else {
+                            return { ...t, done: true, completedBy: user.displayName, completedAt: nowStr };
+                        }
                     }
                     return t;
                 });
+
                 await updateDoc(doc(db, 'rooms', roomCode), { tasks: updatedTasks, coins: increment(task.reward) });
             };
 
@@ -417,16 +433,25 @@
 
             return (
                 <div className={`flex h-full bg-slate-100 overflow-hidden md:max-w-7xl md:mx-auto md:my-8 md:rounded-3xl md:shadow-2xl md:border ${isSpectator ? 'border-purple-300 ring-4 ring-purple-100' : 'border-slate-200'}`}>
+                    
                     <nav className="fixed bottom-0 left-0 w-full bg-white border-t z-40 flex justify-around p-2 pb-safe md:relative md:w-64 md:flex-col md:justify-start md:border-t-0 md:border-r md:p-6 md:gap-4">
                         <div className="hidden md:block mb-8">
                             <h1 className="text-2xl font-bold text-green-600 flex items-center gap-2"><i data-lucide="sprout"></i> DuoBloom</h1>
                             {isSpectator && <div className="bg-purple-100 text-purple-600 text-xs px-2 py-1 rounded mt-2 font-bold uppercase text-center">Zuschauer Modus</div>}
                         </div>
-                        <button onClick={() => setTab('garden')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'garden' ? 'bg-green-50 text-green-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><i data-lucide="flower-2"></i> <span className="text-[10px] md:text-sm">Garten</span></button>
+                        
+                        <button onClick={() => setTab('garden')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'garden' ? 'bg-green-50 text-green-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}>
+                            <i data-lucide="flower-2"></i> <span className="text-[10px] md:text-sm">Garten</span>
+                        </button>
+                        
                         {!isSpectator && (
                             <>
-                            <button onClick={() => setTab('tasks')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'tasks' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><i data-lucide="check-square"></i> <span className="text-[10px] md:text-sm">Aufgaben</span></button>
-                            <button onClick={() => setTab('shop')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'shop' ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><i data-lucide="shopping-cart"></i> <span className="text-[10px] md:text-sm">Shop</span></button>
+                            <button onClick={() => setTab('tasks')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'tasks' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}>
+                                <i data-lucide="check-square"></i> <span className="text-[10px] md:text-sm">Aufgaben</span>
+                            </button>
+                            <button onClick={() => setTab('shop')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'shop' ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}>
+                                <i data-lucide="shopping-cart"></i> <span className="text-[10px] md:text-sm">Shop</span>
+                            </button>
                             </>
                         )}
                     </nav>
@@ -434,17 +459,33 @@
                     <main className="flex-1 overflow-y-auto bg-[#eefcf3] relative pb-28 md:pb-0">
                         <header className={`sticky top-0 backdrop-blur-md p-4 shadow-sm z-30 flex justify-between items-center px-6 ${isSpectator ? 'bg-purple-50/90' : 'bg-white/90'}`}>
                             <div className="flex items-center gap-4">
-                                <button onClick={onBackToMenu} className="bg-white border p-2 rounded-xl hover:bg-gray-100 shadow-sm" title="Zurück"><i data-lucide="home" className="text-gray-600"></i></button>
+                                <button onClick={onBackToMenu} className="bg-white border p-2 rounded-xl hover:bg-gray-100 shadow-sm" title="Zurück zum Menü">
+                                    <i data-lucide="home" className="text-gray-600"></i>
+                                </button>
                                 <div className="flex flex-col">
                                     <span className="font-bold text-gray-700 truncate max-w-[150px] md:max-w-none text-lg">{roomData.roomName}</span>
-                                    <span className="text-[10px] text-gray-400 font-mono">{isSpectator ? `Besuche: ${roomCode}` : `Code: ${roomCode}`}</span>
+                                    <span className="text-[10px] text-gray-400 font-mono">
+                                        {isSpectator ? `Besuche: ${roomCode}` : `Code: ${roomCode}`}
+                                    </span>
                                 </div>
                             </div>
+                            
                             <div className="flex gap-4 ml-auto items-center">
                                 {isSpectator ? (
-                                    <button onClick={handleLike} className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold transition-all ${hasLiked ? 'bg-red-100 text-red-500' : 'bg-white border hover:bg-red-50 text-gray-500'}`}><i data-lucide="heart" className={hasLiked ? "fill-red-500" : ""}></i> {roomData.likes || 0}</button>
+                                    <button onClick={handleLike} className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold transition-all ${hasLiked ? 'bg-red-100 text-red-500' : 'bg-white border hover:bg-red-50 text-gray-500'}`}>
+                                        <i data-lucide="heart" className={hasLiked ? "fill-red-500" : ""}></i> {roomData.likes || 0}
+                                    </button>
                                 ) : (
-                                    <div className="flex flex-col items-end"><span className="font-bold text-yellow-600 text-lg flex items-center gap-1">💰 {roomData.coins}</span><span className="font-bold text-purple-600 text-lg flex items-center gap-1">💎 {roomData.gems}</span></div>
+                                    <>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-xs text-gray-400 font-bold uppercase">Münzen</span>
+                                        <span className="font-bold text-yellow-600 text-lg flex items-center gap-1">💰 {roomData.coins}</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-xs text-gray-400 font-bold uppercase">Gems</span>
+                                        <span className="font-bold text-purple-600 text-lg flex items-center gap-1">💎 {roomData.gems}</span>
+                                    </div>
+                                    </>
                                 )}
                             </div>
                         </header>
@@ -453,30 +494,60 @@
                             <div className="p-4 md:p-8 flex flex-col items-center">
                                 <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">
                                     {GARDEN_UPGRADES.map(g => {
-                                        const owned = (roomData.unlockedGardens || []).includes(g.id);
+                                        const owned = roomData.unlockedGardens?.includes(g.id);
                                         if(!owned) return null;
-                                        return <button key={g.id} onClick={() => setActiveGardenIdx(g.id)} className={`px-4 py-1 rounded-full text-sm font-bold border ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200'}`}>{g.name}</button>
+                                        return (
+                                            <button key={g.id} onClick={() => setActiveGardenIdx(g.id)} 
+                                                className={`px-4 py-1 rounded-full text-sm font-bold border ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200'}`}>
+                                                {g.name}
+                                            </button>
+                                        )
                                     })}
                                 </div>
+
                                 <div className="bg-[#5c4033] p-4 rounded-xl shadow-2xl relative inline-block">
                                     <div className="grid grid-cols-5 gap-0 border-2 border-[#3e2b22]">
                                         {Array.from({ length: 25 }).map((_, i) => {
                                             const key = `${i % 5},${Math.floor(i / 5)}`;
-                                            const cell = getCurrentGrid()[key] || {};
+                                            const cell = (roomData.gardens[activeGardenIdx] || {})[key] || {};
                                             const floorItem = cell.floor ? ITEMS[cell.floor] : null;
                                             const objectItem = cell.item ? ITEMS[cell.item] : null;
-                                            let timeLeft = null, showTimer = false;
+
+                                            let timeLeft = null;
+                                            let showTimer = false;
                                             if (objectItem && objectItem.type === 'seed' && !cell.grown) {
                                                 const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
-                                                if (now - lastWatered < WATER_COOLDOWN) { timeLeft = WATER_COOLDOWN - (now - lastWatered); showTimer = true; }
+                                                const diff = now - lastWatered;
+                                                if (diff < WATER_COOLDOWN) {
+                                                    timeLeft = WATER_COOLDOWN - diff;
+                                                    showTimer = true;
+                                                }
                                             }
+
                                             return (
-                                                <div key={key} onClick={() => handleGridClick(key)} className={`w-14 h-14 md:w-20 md:h-20 relative ${!isSpectator && 'cursor-pointer'} ${floorItem ? floorItem.css : 'bg-[#8fbc8f] border border-black/5'}`}>
+                                                <div key={key} onClick={() => handleGridClick(key)}
+                                                    className={`w-14 h-14 md:w-20 md:h-20 relative ${!isSpectator && 'cursor-pointer'} ${floorItem ? floorItem.css : 'bg-[#8fbc8f] border border-black/5'}`}
+                                                >
                                                     {objectItem && (
                                                         <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
                                                             {cell.grown || objectItem.type === 'deco' 
                                                                 ? <span className="text-3xl md:text-4xl drop-shadow-md">{objectItem.icon}</span>
-                                                                : <div className="flex flex-col items-center relative"><span className="text-xl">{objectItem.icon}</span>{showTimer ? <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">{formatTime(timeLeft)}</div> : !isSpectator && <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>}<div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden"><div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} /></div></div>}
+                                                                : (
+                                                                    <div className="flex flex-col items-center relative">
+                                                                        <span className="text-xl">{objectItem.icon}</span>
+                                                                        {showTimer ? (
+                                                                            <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">
+                                                                                {formatTime(timeLeft)}
+                                                                            </div>
+                                                                        ) : (
+                                                                             !isSpectator && <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>
+                                                                        )}
+                                                                        <div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden">
+                                                                            <div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} />
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            }
                                                         </div>
                                                     )}
                                                     {selectedItem && !objectItem && !floorItem && <div className="absolute inset-0 hover:bg-white/20" />}
@@ -485,15 +556,22 @@
                                         })}
                                     </div>
                                 </div>
+
                                 {!isSpectator && (
                                     <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100">
                                         <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3>
                                         <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                                            {Object.entries(getInventory()).map(([id, count]) => {
+                                            {Object.entries(roomData.inventory).map(([id, count]) => {
                                                 if (count <= 0) return null;
-                                                return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><span className="text-2xl mb-1">{ITEMS[id].icon}</span><span className="text-xs font-bold text-gray-600">{count}x</span></button>
+                                                return (
+                                                    <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)}
+                                                        className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}>
+                                                        <span className="text-2xl mb-1">{ITEMS[id].icon}</span>
+                                                        <span className="text-xs font-bold text-gray-600">{count}x</span>
+                                                    </button>
+                                                )
                                             })}
-                                            {Object.values(getInventory()).every(c => c <= 0) && <div className="text-gray-400 text-sm italic">Leer. Geh zum Shop!</div>}
+                                            {Object.values(roomData.inventory).every(c => c <= 0) && <div className="text-gray-400 text-sm italic">Leer. Geh zum Shop!</div>}
                                         </div>
                                     </div>
                                 )}
@@ -502,24 +580,55 @@
 
                         {tab === 'tasks' && !isSpectator && (
                             <div className="p-6 md:max-w-3xl md:mx-auto">
-                                <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-700">Aufgaben</h2><button onClick={() => setTaskModalOpen(true)} className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><i data-lucide="plus"></i> Neu</button></div>
-                                <div className="flex gap-2 mb-4 bg-white p-1 rounded-xl w-fit border border-gray-200"><button onClick={() => setTaskFilter('active')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${taskFilter === 'active' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>Offen</button><button onClick={() => setTaskFilter('done')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${taskFilter === 'done' ? 'bg-green-100 text-green-600' : 'text-gray-400 hover:text-gray-600'}`}>Erledigt</button></div>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-bold text-gray-700">Aufgaben</h2>
+                                    <button onClick={() => setTaskModalOpen(true)} className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><i data-lucide="plus"></i> Neu</button>
+                                </div>
+                                
+                                <div className="flex gap-2 mb-4 bg-white p-1 rounded-xl w-fit border border-gray-200">
+                                    <button onClick={() => setTaskFilter('active')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${taskFilter === 'active' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>Offen</button>
+                                    <button onClick={() => setTaskFilter('done')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${taskFilter === 'done' ? 'bg-green-100 text-green-600' : 'text-gray-400 hover:text-gray-600'}`}>Erledigt</button>
+                                </div>
+
                                 <div className="space-y-3 pb-12">
-                                    {getTasks().filter(task => {
+                                    {roomData.tasks.filter(task => {
                                         const today = new Date().toISOString().split('T')[0];
                                         const isDoneToday = task.type === 'daily' && task.lastDone === today;
                                         const isDoneEver = task.type === 'once' && task.done;
-                                        return taskFilter === 'active' ? (!isDoneEver && !isDoneToday) : (isDoneEver || isDoneToday);
+                                        
+                                        if (taskFilter === 'active') return !isDoneEver && !isDoneToday;
+                                        if (taskFilter === 'done') return isDoneEver || isDoneToday;
+                                        return false;
                                     }).map(task => (
                                         <div key={task.id} className={`bg-white p-5 rounded-2xl shadow-sm border ${taskFilter === 'done' ? 'border-green-100 opacity-80' : 'border-gray-100'} flex justify-between items-center`}>
                                             <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-2"><span className={`font-bold text-lg ${taskFilter === 'done' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{task.title}</span>{task.type === 'daily' && <span className="text-blue-500"><i data-lucide="repeat" size={14}></i></span>}</div>
-                                                <div className="flex gap-3 text-xs">{taskFilter === 'done' ? <span className="text-gray-500 flex items-center gap-1"><i data-lucide="check-circle" size={12}></i> {task.completedBy} ({task.completedAt})</span> : <><span className="text-green-600 font-bold">+{task.reward} Münzen</span>{task.deadline && <span className="text-red-400 font-bold flex items-center gap-1"><i data-lucide="calendar" size={10}></i> {task.deadline}</span>}</>}</div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`font-bold text-lg ${taskFilter === 'done' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{task.title}</span>
+                                                    {task.type === 'daily' && <span className="text-blue-500"><i data-lucide="repeat" size={14}></i></span>}
+                                                </div>
+                                                <div className="flex gap-3 text-xs">
+                                                    {taskFilter === 'done' ? (
+                                                        <span className="text-gray-500 flex items-center gap-1">
+                                                            <i data-lucide="check-circle" size={12}></i> {task.completedBy} ({task.completedAt})
+                                                        </span>
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-green-600 font-bold">+{task.reward} Münzen</span>
+                                                            {task.deadline && <span className="text-red-400 font-bold flex items-center gap-1"><i data-lucide="calendar" size={10}></i> {task.deadline}</span>}
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
-                                            {taskFilter === 'active' && <button onClick={() => toggleTask(task)} className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors"><i data-lucide="check" className="text-transparent hover:text-green-500 w-4 h-4"></i></button>}
+                                            {taskFilter === 'active' && (
+                                                <button onClick={() => toggleTask(task)} className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors">
+                                                    <i data-lucide="check" className="text-transparent hover:text-green-500 w-4 h-4"></i>
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
-                                    {getTasks().filter(t => taskFilter === 'active' ? (!t.done || (t.type==='daily' && t.lastDone!==new Date().toISOString().split('T')[0])) : (t.done || (t.type==='daily' && t.lastDone===new Date().toISOString().split('T')[0]))).length === 0 && <div className="text-center py-8 text-gray-400 italic">Keine Aufgaben in dieser Liste.</div>}
+                                    {roomData.tasks.filter(t => taskFilter === 'active' ? (!t.done || (t.type==='daily' && t.lastDone!==new Date().toISOString().split('T')[0])) : (t.done || (t.type==='daily' && t.lastDone===new Date().toISOString().split('T')[0]))).length === 0 && (
+                                        <div className="text-center py-8 text-gray-400 italic">Keine Aufgaben in dieser Liste.</div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -529,14 +638,31 @@
                                 <h3 className="font-bold text-xl text-purple-700 mb-4 flex items-center gap-2"><i data-lucide="castle"></i> Immobilien (Gems)</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
                                     {GARDEN_UPGRADES.filter(g => g.id > 0).map(g => {
-                                        const owned = (roomData.unlockedGardens || []).includes(g.id);
-                                        return <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}><div className="text-3xl mb-2">🏞️</div><div className="font-bold">{g.name}</div><button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>{owned ? 'Gekauft' : `${g.price} 💎`}</button></div>
+                                        const owned = roomData.unlockedGardens?.includes(g.id);
+                                        return (
+                                            <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}>
+                                                <div className="text-3xl mb-2">🏞️</div>
+                                                <div className="font-bold">{g.name}</div>
+                                                <button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} 
+                                                    className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>
+                                                    {owned ? 'Gekauft' : `${g.price} 💎`}
+                                                </button>
+                                            </div>
+                                        )
                                     })}
                                 </div>
+
                                 <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><i data-lucide="store"></i> Markt (Münzen)</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     {Object.values(ITEMS).map(item => (
-                                        <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{item.icon}</div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>
+                                        <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
+                                            <div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{item.icon}</div>
+                                            <h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3>
+                                            <button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price}
+                                                className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>
+                                                {item.price} 💰
+                                            </button>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
@@ -546,13 +672,80 @@
                     {isTaskModalOpen && (
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}>
                             <div className="space-y-4">
-                                <div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div>
-                                <div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div>
-                                <div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400 uppercase">Titel</label>
+                                    <input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" />
+                                </div>
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label>
+                                        <input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" />
+                                    </div>
+                                </div>
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="text-xs font-bold text-gray-400 uppercase">Typ</label>
+                                        <select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1">
+                                            <option value="once">Einmalig</option>
+                                            <option value="daily">Täglich</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="text-xs font-bold text-gray-400 uppercase">Frist</label>
+                                        <input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" />
+                                    </div>
+                                </div>
                                 <button onClick={createTask} className="w-full bg-blue-500 text-white font-bold py-3 rounded-xl mt-2">Erstellen</button>
                             </div>
                         </Modal>
                     )}
+                    
+                    {showInstallHelp && <InstallHelpModal onClose={() => setShowInstallHelp(false)} />}
+                </div>
+            );
+        };
+
+        const CommunityList = ({ onVisit, onBack }) => {
+            const [list, setList] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
+
+            React.useEffect(() => {
+                // FIX: Icons hier laden, weil View gewechselt wurde
+                lucide.createIcons();
+                
+                const fetchG = async () => {
+                    try {
+                        const q = query(collection(db, 'rooms'), limit(50));
+                        const snap = await getDocs(q);
+                        const sorted = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.likes||0) - (a.likes||0));
+                        setList(sorted);
+                    } catch(e) { console.error(e); }
+                    setLoading(false);
+                };
+                fetchG();
+            }, []);
+
+            return (
+                <div className="h-full bg-slate-50 flex flex-col md:max-w-4xl md:mx-auto md:my-8 md:rounded-3xl shadow-xl overflow-hidden">
+                    <div className="p-6 bg-white shadow-sm flex items-center gap-4">
+                        <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><i data-lucide="arrow-left"></i></button>
+                        <h2 className="text-2xl font-bold text-gray-800">Community Gärten</h2>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                        {loading && <div>Lade Liste...</div>}
+                        {list.map(g => (
+                            <div key={g.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow">
+                                <div>
+                                    <div className="font-bold text-lg text-gray-800">{g.roomName || "Unbenannter Garten"}</div>
+                                    <div className="text-sm text-gray-500 flex gap-3">
+                                        <span className="text-red-500 flex items-center gap-1"><i data-lucide="heart" size={12}></i> {g.likes||0}</span>
+                                        <span>Level {g.unlockedGardens?.length || 1}</span>
+                                    </div>
+                                </div>
+                                <button onClick={() => onVisit(g.id)} className="bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-bold hover:bg-purple-200">Besuchen</button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             );
         };
@@ -568,16 +761,29 @@
                 const unsub = onAuthStateChanged(auth, async (u) => {
                     if (u) {
                         setUser(u);
-                        if(view === 'loading') { const userSnap = await getDoc(doc(db, 'users', u.uid)); if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom); setView('menu'); }
-                    } else { setView('login'); }
-                }); return () => unsub();
+                        if(view === 'loading') {
+                            const userSnap = await getDoc(doc(db, 'users', u.uid));
+                            if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom);
+                            setView('menu');
+                        }
+                    } else {
+                        setView('login');
+                    }
+                });
+                return () => unsub();
             }, []);
 
             const handleAction = async (action, code, name) => {
                 if (action === 'resume') setView('game');
                 else if (action === 'create') {
                     const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    await setDoc(doc(db, 'rooms', newCode), { roomName: name, coins: 50, gems: 0, tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0], likes: 0, createdAt: new Date().toISOString(), owner: user.uid });
+                    await setDoc(doc(db, 'rooms', newCode), {
+                        roomName: name,
+                        coins: 50, gems: 0,
+                        tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0],
+                        likes: 0, createdAt: new Date().toISOString(), owner: user.uid
+                    });
+                    
                     setRoomCode(newCode);
                     await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
                     setView('game');
@@ -585,20 +791,26 @@
                     setRoomCode(code);
                     await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
                     setView('game');
-                } else if (action === 'community') setView('community');
+                } else if (action === 'community') {
+                    setView('community');
+                }
             };
 
             if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
-            if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
-            
-            return (
-                <ErrorBoundary roomCode={roomCode}>
-                    {view === 'community' && <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />}
-                    {view === 'spectator' && <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />}
-                    {view === 'menu' && <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />}
-                    {view === 'game' && <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />}
-                </ErrorBoundary>
+
+            if (view === 'login') return (
+                <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center">
+                    <h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1>
+                    <button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's
+                    </button>
+                </div>
             );
+
+            if (view === 'community') return <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />;
+            if (view === 'spectator') return <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />;
+            if (view === 'menu') return <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />;
+            if (view === 'game') return <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />;
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -606,5 +818,4 @@
     </script>
 </body>
 </html>
-
 
