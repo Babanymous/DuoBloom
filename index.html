@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DuoBloom</title>
     
-    <!-- PWA Verknüpfungen -->
+    <!-- PWA -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
     <link rel="apple-touch-icon" href="icon.png">
@@ -18,13 +18,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        body { 
-            height: 100dvh; 
-            width: 100%;
-            touch-action: manipulation; 
-            -webkit-tap-highlight-color: transparent; 
-            overflow: hidden; 
-        }
+        body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
@@ -50,10 +44,9 @@
 
     <div id="root" class="h-full w-full"></div>
 
-    <!-- Service Worker Registrierung -->
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+            navigator.serviceWorker.register('sw.js').catch(console.error);
         }
     </script>
 
@@ -123,75 +116,38 @@
             </div>
         );
 
-        // --- INSTALL PROMPT COMPONENT ---
-        const InstallPrompt = () => {
-            const [deferredPrompt, setDeferredPrompt] = React.useState(null);
-            const [showInstall, setShowInstall] = React.useState(false);
-            const [isIOS, setIsIOS] = React.useState(false);
-
-            React.useEffect(() => {
-                // 1. Check if already installed (Standalone Mode)
-                const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-                if (isStandalone) return; 
-
-                // 2. Check for iOS
-                const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
-                if (ios) {
-                    setIsIOS(true);
-                    setShowInstall(true); // Always show on iOS in browser
-                }
-
-                // 3. Check for Android/Desktop (beforeinstallprompt)
-                const handler = (e) => {
-                    e.preventDefault();
-                    setDeferredPrompt(e);
-                    setShowInstall(true);
-                };
-                window.addEventListener('beforeinstallprompt', handler);
-
-                return () => window.removeEventListener('beforeinstallprompt', handler);
-            }, []);
-
-            const handleInstall = async () => {
-                if (!deferredPrompt) return;
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    setShowInstall(false);
-                }
-                setDeferredPrompt(null);
-            };
-
-            if (!showInstall) return null;
-
+        // --- INSTALLATION HELP MODAL ---
+        const InstallHelpModal = ({ onClose }) => {
+            const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+            
             return (
-                <div className="fixed bottom-0 left-0 w-full bg-white p-6 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-50 animate-pop rounded-t-3xl border-t border-gray-100">
-                    <div className="flex flex-col items-center text-center gap-4 max-w-md mx-auto">
-                        <div className="bg-green-100 p-3 rounded-full text-green-600">
+                <Modal title="Als App installieren" onClose={onClose}>
+                    <div className="space-y-4 text-center">
+                        <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-green-600 mb-2">
                             <i data-lucide="download" size={32}></i>
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-gray-800">DuoBloom als App?</h3>
-                            <p className="text-sm text-gray-500 mt-1">
-                                {isIOS 
-                                    ? "Installiere die App für das beste Erlebnis (Vollbild, kein Browser-Rand)." 
-                                    : "Lade die App herunter für schnellen Zugriff und Vollbild-Modus."}
-                            </p>
                         </div>
                         
                         {isIOS ? (
-                            <div className="bg-gray-50 p-4 rounded-xl text-sm text-gray-600 w-full border border-gray-200">
-                                Tippe unten auf <span className="font-bold text-blue-500">Teilen <i data-lucide="share" size={12} className="inline"/></span> und dann auf <span className="font-bold">"Zum Home-Bildschirm"</span>.
-                                <button onClick={() => setShowInstall(false)} className="mt-3 w-full py-2 text-gray-400 font-bold text-xs">Schließen</button>
-                            </div>
+                            <>
+                                <p className="text-gray-600">Installiere DuoBloom auf deinem iPhone/iPad für den Vollbild-Modus:</p>
+                                <ol className="text-left bg-gray-50 p-4 rounded-xl space-y-2 text-sm text-gray-700 border border-gray-200">
+                                    <li className="flex items-center gap-2">1. Tippe unten auf <strong className="text-blue-500 flex items-center gap-1">Teilen <i data-lucide="share" size={14}/></strong></li>
+                                    <li className="flex items-center gap-2">2. Scrolle runter zu <strong>"Zum Home-Bildschirm"</strong></li>
+                                    <li className="flex items-center gap-2">3. Tippe oben rechts auf <strong>"Hinzufügen"</strong></li>
+                                </ol>
+                            </>
                         ) : (
-                            <div className="flex gap-3 w-full">
-                                <button onClick={() => setShowInstall(false)} className="flex-1 py-3 rounded-xl font-bold text-gray-500 bg-gray-100">Nein</button>
-                                <button onClick={handleInstall} className="flex-1 py-3 rounded-xl font-bold text-white bg-green-500 hover:bg-green-600 shadow-lg">Ja, installieren</button>
-                            </div>
+                            <>
+                                <p className="text-gray-600">So installierst du die App manuell:</p>
+                                <ol className="text-left bg-gray-50 p-4 rounded-xl space-y-2 text-sm text-gray-700 border border-gray-200">
+                                    <li className="flex items-center gap-2">1. Tippe auf das <strong>Browser-Menü</strong> (drei Punkte)</li>
+                                    <li className="flex items-center gap-2">2. Wähle <strong>"App installieren"</strong> oder <strong>"Zum Startbildschirm"</strong></li>
+                                </ol>
+                            </>
                         )}
+                        <button onClick={onClose} className="w-full bg-gray-200 text-gray-700 font-bold py-3 rounded-xl mt-4">Verstanden</button>
                     </div>
-                </div>
+                </Modal>
             );
         };
 
@@ -201,8 +157,20 @@
             const [isCreating, setIsCreating] = React.useState(false);
             const [newGardenName, setNewGardenName] = React.useState("");
             const [isBusy, setIsBusy] = React.useState(false);
+            
+            // Installation State
+            const [installPrompt, setInstallPrompt] = React.useState(null);
+            const [showInstallHelp, setShowInstallHelp] = React.useState(false);
 
-            React.useEffect(() => { lucide.createIcons(); }, []);
+            React.useEffect(() => { 
+                lucide.createIcons();
+                
+                // PWA Install Event Listener
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    setInstallPrompt(e);
+                });
+            }, []);
 
             const handleCreate = async () => {
                 if(!newGardenName.trim()) return alert("Bitte Namen eingeben");
@@ -210,6 +178,19 @@
                 await onAction('create', null, newGardenName);
                 setIsBusy(false);
                 setIsCreating(false);
+            };
+
+            const handleInstallClick = () => {
+                if (installPrompt) {
+                    installPrompt.prompt();
+                    installPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            setInstallPrompt(null);
+                        }
+                    });
+                } else {
+                    setShowInstallHelp(true);
+                }
             };
 
             return (
@@ -223,9 +204,13 @@
                             </div>
                             <button onClick={() => auth.signOut()} className="ml-auto md:ml-0 md:mt-auto text-red-500 font-bold bg-red-50 p-2 rounded-lg"><i data-lucide="log-out"></i></button>
                         </div>
-                        <div className="hidden md:flex w-full space-y-2 mt-8">
+                        
+                        <div className="hidden md:flex flex-col w-full space-y-2 mt-8">
                             <button onClick={() => onAction('community')} className="w-full bg-purple-50 border border-purple-200 p-3 rounded-xl text-purple-700 font-bold flex items-center justify-center gap-2 hover:bg-purple-100 transition-colors">
                                 <i data-lucide="globe"></i> Community
+                            </button>
+                            <button onClick={handleInstallClick} className="w-full bg-green-50 border border-green-200 p-3 rounded-xl text-green-700 font-bold flex items-center justify-center gap-2 hover:bg-green-100 transition-colors">
+                                <i data-lucide="download"></i> App installieren
                             </button>
                         </div>
                     </div>
@@ -263,8 +248,13 @@
                                     <button onClick={() => joinCode && onAction('join', joinCode)} className="bg-blue-500 text-white px-3 rounded-lg font-bold hover:bg-blue-600 transition-colors"><i data-lucide="arrow-right"></i></button>
                                 </div>
                             </div>
+
+                            {/* Mobile Buttons */}
                             <button onClick={() => onAction('community')} className="md:hidden bg-purple-50 border border-purple-200 p-4 rounded-2xl text-purple-700 font-bold flex items-center justify-center gap-2 hover:bg-purple-100 flex-shrink-0">
                                 <i data-lucide="globe"></i> Community
+                            </button>
+                            <button onClick={handleInstallClick} className="md:hidden bg-green-50 border border-green-200 p-4 rounded-2xl text-green-700 font-bold flex items-center justify-center gap-2 hover:bg-green-100 flex-shrink-0">
+                                <i data-lucide="download"></i> App installieren
                             </button>
                         </div>
                     </div>
@@ -279,6 +269,8 @@
                             </div>
                         </Modal>
                     )}
+
+                    {showInstallHelp && <InstallHelpModal onClose={() => setShowInstallHelp(false)} />}
                 </div>
             );
         };
@@ -707,7 +699,7 @@
                         </Modal>
                     )}
                     
-                    <InstallPrompt />
+                    {showInstallHelp && <InstallHelpModal onClose={() => setShowInstallHelp(false)} />}
                 </div>
             );
         };
@@ -735,7 +727,7 @@
             return (
                 <div className="h-full bg-slate-50 flex flex-col md:max-w-4xl md:mx-auto md:my-8 md:rounded-3xl shadow-xl overflow-hidden">
                     <div className="p-6 bg-white shadow-sm flex items-center gap-4">
-                        <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><i data-lucide="home"></i></button>
+                        <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><i data-lucide="arrow-left"></i></button>
                         <h2 className="text-2xl font-bold text-gray-800">Community Gärten</h2>
                     </div>
                     <div className="flex-1 overflow-y-auto p-6 space-y-3">
