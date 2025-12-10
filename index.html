@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 6.4 🌷</title>
+    <title>DuoBloom</title>
+    
+    <!-- PWA Verknüpfungen -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4ade80">
+    <link rel="apple-touch-icon" href="icon.png">
     
     <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -44,6 +49,13 @@
 <body class="bg-slate-50 text-slate-800 font-sans">
 
     <div id="root" class="h-full w-full"></div>
+
+    <!-- Service Worker Registrierung -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
+        }
+    </script>
 
     <script type="text/babel" data-type="module">
         
@@ -111,6 +123,78 @@
             </div>
         );
 
+        // --- INSTALL PROMPT COMPONENT ---
+        const InstallPrompt = () => {
+            const [deferredPrompt, setDeferredPrompt] = React.useState(null);
+            const [showInstall, setShowInstall] = React.useState(false);
+            const [isIOS, setIsIOS] = React.useState(false);
+
+            React.useEffect(() => {
+                // 1. Check if already installed (Standalone Mode)
+                const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+                if (isStandalone) return; 
+
+                // 2. Check for iOS
+                const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+                if (ios) {
+                    setIsIOS(true);
+                    setShowInstall(true); // Always show on iOS in browser
+                }
+
+                // 3. Check for Android/Desktop (beforeinstallprompt)
+                const handler = (e) => {
+                    e.preventDefault();
+                    setDeferredPrompt(e);
+                    setShowInstall(true);
+                };
+                window.addEventListener('beforeinstallprompt', handler);
+
+                return () => window.removeEventListener('beforeinstallprompt', handler);
+            }, []);
+
+            const handleInstall = async () => {
+                if (!deferredPrompt) return;
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    setShowInstall(false);
+                }
+                setDeferredPrompt(null);
+            };
+
+            if (!showInstall) return null;
+
+            return (
+                <div className="fixed bottom-0 left-0 w-full bg-white p-6 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] z-50 animate-pop rounded-t-3xl border-t border-gray-100">
+                    <div className="flex flex-col items-center text-center gap-4 max-w-md mx-auto">
+                        <div className="bg-green-100 p-3 rounded-full text-green-600">
+                            <i data-lucide="download" size={32}></i>
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-gray-800">DuoBloom als App?</h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                                {isIOS 
+                                    ? "Installiere die App für das beste Erlebnis (Vollbild, kein Browser-Rand)." 
+                                    : "Lade die App herunter für schnellen Zugriff und Vollbild-Modus."}
+                            </p>
+                        </div>
+                        
+                        {isIOS ? (
+                            <div className="bg-gray-50 p-4 rounded-xl text-sm text-gray-600 w-full border border-gray-200">
+                                Tippe unten auf <span className="font-bold text-blue-500">Teilen <i data-lucide="share" size={12} className="inline"/></span> und dann auf <span className="font-bold">"Zum Home-Bildschirm"</span>.
+                                <button onClick={() => setShowInstall(false)} className="mt-3 w-full py-2 text-gray-400 font-bold text-xs">Schließen</button>
+                            </div>
+                        ) : (
+                            <div className="flex gap-3 w-full">
+                                <button onClick={() => setShowInstall(false)} className="flex-1 py-3 rounded-xl font-bold text-gray-500 bg-gray-100">Nein</button>
+                                <button onClick={handleInstall} className="flex-1 py-3 rounded-xl font-bold text-white bg-green-500 hover:bg-green-600 shadow-lg">Ja, installieren</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
         // --- MAIN MENU ---
         const MainMenu = ({ user, onAction, currentRoom }) => {
             const [joinCode, setJoinCode] = React.useState("");
@@ -118,7 +202,6 @@
             const [newGardenName, setNewGardenName] = React.useState("");
             const [isBusy, setIsBusy] = React.useState(false);
 
-            // Icons laden beim Start des Menüs
             React.useEffect(() => { lucide.createIcons(); }, []);
 
             const handleCreate = async () => {
@@ -623,6 +706,8 @@
                             </div>
                         </Modal>
                     )}
+                    
+                    <InstallPrompt />
                 </div>
             );
         };
