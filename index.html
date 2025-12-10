@@ -73,7 +73,7 @@
 
         let app, auth, db;
         try {
-            if (firebaseConfig.apiKey !== "HIER_API_KEY") {
+            if (firebaseConfig.apiKey.includes("AIza")) { // Check ob Key da ist
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
@@ -85,7 +85,7 @@
         const ITEMS = {
             carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, icon: '🥕', growsInto: 'carrot', stages: 3, reward: 10 },
             sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 20 },
-            forgetmenot_seed: { id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, icon: '🪻', growsInto: 'forgetmenot', stage: '6', reward: '50'},
+            forgetmenot_seed: { id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, icon: '🪻', growsInto: 'forgetmenot', stages: 6, reward: 50},
             stone_floor: { id: 'stone_floor', name: 'Steinweg', type: 'floor', price: 10, css: 'texture-stone', icon: '🪨' },
             wood_floor: { id: 'wood_floor', name: 'Holzboden', type: 'floor', price: 25, css: 'texture-wood', icon: '🪵' },
             fence: { id: 'fence', name: 'Zaun', type: 'deco', price: 15, icon: '🚧' },
@@ -276,11 +276,14 @@
 
             const handleLike = async () => { if(hasLiked || !isSpectator) return; await updateDoc(doc(db, 'rooms', roomCode), { likes: increment(1) }); localStorage.setItem(`liked_${roomCode}`, 'true'); setHasLiked(true); };
             
+            // --- HIER IST DIE GEWÜNSCHTE ÄNDERUNG ---
             const handleGridClick = async (key) => {
                 if (isSpectator || !roomData) return;
                 const cell = getCurrentGrid()[key] || {};
                 const roomRef = doc(db, 'rooms', roomCode);
                 const path = `gardens.${activeGardenIdx}.${key}`;
+
+                // 1. Wenn ein Werkzeug ausgewählt ist
                 if (selectedItem) {
                     const itemDef = ITEMS[selectedItem];
                     const invCount = getInventory()[selectedItem] || 0;
@@ -292,13 +295,44 @@
                     }
                     return;
                 }
+
+                // 2. Wenn KEIN Werkzeug ausgewählt ist (Interaktion / Entfernen)
+                
+                // Fall A: Ein Item (Pflanze oder Deko) ist auf dem Feld
                 if (cell.item) {
                     const itemDef = ITEMS[cell.item];
                     if(!itemDef) return; 
-                    if (cell.grown) { await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) }); }
+                    
+                    // Pflanze ernten (wenn ausgewachsen)
+                    if (itemDef.type === 'seed' && cell.grown) {
+                         await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) });
+                    } 
+                    // Pflanze gießen (wenn noch nicht fertig)
                     else if (itemDef.type === 'seed') {
                         const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
                         if (now - lastWatered > WATER_COOLDOWN) { const newStage = (cell.stage || 0) + 1; await updateDoc(roomRef, { [`${path}.stage`]: newStage, [`${path}.grown`]: newStage >= itemDef.stages, [`${path}.lastWatered`]: new Date().toISOString() }); }
+                        else { alert("Braucht noch kein Wasser."); }
+                    }
+                    // DEKO ENTFERNEN (NEU)
+                    else if (itemDef.type === 'deco') {
+                        if(confirm(`${itemDef.name} ins Inventar zurück?`)) {
+                            await updateDoc(roomRef, { 
+                                [`${path}.item`]: deleteField(), 
+                                [`inventory.${cell.item}`]: increment(1) 
+                            });
+                        }
+                    }
+                    return; // Stop, damit wir nicht versehentlich den Boden darunter löschen
+                }
+
+                // Fall B: Nur Boden ist auf dem Feld (NEU)
+                if (cell.floor) {
+                    const floorDef = ITEMS[cell.floor];
+                    if(confirm(`${floorDef.name} aufheben?`)) {
+                        await updateDoc(roomRef, { 
+                            [`${path}.floor`]: deleteField(), 
+                            [`inventory.${cell.floor}`]: increment(1) 
+                        });
                     }
                 }
             };
