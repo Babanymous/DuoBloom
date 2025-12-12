@@ -278,11 +278,24 @@
                         
                         const todayStr = new Date().toISOString().split('T')[0];
                         if (!isSpectator) {
+                            
+                            // AUTO-CLEANUP (30 TAGE)
+                            const thirtyDaysAgo = new Date();
+                            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                            
                             const currentTasks = Array.isArray(data.tasks) ? data.tasks : [];
                             const validTasks = currentTasks.filter(t => {
+                                // Alte Deadline Aufgaben löschen (die nicht erledigt wurden)
                                 if (t.type === 'once' && t.deadline && !t.done && t.deadline < todayStr) return false;
+                                
+                                // Erledigte Aufgaben älter als 30 Tage löschen
+                                if (t.done && t.completedAtISO) {
+                                    const completedDate = new Date(t.completedAtISO);
+                                    if (completedDate < thirtyDaysAgo) return false;
+                                }
                                 return true;
                             });
+
                             if (validTasks.length !== currentTasks.length) updateDoc(doc(db, 'rooms', roomCode), { tasks: validTasks });
                             if (data.lastDailyReset !== todayStr) updateDoc(doc(db, 'rooms', roomCode), { lastDailyReset: todayStr });
                         }
@@ -308,6 +321,7 @@
                 const cell = getCurrentGrid()[key] || {};
                 const roomRef = doc(db, 'rooms', roomCode);
                 const path = `gardens.${activeGardenIdx}.${key}`;
+
                 if (selectedItem) {
                     const itemDef = ITEMS[selectedItem];
                     const invCount = getInventory()[selectedItem] || 0;
@@ -319,6 +333,7 @@
                     }
                     return;
                 }
+
                 if (cell.item) {
                     const itemDef = ITEMS[cell.item];
                     if(!itemDef) return; 
@@ -337,21 +352,22 @@
                 }
             };
 
-            const createTask = async () => { if (!newTaskTitle.trim()) return; const task = { id: Date.now().toString(), title: newTaskTitle, reward: parseInt(newTaskReward), type: newTaskType, deadline: newTaskDeadline || null, done: false, lastDone: null, completedBy: null, completedAt: null }; await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayUnion(task) }); setTaskModalOpen(false); setNewTaskTitle(""); };
+            const createTask = async () => { if (!newTaskTitle.trim()) return; const task = { id: Date.now().toString(), title: newTaskTitle, reward: parseInt(newTaskReward), type: newTaskType, deadline: newTaskDeadline || null, done: false, lastDone: null, completedBy: null, completedAt: null, completedAtISO: null }; await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayUnion(task) }); setTaskModalOpen(false); setNewTaskTitle(""); };
             
             const toggleTask = async (task) => {
                 if (isSpectator) return;
                 const today = new Date().toISOString().split('T')[0];
                 const nowStr = new Date().toLocaleString('de-DE');
+                const nowISO = new Date().toISOString(); // WICHTIG für Cleanup
                 
-                // STREAK LOGIC INTEGRATION
+                // STREAK LOGIC
                 const anyTaskDoneToday = getTasks().some(t => 
                     (t.type === 'daily' && t.lastDone === today) || 
                     (t.type === 'once' && t.done && t.completedAt?.startsWith(new Date().toLocaleDateString('de-DE')))
                 );
 
                 const updatedTasks = getTasks().map(t => {
-                    if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr }; }
+                    if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; }
                     return t;
                 });
                 
@@ -361,19 +377,20 @@
                     const lastStreakDate = roomData.lastStreakDate;
                     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
                     let newStreak = roomData.currentStreak || 0;
-
-                    if (lastStreakDate === yesterday) {
-                        newStreak++; 
-                    } else if (lastStreakDate !== today) {
-                        newStreak = 1; 
-                    }
-                    
+                    if (lastStreakDate === yesterday) { newStreak++; } else if (lastStreakDate !== today) { newStreak = 1; }
                     updates.currentStreak = newStreak;
                     updates.lastStreakDate = today;
                 }
 
                 await updateDoc(doc(db, 'rooms', roomCode), updates);
             };
+
+            // NEW: DELETE TASK FUNCTION
+            const deleteTask = async (taskToDelete) => {
+                if(!confirm("Aufgabe wirklich löschen?")) return;
+                const newTasks = getTasks().filter(t => t.id !== taskToDelete.id);
+                await updateDoc(doc(db, 'rooms', roomCode), { tasks: newTasks });
+            }
 
             const buy = async (id, isGarden) => {
                 if (isSpectator) return;
@@ -411,7 +428,18 @@
                                 <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-700">Aufgaben</h2><button onClick={() => setTaskModalOpen(true)} className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><i data-lucide="plus"></i> Neu</button></div>
                                 <div className="flex gap-2 mb-4 bg-white p-1 rounded-xl w-fit border border-gray-200"><button onClick={() => setTaskFilter('active')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${taskFilter === 'active' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>Offen</button><button onClick={() => setTaskFilter('done')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${taskFilter === 'done' ? 'bg-green-100 text-green-600' : 'text-gray-400 hover:text-gray-600'}`}>Erledigt</button></div>
                                 <div className="space-y-3 pb-12">
-                                    {getTasks().filter(task => { const today = new Date().toISOString().split('T')[0]; const isDoneToday = task.type === 'daily' && task.lastDone === today; const isDoneEver = task.type === 'once' && task.done; return taskFilter === 'active' ? (!isDoneEver && !isDoneToday) : (isDoneEver || isDoneToday); }).map(task => (<div key={task.id} className={`bg-white p-5 rounded-2xl shadow-sm border ${taskFilter === 'done' ? 'border-green-100 opacity-80' : 'border-gray-100'} flex justify-between items-center`}><div className="flex flex-col gap-1"><div className="flex items-center gap-2"><span className={`font-bold text-lg ${taskFilter === 'done' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{task.title}</span>{task.type === 'daily' && <span className="text-blue-500"><i data-lucide="repeat" size={14}></i></span>}</div><div className="flex gap-3 text-xs">{taskFilter === 'done' ? <span className="text-gray-500 flex items-center gap-1"><i data-lucide="check-circle" size={12}></i> {task.completedBy} ({task.completedAt})</span> : <><span className="text-green-600 font-bold">+{task.reward} Münzen</span>{task.deadline && <span className="text-red-400 font-bold flex items-center gap-1"><i data-lucide="calendar" size={10}></i> {task.deadline}</span>}</>}</div></div>{taskFilter === 'active' && <button onClick={() => toggleTask(task)} className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors"><i data-lucide="check" className="text-transparent hover:text-green-500 w-4 h-4"></i></button>}</div>))}
+                                    {getTasks().filter(task => { const today = new Date().toISOString().split('T')[0]; const isDoneToday = task.type === 'daily' && task.lastDone === today; const isDoneEver = task.type === 'once' && task.done; return taskFilter === 'active' ? (!isDoneEver && !isDoneToday) : (isDoneEver || isDoneToday); }).map(task => (
+                                        <div key={task.id} className={`bg-white p-5 rounded-2xl shadow-sm border ${taskFilter === 'done' ? 'border-green-100 opacity-80' : 'border-gray-100'} flex justify-between items-center`}>
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex items-center gap-2"><span className={`font-bold text-lg ${taskFilter === 'done' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{task.title}</span>{task.type === 'daily' && <span className="text-blue-500"><i data-lucide="repeat" size={14}></i></span>}</div>
+                                                <div className="flex gap-3 text-xs">{taskFilter === 'done' ? <span className="text-gray-500 flex items-center gap-1"><i data-lucide="check-circle" size={12}></i> {task.completedBy} ({task.completedAt})</span> : <><span className="text-green-600 font-bold">+{task.reward} Münzen</span>{task.deadline && <span className="text-red-400 font-bold flex items-center gap-1"><i data-lucide="calendar" size={10}></i> {task.deadline}</span>}</>}</div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => deleteTask(task)} className="w-8 h-8 rounded-full border-2 border-red-100 hover:border-red-500 hover:bg-red-50 flex items-center justify-center transition-colors text-red-300 hover:text-red-500"><i data-lucide="trash-2" size={14}></i></button>
+                                                {taskFilter === 'active' && <button onClick={() => toggleTask(task)} className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors"><i data-lucide="check" className="text-transparent hover:text-green-500 w-4 h-4"></i></button>}
+                                            </div>
+                                        </div>
+                                    ))}
                                     {getTasks().filter(t => taskFilter === 'active' ? (!t.done || (t.type==='daily' && t.lastDone!==new Date().toISOString().split('T')[0])) : (t.done || (t.type==='daily' && t.lastDone===new Date().toISOString().split('T')[0]))).length === 0 && <div className="text-center py-8 text-gray-400 italic">Keine Aufgaben in dieser Liste.</div>}
                                 </div>
                             </div>
@@ -426,73 +454,9 @@
                         )}
                     </main>
                     {isTaskModalOpen && (
-                        <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><button onClick={createTask} className="w-full bg-blue-500 text-white font-bold py-3 rounded-xl mt-2">Erstellen</button></div></Modal>
+                        <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                 </div>
-            );
-        };
-
-        const CommunityList = ({ onVisit, onBack }) => {
-            const [list, setList] = React.useState([]);
-            const [loading, setLoading] = React.useState(true);
-            React.useEffect(() => {
-                const timer = setTimeout(() => { try { lucide.createIcons(); } catch(e) {} }, 100);
-                const fetchG = async () => { try { const q = query(collection(db, 'rooms'), limit(50)); const snap = await getDocs(q); const sorted = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.likes||0) - (a.likes||0)); setList(sorted); } catch(e) { console.error(e); } setLoading(false); }; fetchG();
-                return () => clearTimeout(timer);
-            }, []);
-            React.useEffect(() => { const t = setTimeout(() => { try { lucide.createIcons(); } catch(e) {} }, 100); return () => clearTimeout(t); }, [list]);
-            return (
-                <div className="h-full bg-slate-50 flex flex-col md:max-w-4xl md:mx-auto md:my-8 md:rounded-3xl shadow-xl overflow-hidden">
-                    <div className="p-6 bg-white shadow-sm flex items-center gap-4"><button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><i data-lucide="home"></i></button><h2 className="text-2xl font-bold text-gray-800">Community Gärten</h2></div>
-                    <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                        {loading && <div>Lade Liste...</div>}
-                        {list.map(g => (<div key={g.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow"><div><div className="font-bold text-lg text-gray-800">{g.roomName || "Unbenannter Garten"}</div><div className="text-sm text-gray-500 flex gap-3"><span className="text-red-500 flex items-center gap-1"><i data-lucide="heart" size={12}></i> {g.likes||0}</span><span>Level {g.unlockedGardens?.length || 1}</span></div></div><button onClick={() => onVisit(g.id)} className="bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-bold hover:bg-purple-200">Besuchen</button></div>))}
-                    </div>
-                </div>
-            );
-        };
-
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [view, setView] = React.useState('loading'); 
-            const [roomCode, setRoomCode] = React.useState(null);
-            const [spectateCode, setSpectateCode] = React.useState(null);
-
-            React.useEffect(() => {
-                if(!auth) return;
-                const unsub = onAuthStateChanged(auth, async (u) => {
-                    if (u) {
-                        setUser(u);
-                        if(view === 'loading') { const userSnap = await getDoc(doc(db, 'users', u.uid)); if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom); setView('menu'); }
-                    } else { setView('login'); }
-                }); return () => unsub();
-            }, []);
-
-            const handleAction = async (action, code, name) => {
-                if (action === 'resume') setView('game');
-                else if (action === 'create') {
-                    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    await setDoc(doc(db, 'rooms', newCode), { roomName: name, coins: 50, gems: 0, tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0], likes: 0, createdAt: new Date().toISOString(), owner: user.uid });
-                    setRoomCode(newCode);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
-                    setView('game');
-                } else if (action === 'join') {
-                    setRoomCode(code);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
-                    setView('game');
-                } else if (action === 'community') setView('community');
-            };
-
-            if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
-            if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
-            
-            return (
-                <ErrorBoundary roomCode={roomCode}>
-                    {view === 'community' && <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />}
-                    {view === 'spectator' && <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />}
-                    {view === 'menu' && <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />}
-                    {view === 'game' && <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />}
-                </ErrorBoundary>
             );
         };
 
