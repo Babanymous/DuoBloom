@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom</title>
+    <title>DuoBloom 8.4</title>
     
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
@@ -61,6 +61,9 @@
             getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+        // =================================================================
+        // ⚠️ FÜGE HIER DEINE FIREBASE CONFIG EIN ⚠️
+        // =================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -69,7 +72,8 @@
             messagingSenderId: "118209789780",
             appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
             measurementId: "G-Z0W0LK6D88"
-        };
+          };
+        // =================================================================
 
         let app, auth, db;
         try {
@@ -80,7 +84,6 @@
             }
         } catch (e) { console.error("Firebase Error", e); }
 
-        // --- GLOBAL HELPERS ---
         const safeRefreshIcons = () => {
             if (window.lucide && window.lucide.createIcons) {
                 try { window.lucide.createIcons(); } catch (e) { console.warn(e); }
@@ -105,8 +108,6 @@
             { id: 1, name: "Hinterhof", price: 200 },
             { id: 2, name: "Waldlichtung", price: 650 },
         ];
-
-        // --- COMPONENTS ---
 
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -205,7 +206,7 @@
 
             return (
                 <div className="h-full bg-slate-100 flex flex-col md:flex-row max-w-5xl mx-auto shadow-xl md:rounded-3xl md:my-8 overflow-hidden">
-                    <div className="bg-white p-6 flex flex-col items-center border-b md:border-b-0 md:border-r border-gray-100 shadow-sm z-10 md:w-1/3">
+                    <div className="bg-white p-6 flex flex-col items-center border-b md:border-b-0 md:border-r border-gray-100 shadow-sm z-10 md:w-1/3 flex-shrink-0">
                         <div className="flex items-center gap-4 w-full md:flex-col">
                             <img src={user.photoURL} className="w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-green-500 shadow-lg" />
                             <div className="text-left md:text-center"><h1 className="text-xl md:text-2xl font-bold text-gray-800">{user.displayName}</h1><p className="text-xs text-gray-400">ID: {user.uid.slice(0,5)}</p></div>
@@ -218,12 +219,23 @@
                     </div>
                     <div className="flex-1 bg-[#f8fafc] p-6 flex flex-col gap-6 overflow-y-auto">
                         <h2 className="text-2xl font-bold text-gray-700">Dashboard</h2>
+                        
+                        {/* --- STREAK WIDGET (FIXED RESPONSIVENESS) --- */}
                         {currentRoom && (
-                            <div className="bg-gradient-to-r from-orange-500 to-red-500 p-4 rounded-2xl shadow-lg flex items-center justify-between text-white relative overflow-hidden mb-2">
-                                <div className="z-10"><div className="text-xs font-bold uppercase opacity-90 mb-1">Streak</div><div className="text-4xl font-black flex items-center gap-2">{streak} <span className="text-lg font-normal">Tage</span></div></div>
-                                <div className="text-6xl animate-pulse z-10">🔥</div>
+                            <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-3xl shadow-lg flex items-center justify-between text-white relative overflow-hidden mb-2 flex-shrink-0 min-h-[100px]">
+                                <div className="z-10 relative">
+                                    <div className="text-xs font-bold uppercase tracking-wider opacity-90 mb-1">Dein Streak</div>
+                                    <div className="text-4xl font-black flex items-baseline gap-2">
+                                        {streak} <span className="text-base font-medium opacity-90">Tage</span>
+                                    </div>
+                                    <div className="text-xs font-medium opacity-80 mt-1">Bleib dran! 🔥</div>
+                                </div>
+                                <div className="text-6xl animate-pulse z-10 drop-shadow-md transform translate-x-2">🔥</div>
+                                <div className="absolute -right-4 -bottom-8 bg-white opacity-10 w-32 h-32 rounded-full blur-2xl pointer-events-none"></div>
                             </div>
                         )}
+                        {/* ------------------------------------------- */}
+
                         {currentRoom ? (
                             <button onClick={() => onAction('resume', currentRoom)} className="bg-white border-2 border-green-500 text-green-600 p-6 rounded-2xl shadow-sm hover:bg-green-50 transition-all text-left flex items-center justify-between group flex-shrink-0">
                                 <div><div className="text-green-800 text-sm font-bold uppercase mb-1">Letzte Sitzung</div><div className="text-2xl font-bold">Weitergärtnern</div><div className="text-sm opacity-80 font-mono mt-1">Code: {currentRoom}</div></div>
@@ -246,7 +258,6 @@
             );
         };
 
-        // --- SUB COMPONENTS FOR GAME APP TO AVOID RERENDER LOOPS ---
         const GridCell = ({ x, y, cell, handleGridClick, now }) => {
             const floorItem = cell.floor ? ITEMS[cell.floor] : null;
             const objectItem = cell.item ? ITEMS[cell.item] : null;
@@ -446,88 +457,23 @@
                                             </div>
                                         </div>
                                     ))}
+                                    {getTasks().filter(t => taskFilter === 'active' ? (!t.done || (t.type==='daily' && t.lastDone!==new Date().toISOString().split('T')[0])) : (t.done || (t.type==='daily' && t.lastDone===new Date().toISOString().split('T')[0]))).length === 0 && <div className="text-center py-8 text-gray-400 italic">Keine Aufgaben in dieser Liste.</div>}
                                 </div>
                             </div>
                         )}
                         {tab === 'shop' && !isSpectator && (
                             <div className="p-6 md:max-w-4xl md:mx-auto pb-32">
-                                <h3 className="font-bold text-xl text-purple-700 mb-4 flex items-center gap-2"><i data-lucide="castle"></i> Immobilien</h3>
+                                <h3 className="font-bold text-xl text-purple-700 mb-4 flex items-center gap-2"><i data-lucide="castle"></i> Immobilien (Gems)</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">{GARDEN_UPGRADES.filter(g => g.id > 0).map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); return <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}><div className="text-3xl mb-2">🏞️</div><div className="font-bold">{g.name}</div><button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>{owned ? 'Gekauft' : `${g.price} 💎`}</button></div> })}</div>
-                                <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><i data-lucide="store"></i> Markt</h3>
+                                <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><i data-lucide="store"></i> Markt (Münzen)</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{item.icon}</div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
                             </div>
                         )}
                     </main>
                     {isTaskModalOpen && (
-                        <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}>
-                            <div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div>
-                        </Modal>
+                        <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                 </div>
-            );
-        };
-
-        const CommunityList = ({ onVisit, onBack }) => {
-            const [list, setList] = React.useState([]);
-            const [loading, setLoading] = React.useState(true);
-            React.useEffect(() => {
-                const timer = setTimeout(() => { safeRefreshIcons(); }, 100);
-                const fetchG = async () => { try { const q = query(collection(db, 'rooms'), limit(50)); const snap = await getDocs(q); const sorted = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.likes||0) - (a.likes||0)); setList(sorted); } catch(e) { console.error(e); } setLoading(false); }; fetchG();
-                return () => clearTimeout(timer);
-            }, []);
-            React.useEffect(() => { const t = setTimeout(() => { safeRefreshIcons(); }, 100); return () => clearTimeout(t); }, [list]);
-            return (
-                <div className="h-full bg-slate-50 flex flex-col md:max-w-4xl md:mx-auto md:my-8 md:rounded-3xl shadow-xl overflow-hidden">
-                    <div className="p-6 bg-white shadow-sm flex items-center gap-4"><button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><i data-lucide="home"></i></button><h2 className="text-2xl font-bold text-gray-800">Community Gärten</h2></div>
-                    <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                        {loading && <div>Lade Liste...</div>}
-                        {list.map(g => (<div key={g.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow"><div><div className="font-bold text-lg text-gray-800">{g.roomName || "Unbenannter Garten"}</div><div className="text-sm text-gray-500 flex gap-3"><span className="text-red-500 flex items-center gap-1"><i data-lucide="heart" size={12}></i> {g.likes||0}</span><span>Level {g.unlockedGardens?.length || 1}</span></div></div><button onClick={() => onVisit(g.id)} className="bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-bold hover:bg-purple-200">Besuchen</button></div>))}
-                    </div>
-                </div>
-            );
-        };
-
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [view, setView] = React.useState('loading'); 
-            const [roomCode, setRoomCode] = React.useState(null);
-            const [spectateCode, setSpectateCode] = React.useState(null);
-
-            React.useEffect(() => {
-                if(!auth) return;
-                const unsub = onAuthStateChanged(auth, async (u) => {
-                    if (u) {
-                        setUser(u);
-                        if(view === 'loading') { const userSnap = await getDoc(doc(db, 'users', u.uid)); if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom); setView('menu'); }
-                    } else { setView('login'); }
-                }); return () => unsub();
-            }, []);
-
-            const handleAction = async (action, code, name) => {
-                if (action === 'resume') setView('game');
-                else if (action === 'create') {
-                    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    await setDoc(doc(db, 'rooms', newCode), { roomName: name, coins: 50, gems: 0, tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0], likes: 0, createdAt: new Date().toISOString(), owner: user.uid });
-                    setRoomCode(newCode);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
-                    setView('game');
-                } else if (action === 'join') {
-                    setRoomCode(code);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
-                    setView('game');
-                } else if (action === 'community') setView('community');
-            };
-
-            if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
-            if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
-            
-            return (
-                <ErrorBoundary roomCode={roomCode}>
-                    {view === 'community' && <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />}
-                    {view === 'spectator' && <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />}
-                    {view === 'menu' && <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />}
-                    {view === 'game' && <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />}
-                </ErrorBoundary>
             );
         };
 
