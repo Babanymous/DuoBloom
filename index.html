@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 8.0 🔥</title>
+    <title>DuoBloom</title>
     
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
@@ -38,10 +38,6 @@
         
         .animate-pop { animation: pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes pop { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        
-        /* Feuer Animation */
-        @keyframes burn { 0% { transform: scale(1); filter: brightness(100%); } 50% { transform: scale(1.1); filter: brightness(120%); } 100% { transform: scale(1); filter: brightness(100%); } }
-        .animate-burn { animation: burn 1.5s infinite ease-in-out; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -65,7 +61,6 @@
             getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // ⚠️ FÜGE HIER DEINE FIREBASE CONFIG EIN ⚠️
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -78,7 +73,7 @@
 
         let app, auth, db;
         try {
-            if (firebaseConfig.apiKey !== "HIER_API_KEY_EINFUEGEN") {
+            if (firebaseConfig.apiKey.includes("AIza")) { // Check ob Key da ist
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
@@ -88,8 +83,8 @@
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
 
         const ITEMS = {
-            carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, icon: '🥕', growsInto: 'carrot', stages: 3, reward: 5 },
-            sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 15 },
+            carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, icon: '🥕', growsInto: 'carrot', stages: 3, reward: 10 },
+            sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 20 },
             forgetmenot_seed: { id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, icon: '🪻', growsInto: 'forgetmenot', stages: 6, reward: 50},
             stone_floor: { id: 'stone_floor', name: 'Steinweg', type: 'floor', price: 10, css: 'texture-stone', icon: '🪨' },
             wood_floor: { id: 'wood_floor', name: 'Holzboden', type: 'floor', price: 25, css: 'texture-wood', icon: '🪵' },
@@ -100,8 +95,8 @@
 
         const GARDEN_UPGRADES = [
             { id: 0, name: "Start-Garten", price: 0 },
-            { id: 1, name: "Hinterhof", price: 100 },
-            { id: 2, name: "Waldlichtung", price: 500 },
+            { id: 1, name: "Hinterhof", price: 200 },
+            { id: 2, name: "Waldlichtung", price: 650 },
         ];
 
         class ErrorBoundary extends React.Component {
@@ -153,8 +148,9 @@
                             </ol>
                         ) : (
                             <ol className="text-left bg-gray-50 p-4 rounded-xl space-y-2 text-sm text-gray-700 border border-gray-200">
-                                <li className="flex items-center gap-2">1. Tippe auf das <strong>Browser-Menü</strong></li>
-                                <li className="flex items-center gap-2">2. Wähle <strong>"App installieren"</strong></li>
+                                <li className="flex items-center gap-2">1. Tippe auf das <strong>Browser-Menü</strong> (⋮ / ≡)</li>
+                                <li className="flex items-center gap-2">2. Wähle: </li>
+                                <li className="flex items-center gap-2"><strong>"Web-app installieren"</strong> oder <strong>"Zum Home-Bildschirm"</strong></li>
                             </ol>
                         )}
                         <button onClick={onClose} className="w-full bg-gray-200 text-gray-700 font-bold py-3 rounded-xl mt-4">Verstanden</button>
@@ -170,21 +166,11 @@
             const [isBusy, setIsBusy] = React.useState(false);
             const [installPrompt, setInstallPrompt] = React.useState(null);
             const [showInstallHelp, setShowInstallHelp] = React.useState(false);
-            
-            // Stats for Streak display
-            const [streak, setStreak] = React.useState(0);
-            
+
             React.useEffect(() => { 
                 lucide.createIcons();
                 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
-                
-                // Fetch Streak for Dashboard
-                if(currentRoom) {
-                    getDoc(doc(db, 'rooms', currentRoom)).then(snap => {
-                        if(snap.exists()) setStreak(snap.data().currentStreak || 0);
-                    });
-                }
-            }, [currentRoom]);
+            }, []);
 
             const handleCreate = async () => {
                 if(!newGardenName.trim()) return alert("Bitte Namen eingeben");
@@ -215,27 +201,11 @@
                         </div>
                     </div>
                     <div className="flex-1 bg-[#f8fafc] p-6 flex flex-col gap-6 overflow-y-auto">
-                        <h2 className="text-2xl font-bold text-gray-700">Dein Dashboard</h2>
-                        
-                        {/* STREAK WIDGET (DUOLINGO STYLE) */}
-                        {currentRoom && (
-                            <div className="bg-gradient-to-r from-orange-500 to-red-500 p-4 rounded-2xl shadow-lg flex items-center justify-between text-white relative overflow-hidden group hover:scale-[1.01] transition-transform cursor-default">
-                                <div className="z-10">
-                                    <div className="text-xs font-bold uppercase opacity-90 mb-1">Aktueller Streak</div>
-                                    <div className="text-4xl font-black flex items-center gap-2">
-                                        {streak} <span className="text-lg font-normal">Tage</span>
-                                    </div>
-                                    <div className="text-xs opacity-75 mt-1">Gieße oder erledige Aufgaben!</div>
-                                </div>
-                                <div className="text-7xl animate-burn drop-shadow-lg z-10">🔥</div>
-                                <div className="absolute right-[-20px] top-[-20px] bg-white opacity-10 w-32 h-32 rounded-full"></div>
-                            </div>
-                        )}
-
+                        <h2 className="text-2xl font-bold text-gray-700">Dashboard</h2>
                         {currentRoom ? (
-                            <button onClick={() => onAction('resume', currentRoom)} className="bg-white border-2 border-green-500 text-green-600 p-6 rounded-2xl shadow-sm hover:bg-green-50 transition-all text-left flex items-center justify-between group flex-shrink-0">
-                                <div><div className="text-green-800 text-sm font-bold uppercase mb-1">Letzte Sitzung</div><div className="text-2xl font-bold">Weitergärtnern</div><div className="text-sm opacity-80 font-mono mt-1">Code: {currentRoom}</div></div>
-                                <div className="bg-green-100 p-3 rounded-full"><i data-lucide="play" className="fill-green-600 border-none w-6 h-6"></i></div>
+                            <button onClick={() => onAction('resume', currentRoom)} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-6 rounded-2xl shadow-lg hover:scale-[1.01] transition-all text-left flex items-center justify-between group flex-shrink-0">
+                                <div><div className="text-green-100 text-sm font-bold uppercase mb-1">Letzte Sitzung</div><div className="text-2xl font-bold">Weitergärtnern</div><div className="text-sm opacity-80 font-mono mt-1">Code: {currentRoom}</div></div>
+                                <div className="bg-white/20 p-3 rounded-full"><i data-lucide="play" className="fill-white border-none w-6 h-6"></i></div>
                             </button>
                         ) : <div className="bg-gray-100 p-4 rounded-xl text-center text-gray-500 italic flex-shrink-0">Kein Garten besucht.</div>}
                         <hr className="border-gray-200" />
@@ -247,7 +217,9 @@
                         </div>
                     </div>
                     {isCreating && (
-                        <Modal title="Garten benennen" onClose={() => !isBusy && setIsCreating(false)}><div className="space-y-4"><input autoFocus value={newGardenName} onChange={e => setNewGardenName(e.target.value)} placeholder="Name..." className="w-full border rounded-xl p-3 outline-none" disabled={isBusy} /><button onClick={handleCreate} disabled={isBusy} className={`w-full text-white font-bold py-3 rounded-xl ${isBusy ? 'bg-gray-400' : 'bg-green-500'}`}>{isBusy ? '...' : 'Erstellen'}</button></div></Modal>
+                        <Modal title="Garten benennen" onClose={() => !isBusy && setIsCreating(false)}>
+                            <div className="space-y-4"><input autoFocus value={newGardenName} onChange={e => setNewGardenName(e.target.value)} placeholder="Name..." className="w-full border rounded-xl p-3 outline-none" disabled={isBusy} /><button onClick={handleCreate} disabled={isBusy} className={`w-full text-white font-bold py-3 rounded-xl ${isBusy ? 'bg-gray-400' : 'bg-green-500'}`}>{isBusy ? '...' : 'Erstellen'}</button></div>
+                        </Modal>
                     )}
                     {showInstallHelp && <InstallHelpModal onClose={() => setShowInstallHelp(false)} />}
                 </div>
@@ -277,7 +249,6 @@
                         if(!data.inventory) data.inventory = {};
                         if(!data.gardens) data.gardens = { 0: {} };
                         if(!data.unlockedGardens) data.unlockedGardens = [0];
-                        
                         const todayStr = new Date().toISOString().split('T')[0];
                         if (!isSpectator) {
                             const currentTasks = Array.isArray(data.tasks) ? data.tasks : [];
@@ -305,11 +276,14 @@
 
             const handleLike = async () => { if(hasLiked || !isSpectator) return; await updateDoc(doc(db, 'rooms', roomCode), { likes: increment(1) }); localStorage.setItem(`liked_${roomCode}`, 'true'); setHasLiked(true); };
             
+            // --- HIER IST DIE GEWÜNSCHTE ÄNDERUNG ---
             const handleGridClick = async (key) => {
                 if (isSpectator || !roomData) return;
                 const cell = getCurrentGrid()[key] || {};
                 const roomRef = doc(db, 'rooms', roomCode);
                 const path = `gardens.${activeGardenIdx}.${key}`;
+
+                // 1. Wenn ein Werkzeug ausgewählt ist
                 if (selectedItem) {
                     const itemDef = ITEMS[selectedItem];
                     const invCount = getInventory()[selectedItem] || 0;
@@ -321,21 +295,45 @@
                     }
                     return;
                 }
+
+                // 2. Wenn KEIN Werkzeug ausgewählt ist (Interaktion / Entfernen)
+                
+                // Fall A: Ein Item (Pflanze oder Deko) ist auf dem Feld
                 if (cell.item) {
                     const itemDef = ITEMS[cell.item];
                     if(!itemDef) return; 
-                    if (cell.grown && itemDef.type === 'seed') { await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) }); }
+                    
+                    // Pflanze ernten (wenn ausgewachsen)
+                    if (itemDef.type === 'seed' && cell.grown) {
+                         await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) });
+                    } 
+                    // Pflanze gießen (wenn noch nicht fertig)
                     else if (itemDef.type === 'seed') {
                         const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
                         if (now - lastWatered > WATER_COOLDOWN) { const newStage = (cell.stage || 0) + 1; await updateDoc(roomRef, { [`${path}.stage`]: newStage, [`${path}.grown`]: newStage >= itemDef.stages, [`${path}.lastWatered`]: new Date().toISOString() }); }
-                    } else if (itemDef.type === 'deco') {
-                        if(confirm(`${itemDef.name} ins Inventar?`)) await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`inventory.${cell.item}`]: increment(1) });
+                        else { alert("Braucht noch kein Wasser."); }
                     }
-                    return;
+                    // DEKO ENTFERNEN (NEU)
+                    else if (itemDef.type === 'deco') {
+                        if(confirm(`${itemDef.name} ins Inventar zurück?`)) {
+                            await updateDoc(roomRef, { 
+                                [`${path}.item`]: deleteField(), 
+                                [`inventory.${cell.item}`]: increment(1) 
+                            });
+                        }
+                    }
+                    return; // Stop, damit wir nicht versehentlich den Boden darunter löschen
                 }
+
+                // Fall B: Nur Boden ist auf dem Feld (NEU)
                 if (cell.floor) {
                     const floorDef = ITEMS[cell.floor];
-                    if(confirm(`${floorDef.name} aufheben?`)) await updateDoc(roomRef, { [`${path}.floor`]: deleteField(), [`inventory.${cell.floor}`]: increment(1) });
+                    if(confirm(`${floorDef.name} aufheben?`)) {
+                        await updateDoc(roomRef, { 
+                            [`${path}.floor`]: deleteField(), 
+                            [`inventory.${cell.floor}`]: increment(1) 
+                        });
+                    }
                 }
             };
 
@@ -345,39 +343,11 @@
                 if (isSpectator) return;
                 const today = new Date().toISOString().split('T')[0];
                 const nowStr = new Date().toLocaleString('de-DE');
-                
-                // STREAK LOGIC
-                // Wir checken, ob HEUTE schon was erledigt wurde. Wenn nicht, und wir erledigen jetzt was -> Streak Update
-                const anyTaskDoneToday = getTasks().some(t => 
-                    (t.type === 'daily' && t.lastDone === today) || 
-                    (t.type === 'once' && t.done && t.completedAt?.startsWith(new Date().toLocaleDateString('de-DE')))
-                );
-
                 const updatedTasks = getTasks().map(t => {
                     if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr }; }
                     return t;
                 });
-                
-                const updates = { tasks: updatedTasks, coins: increment(task.reward) };
-
-                if (!anyTaskDoneToday && !task.done) {
-                    // Streak Logik
-                    const lastStreakDate = roomData.lastStreakDate;
-                    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-                    let newStreak = roomData.currentStreak || 0;
-
-                    if (lastStreakDate === yesterday) {
-                        newStreak++; // Streak fortgesetzt
-                    } else if (lastStreakDate !== today) {
-                        newStreak = 1; // Streak neu gestartet (oder war unterbrochen)
-                    }
-                    // Wenn lastStreakDate === today, dann wurde heute schon gezählt (passiert hier durch !anyTaskDoneToday check aber eh nicht)
-                    
-                    updates.currentStreak = newStreak;
-                    updates.lastStreakDate = today;
-                }
-
-                await updateDoc(doc(db, 'rooms', roomCode), updates);
+                await updateDoc(doc(db, 'rooms', roomCode), { tasks: updatedTasks, coins: increment(task.reward) });
             };
 
             const buy = async (id, isGarden) => {
@@ -437,56 +407,74 @@
             );
         };
 
+        const CommunityList = ({ onVisit, onBack }) => {
+            const [list, setList] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
+            React.useEffect(() => {
+                const timer = setTimeout(() => { try { lucide.createIcons(); } catch(e) {} }, 100);
+                const fetchG = async () => { try { const q = query(collection(db, 'rooms'), limit(50)); const snap = await getDocs(q); const sorted = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.likes||0) - (a.likes||0)); setList(sorted); } catch(e) { console.error(e); } setLoading(false); }; fetchG();
+                return () => clearTimeout(timer);
+            }, []);
+            React.useEffect(() => { const t = setTimeout(() => { try { lucide.createIcons(); } catch(e) {} }, 100); return () => clearTimeout(t); }, [list]);
+            return (
+                <div className="h-full bg-slate-50 flex flex-col md:max-w-4xl md:mx-auto md:my-8 md:rounded-3xl shadow-xl overflow-hidden">
+                    <div className="p-6 bg-white shadow-sm flex items-center gap-4"><button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><i data-lucide="home"></i></button><h2 className="text-2xl font-bold text-gray-800">Community Gärten</h2></div>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                        {loading && <div>Lade Liste...</div>}
+                        {list.map(g => (<div key={g.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow"><div><div className="font-bold text-lg text-gray-800">{g.roomName || "Unbenannter Garten"}</div><div className="text-sm text-gray-500 flex gap-3"><span className="text-red-500 flex items-center gap-1"><i data-lucide="heart" size={12}></i> {g.likes||0}</span><span>Level {g.unlockedGardens?.length || 1}</span></div></div><button onClick={() => onVisit(g.id)} className="bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-bold hover:bg-purple-200">Besuchen</button></div>))}
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const [view, setView] = React.useState('loading'); 
+            const [roomCode, setRoomCode] = React.useState(null);
+            const [spectateCode, setSpectateCode] = React.useState(null);
+
+            React.useEffect(() => {
+                if(!auth) return;
+                const unsub = onAuthStateChanged(auth, async (u) => {
+                    if (u) {
+                        setUser(u);
+                        if(view === 'loading') { const userSnap = await getDoc(doc(db, 'users', u.uid)); if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom); setView('menu'); }
+                    } else { setView('login'); }
+                }); return () => unsub();
+            }, []);
+
+            const handleAction = async (action, code, name) => {
+                if (action === 'resume') setView('game');
+                else if (action === 'create') {
+                    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    await setDoc(doc(db, 'rooms', newCode), { roomName: name, coins: 50, gems: 0, tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0], likes: 0, createdAt: new Date().toISOString(), owner: user.uid });
+                    setRoomCode(newCode);
+                    await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
+                    setView('game');
+                } else if (action === 'join') {
+                    setRoomCode(code);
+                    await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
+                    setView('game');
+                } else if (action === 'community') setView('community');
+            };
+
+            if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
+            if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
+            
+            return (
+                <ErrorBoundary roomCode={roomCode}>
+                    {view === 'community' && <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />}
+                    {view === 'spectator' && <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />}
+                    {view === 'menu' && <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />}
+                    {view === 'game' && <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />}
+                </ErrorBoundary>
+            );
+        };
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
 </html>
-
-3. "Scriptable" Script für iOS Widget (Optional)
-Wenn du das echte Widget auf dem iPhone haben willst, lade die App Scriptable aus dem App Store und füge diesen Code dort ein.
-Ersetze DEIN_RAUM_CODE (den aus dem DuoBloom Dashboard) und DEIN_PROJECT_ID (steht in deinem Code oben: duobloom-a9b7b).
-// Widget für Scriptable (iOS)
-const roomId = "DEIN_RAUM_CODE"; // Z.B. "X9Y2Z1"
-const projectId = "duobloom-a9b7b"; // Deine ID
-
-const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rooms/${roomId}`;
-
-let widget = new ListWidget();
-widget.backgroundColor = new Color("#f97316"); // Orange wie die Flamme
-
-// Daten holen
-let req = new Request(url);
-let json = await req.loadJSON();
-
-if (json && json.fields) {
-    const streak = json.fields.currentStreak ? json.fields.currentStreak.integerValue : "0";
-    
-    // UI
-    let stack = widget.addStack();
-    stack.layoutVertically();
-    stack.centerAlignContent();
-
-    let icon = stack.addText("🔥");
-    icon.font = Font.systemFont(40);
-    icon.centerAlignText();
-    
-    stack.addSpacer(4);
-
-    let count = stack.addText(streak + " Tage");
-    count.font = Font.boldSystemFont(20);
-    count.textColor = Color.white();
-    count.centerAlignText();
-    
-    let sub = stack.addText("Streak");
-    sub.font = Font.systemFont(10);
-    sub.textColor = new Color("#ffffff", 0.7);
-    sub.centerAlignText();
-} else {
-    widget.addText("Lade...");
-}
-
-Script.setWidget(widget);
-Script.complete();
 
 
