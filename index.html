@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 15.0</title>
+    <title>DuoBloom 15.1</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -97,7 +97,7 @@
             { id: 2, name: "Waldlichtung", price: 650 },
         ];
 
-        // --- 1. BASIC COMPONENTS (Müssen zuerst kommen) ---
+        // --- 1. BASIC COMPONENTS ---
 
         const Icon = ({ name, size = 24, className = "" }) => {
             const ref = React.useRef(null);
@@ -134,7 +134,7 @@
             return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
         };
 
-        // --- 2. GRID CELL (Formatierung repariert) ---
+        // --- 2. GRID CELL ---
 
         const GridCell = ({ x, y, cell, handleGridClick, now }) => {
             const floorItem = cell.floor ? ITEMS[cell.floor] : null;
@@ -243,7 +243,7 @@
             );
         };
 
-        // --- 5. SCREENS (Müssen nach den Komponenten kommen) ---
+        // --- 5. SCREENS ---
 
         const CommunityList = ({ onVisit, onBack }) => {
             const [list, setList] = React.useState([]);
@@ -274,14 +274,15 @@
             const [showInstallHelp, setShowInstallHelp] = React.useState(false);
             const [streak, setStreak] = React.useState(0);
 
+            // FIX: Verwende onSnapshot für Echtzeit-Updates des Streaks
             React.useEffect(() => { 
                 if(window.lucide) try{window.lucide.createIcons();}catch(e){}
                 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
+                
                 if(currentRoom && db) {
-                    getDoc(doc(db, 'rooms', currentRoom)).then(snap => {
+                    const unsub = onSnapshot(doc(db, 'rooms', currentRoom), (snap) => {
                         if(snap.exists()) {
                             const data = snap.data();
-                            // Lokales Datum verwenden
                             const d = new Date();
                             const year = d.getFullYear();
                             const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -299,7 +300,9 @@
                             if (last !== today && last !== yesterday) s = 0; 
                             setStreak(s);
                         }
-                    }).catch(e => console.log("Streak error", e));
+                    }, (err) => console.log("Streak error", err));
+                    
+                    return () => unsub();
                 }
             }, [currentRoom]);
 
@@ -609,7 +612,8 @@
                 </div>
             );
         };
-                // --- 6. LOGIN & APP CONTROLLER (FEHLTE IM ORIGINAL) ---
+        
+        // --- 6. LOGIN & APP CONTROLLER ---
 
         const LoginScreen = ({ onLogin }) => (
             <div className="h-full flex flex-col items-center justify-center bg-[#f0fdf4] p-6 text-center relative overflow-hidden">
@@ -623,7 +627,7 @@
                     <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
                         <Icon name="log-in" /> Mit Google starten
                     </button>
-                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 15.0 • Multiplayer</p>
+                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 15.1 • Multiplayer</p>
                 </div>
             </div>
         );
@@ -712,5 +716,4 @@
     </script>
 </body>
 </html>
-
 
