@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 15.2</title>
+    <title>DuoBloom 15.3</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -496,41 +496,61 @@
             const toggleTask = async (task) => {
                 if (isSpectator) return;
                 
+                // 1. Datum bestimmen (YYYY-MM-DD)
                 const d = new Date();
                 const year = d.getFullYear();
                 const month = String(d.getMonth() + 1).padStart(2, '0');
                 const day = String(d.getDate()).padStart(2, '0');
                 const today = `${year}-${month}-${day}`;
 
+                // 2. Gestern bestimmen
+                const yesterdayDate = new Date();
+                yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+                const yYear = yesterdayDate.getFullYear();
+                const yMonth = String(yesterdayDate.getMonth() + 1).padStart(2, '0');
+                const yDay = String(yesterdayDate.getDate()).padStart(2, '0');
+                const yesterday = `${yYear}-${yMonth}-${yDay}`;
+
+                // 3. Task Update vorbereiten
                 const nowStr = new Date().toLocaleString('de-DE');
                 const nowISO = new Date().toISOString();
-                
-                const anyTaskDoneToday = getTasks().some(t => 
-                    (t.type === 'daily' && t.lastDone === today) || 
-                    (t.type === 'once' && t.done && t.completedAt?.startsWith(new Date().toLocaleDateString('de-DE')))
-                );
 
-                const updatedTasks = getTasks().map(t => { if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; } return t; });
-                const updates = { tasks: updatedTasks, coins: increment(task.reward) };
+                const updatedTasks = getTasks().map(t => { 
+                    if (t.id === task.id) { 
+                        return t.type === 'daily' 
+                            ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } 
+                            : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; 
+                    } 
+                    return t; 
+                });
+
+                const updates = { 
+                    tasks: updatedTasks, 
+                    coins: increment(task.reward) 
+                };
                 
-                if (!anyTaskDoneToday && !task.done) {
-                    const lastStreakDate = roomData.lastStreakDate;
-                    
-                    d.setDate(d.getDate() - 1);
-                    const yesterdayYear = d.getFullYear();
-                    const yesterdayMonth = String(d.getMonth() + 1).padStart(2, '0');
-                    const yesterdayDay = String(d.getDate()).padStart(2, '0');
-                    const yesterday = `${yesterdayYear}-${yesterdayMonth}-${yesterdayDay}`;
-                    
+                // 4. Streak Logik (Vereinfacht & Robust)
+                // Wir prüfen NUR das lastStreakDate im Raum, nicht die einzelnen Tasks.
+                const lastStreakDate = roomData.lastStreakDate;
+                
+                // Wenn heute noch KEIN Streak-Update war:
+                if (lastStreakDate !== today) {
                     let newStreak = roomData.currentStreak || 0;
-                    
-                    if (lastStreakDate === yesterday) { 
-                        newStreak++; 
-                    } else if (lastStreakDate !== today) { 
-                        newStreak = 1; 
+
+                    if (lastStreakDate === yesterday) {
+                        // Gestern war da -> Streak +1
+                        newStreak += 1;
+                    } else {
+                        // Gestern nicht da (oder neuer Raum) -> Reset auf 1
+                        newStreak = 1;
                     }
-                    updates.currentStreak = newStreak; updates.lastStreakDate = today;
+                    
+                    updates.currentStreak = newStreak;
+                    updates.lastStreakDate = today;
+                    
+                    // Optional: Kleines visuelles Feedback oder Sound hier triggern, wenn möglich
                 }
+                
                 await updateDoc(doc(db, 'rooms', roomCode), updates);
             };
 
@@ -627,7 +647,7 @@
                     <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
                         <Icon name="log-in" /> Mit Google starten
                     </button>
-                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 15.2 • Security Fix</p>
+                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 15.3 • Streak Fix</p>
                 </div>
             </div>
         );
@@ -692,7 +712,6 @@
             };
 
             const enterRoom = (code, spectator) => {
-                // Fix 1: Nur speichern, wenn man KEIN Zuschauer ist
                 if (!spectator) {
                     localStorage.setItem('lastRoom', code);
                 }
@@ -702,7 +721,6 @@
             };
 
             const handleBackToMenu = () => {
-                // Fix 2: Wenn man Zuschauer war, den eigenen Garten wieder laden
                 if (isSpectator) {
                     const myLastRoom = localStorage.getItem('lastRoom');
                     setCurrentRoom(myLastRoom);
