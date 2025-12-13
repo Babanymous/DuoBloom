@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 8.5</title>
+    <title>DuoBloom 9.0</title>
     
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
@@ -15,7 +15,6 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Lucide wird hier geladen, aber wir nutzen es kontrolliert -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
@@ -23,6 +22,7 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
+        /* CSS Texturen für Böden (Falls keine Bilder genutzt werden) */
         .texture-stone {
             background-color: #d1d5db;
             background-image: radial-gradient(circle, #9ca3af 20%, transparent 20%), radial-gradient(circle, #9ca3af 20%, transparent 20%);
@@ -63,7 +63,7 @@
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         // =================================================================
-        // ⚠️ FÜGE HIER WIEDER DEINE CONFIG EIN ⚠️
+        // ⚠️ FÜGE HIER DEINE FIREBASE CONFIG EIN ⚠️
         // =================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
@@ -85,17 +85,57 @@
             }
         } catch (e) { console.error("Firebase Init Error", e); }
 
+        const safeRefreshIcons = () => {
+            if (window.lucide && window.lucide.createIcons) {
+                try { window.lucide.createIcons(); } catch (e) { console.warn(e); }
+            }
+        };
+
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
 
+        // --- HIER SIND DIE BILDER DEFINIERT ---
+        // Du kannst die URL (img: '...') durch deine lokalen Pfade ersetzen (z.B. 'assets/zwerg.png')
         const ITEMS = {
-            carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, img: 'assets/carrot.png', growsInto: 'carrot', stages: 3, reward: 10 },
-            sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, img: 'assets/sunflower.png', growsInto: 'sunflower', stages: 4, reward: 20 },
-            forgetmenot_seed: { id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, img: 'assets/forgetmenot.png', growsInto: 'forgetmenot', stages: 6, reward: 50},
-            stone_floor: { id: 'stone_floor', name: 'Steinweg', type: 'floor', price: 10, css: 'texture-stone', icon: '🪨' },
-            wood_floor: { id: 'wood_floor', name: 'Holzboden', type: 'floor', price: 25, css: 'texture-wood', icon: '🪵' },
-            fence: { id: 'fence', name: 'Zaun', type: 'deco', price: 15, icon: '🚧' },
-            bench: { id: 'bench', name: 'Bank', type: 'deco', price: 150, icon: '🪑' },
-            gnome: { id: 'gnome', name: 'Zwerg', type: 'deco', price: 250, img: 'assets/gnome.png'},
+            carrot_seed: { 
+                id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, 
+                img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Food/Carrot.png',
+                icon: '🥕', growsInto: 'carrot', stages: 3, reward: 10 
+            },
+            sunflower_seed: { 
+                id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, 
+                img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals%20and%20Nature/Sunflower.png',
+                icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 20 
+            },
+            forgetmenot_seed: { 
+                id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, 
+                img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals%20and%20Nature/Hyacinth.png', // Hyazinthe als Ersatz
+                icon: '🪻', growsInto: 'forgetmenot', stages: 6, reward: 50
+            },
+            stone_floor: { 
+                id: 'stone_floor', name: 'Steinweg', type: 'floor', price: 10, 
+                css: 'texture-stone', // Nutzt CSS Textur
+                icon: '🪨' 
+            },
+            wood_floor: { 
+                id: 'wood_floor', name: 'Holzboden', type: 'floor', price: 25, 
+                css: 'texture-wood', // Nutzt CSS Textur
+                icon: '🪵' 
+            },
+            fence: { 
+                id: 'fence', name: 'Zaun', type: 'deco', price: 15, 
+                img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Wood.png', // Platzhalter für Zaun
+                icon: '🚧' 
+            },
+            bench: { 
+                id: 'bench', name: 'Bank', type: 'deco', price: 150, 
+                img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Travel%20and%20places/Chair.png',
+                icon: '🪑' 
+            },
+            gnome: { 
+                id: 'gnome', name: 'Zwerg', type: 'deco', price: 250, 
+                img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/People/Santa%20Claus.png', // Santa als Zwerg-Ersatz
+                icon: '🎅' 
+            },
         };
 
         const GARDEN_UPGRADES = [
@@ -104,10 +144,18 @@
             { id: 2, name: "Waldlichtung", price: 650 },
         ];
 
-        // --- SAFE ICON COMPONENT (PREVENTS WHITESCREEN) ---
+        // --- HELPER COMPONENT FOR IMAGES OR ICONS ---
+        // Dies entscheidet intelligent, ob ein Bild oder Emoji gezeigt wird
+        const ItemDisplay = ({ item, className = "w-10 h-10" }) => {
+            if (!item) return null;
+            if (item.img) {
+                return <img src={item.img} alt={item.name} className={`${className} object-contain drop-shadow-md`} />;
+            }
+            return <span className="text-3xl filter drop-shadow-sm">{item.icon}</span>;
+        };
+
         const Icon = ({ name, size = 24, className = "" }) => {
             const ref = React.useRef(null);
-            
             React.useEffect(() => {
                 if (window.lucide && ref.current) {
                     const i = document.createElement('i');
@@ -115,18 +163,11 @@
                     i.setAttribute('width', size);
                     i.setAttribute('height', size);
                     i.setAttribute('class', className);
-                    
                     ref.current.innerHTML = '';
                     ref.current.appendChild(i);
-                    
-                    window.lucide.createIcons({
-                        root: ref.current,
-                        nameAttr: 'data-lucide',
-                        attrs: { width: size, height: size, class: className }
-                    });
+                    window.lucide.createIcons({ root: ref.current, nameAttr: 'data-lucide', attrs: { width: size, height: size, class: className } });
                 }
             }, [name, size, className]);
-
             return <span ref={ref} style={{ display: 'inline-flex', verticalAlign: 'middle' }} />;
         };
 
@@ -145,10 +186,9 @@
                 if (this.state.hasError) {
                     return (
                         <div className="h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
-                            <h1 className="text-xl font-bold text-red-600">Ein Fehler ist aufgetreten 🥀</h1>
-                            <p className="text-sm text-gray-500 mb-4">Ein Neustart behebt das meistens.</p>
-                            <button onClick={() => window.location.reload()} className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold">Neu laden</button>
-                            <button onClick={() => this.handleReset()} className="mt-4 text-gray-400 underline text-xs">Notfall-Reparatur</button>
+                            <h1 className="text-xl font-bold text-red-600">Fehler aufgetreten 🥀</h1>
+                            <button onClick={() => this.handleReset()} className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold mt-4">Notfall-Reparatur</button>
+                            <button onClick={() => window.location.reload()} className="mt-4 text-gray-400 underline text-xs">Neu laden</button>
                         </div>
                     );
                 }
@@ -176,12 +216,12 @@
                         <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto text-green-600 mb-2"><Icon name="download" size={32} /></div>
                         {isIOS ? (
                             <ol className="text-left bg-gray-50 p-4 rounded-xl space-y-2 text-sm text-gray-700 border border-gray-200">
-                                <li className="flex items-center gap-2">1. Tippe auf <strong className="text-blue-500 flex items-center gap-1">Teilen <Icon name="share" size={14}/></strong></li>
-                                <li className="flex items-center gap-2">2. Wähle <strong>"Zum Home-Bildschirm"</strong></li>
+                                <li className="flex items-center gap-2">1. Tippe unten auf <strong className="text-blue-500 flex items-center gap-1">Teilen <Icon name="share" size={14}/></strong></li>
+                                <li className="flex items-center gap-2">2. Scrolle zu <strong>"Zum Home-Bildschirm"</strong></li>
                             </ol>
                         ) : (
                             <ol className="text-left bg-gray-50 p-4 rounded-xl space-y-2 text-sm text-gray-700 border border-gray-200">
-                                <li className="flex items-center gap-2">1. Tippe auf das <strong>Browser-Menü</strong></li>
+                                <li className="flex items-center gap-2">1. Öffne das <strong>Browser-Menü</strong></li>
                                 <li className="flex items-center gap-2">2. Wähle <strong>"App installieren"</strong></li>
                             </ol>
                         )}
@@ -201,6 +241,7 @@
             const [streak, setStreak] = React.useState(0);
 
             React.useEffect(() => { 
+                safeRefreshIcons();
                 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
                 if(currentRoom && db) {
                     getDoc(doc(db, 'rooms', currentRoom)).then(snap => {
@@ -210,7 +251,7 @@
             }, [currentRoom]);
 
             const handleCreate = async () => {
-                if(!newGardenName.trim()) return alert("Bitte Namen eingeben");
+                if(!newGardenName.trim()) return alert("Name fehlt!");
                 setIsBusy(true);
                 await onAction('create', null, newGardenName);
                 setIsBusy(false); setIsCreating(false);
@@ -243,9 +284,7 @@
                             <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-3xl shadow-lg flex items-center justify-between text-white relative overflow-hidden mb-2 flex-shrink-0 min-h-[100px]">
                                 <div className="z-10 relative">
                                     <div className="text-xs font-bold uppercase tracking-wider opacity-90 mb-1">Dein Streak</div>
-                                    <div className="text-4xl font-black flex items-baseline gap-2">
-                                        {streak} <span className="text-base font-medium opacity-90">Tage</span>
-                                    </div>
+                                    <div className="text-4xl font-black flex items-baseline gap-2">{streak} <span className="text-base font-medium opacity-90">Tage</span></div>
                                     <div className="text-xs font-medium opacity-80 mt-1">Bleib dran! 🔥</div>
                                 </div>
                                 <div className="text-6xl animate-pulse z-10 drop-shadow-md transform translate-x-2">🔥</div>
@@ -297,9 +336,8 @@
                     {objectItem && (
                         <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
                             {cell.grown || objectItem.type === 'deco' 
-                                ? <span className="text-3xl md:text-4xl drop-shadow-md">{objectItem.icon}</span> 
-                                : <div className="flex flex-col items-center relative"><img src={objectItem.img} alt={objectItem.name} className="w-10 h-10 object-contain drop-shadow-sm" />
-{showTimer ? <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">{timeLeftStr}</div> : <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>}<div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden"><div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} /></div></div>}
+                                ? <ItemDisplay item={objectItem} className="w-10 h-10 md:w-16 md:h-16" />
+                                : <div className="flex flex-col items-center relative"><ItemDisplay item={objectItem} className="w-8 h-8 md:w-12 md:h-12" />{showTimer ? <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">{timeLeftStr}</div> : <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>}<div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden"><div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} /></div></div>}
                         </div>
                     )}
                 </div>
@@ -325,7 +363,6 @@
                 const unsub = onSnapshot(doc(db, 'rooms', roomCode), (snap) => {
                     if (snap.exists()) {
                         const data = snap.data();
-                        // Init Defaults safely
                         if(!data.tasks) data.tasks = [];
                         if(!data.inventory) data.inventory = {};
                         if(!data.gardens) data.gardens = { 0: {} };
@@ -333,7 +370,6 @@
                         
                         const todayStr = new Date().toISOString().split('T')[0];
                         if (!isSpectator) {
-                            // CLEANUP TASKS (30 Days)
                             const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
                             const currentTasks = Array.isArray(data.tasks) ? data.tasks : [];
                             const validTasks = currentTasks.filter(t => {
@@ -352,6 +388,7 @@
             }, [roomCode, isSpectator]);
 
             React.useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+            React.useEffect(() => { const t = setTimeout(() => { safeRefreshIcons(); }, 100); return () => clearTimeout(t); }, [roomData, tab, taskFilter]);
 
             const getGardens = () => roomData?.gardens || { 0: {} };
             const getCurrentGrid = () => (getGardens()[activeGardenIdx] || {});
@@ -447,11 +484,13 @@
                             <div className="p-4 md:p-8 flex flex-col items-center">
                                 <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">{GARDEN_UPGRADES.map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); if(!owned) return null; return <button key={g.id} onClick={() => setActiveGardenIdx(g.id)} className={`px-4 py-1 rounded-full text-sm font-bold border ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200'}`}>{g.name}</button> })}</div>
                                 <div className="bg-[#5c4033] p-4 rounded-xl shadow-2xl relative inline-block">
-                                    <div className="grid grid-cols-5 gap-0 border-2 border-[#3e2b22]">{Array.from({ length: 25 }).map((_, i) => (
-                                        <GridCell key={i} x={i%5} y={Math.floor(i/5)} cell={(getGardens()[activeGardenIdx] || {})[`${i%5},${Math.floor(i/5)}`] || {}} handleGridClick={handleGridClick} now={now} />
-                                    ))}</div>
+                                    <div className="grid grid-cols-5 gap-0 border-2 border-[#3e2b22]">
+                                        {Array.from({ length: 25 }).map((_, i) => (
+                                            <GridCell key={i} x={i%5} y={Math.floor(i/5)} cell={(getGardens()[activeGardenIdx] || {})[`${i%5},${Math.floor(i/5)}`] || {}} handleGridClick={handleGridClick} now={now} />
+                                        ))}
+                                    </div>
                                 </div>
-                                {!isSpectator && <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100"><h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3><div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">{Object.entries(getInventory()).map(([id, count]) => { if (count <= 0) return null; return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><span className="text-2xl mb-1">{ITEMS[id].icon}</span><span className="text-xs font-bold text-gray-600">{count}x</span></button> })}</div></div>}
+                                {!isSpectator && <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100"><h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3><div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">{Object.entries(getInventory()).map(([id, count]) => { if (count <= 0) return null; return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><ItemDisplay item={ITEMS[id]} className="w-8 h-8" /><span className="text-xs font-bold text-gray-600">{count}x</span></button> })}</div></div>}
                             </div>
                         )}
                         {tab === 'tasks' && !isSpectator && (
@@ -480,7 +519,7 @@
                                 <h3 className="font-bold text-xl text-purple-700 mb-4 flex items-center gap-2"><Icon name="castle"/> Immobilien (Gems)</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">{GARDEN_UPGRADES.filter(g => g.id > 0).map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); return <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}><div className="text-3xl mb-2">🏞️</div><div className="font-bold">{g.name}</div><button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>{owned ? 'Gekauft' : `${g.price} 💎`}</button></div> })}</div>
                                 <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><Icon name="store"/> Markt (Münzen)</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{item.icon}</div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{item.icon && !item.img && item.icon}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
                             </div>
                         )}
                     </main>
@@ -495,8 +534,11 @@
             const [list, setList] = React.useState([]);
             const [loading, setLoading] = React.useState(true);
             React.useEffect(() => {
+                const timer = setTimeout(() => { safeRefreshIcons(); }, 100);
                 const fetchG = async () => { try { const q = query(collection(db, 'rooms'), limit(50)); const snap = await getDocs(q); const sorted = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.likes||0) - (a.likes||0)); setList(sorted); } catch(e) { console.error(e); } setLoading(false); }; fetchG();
+                return () => clearTimeout(timer);
             }, []);
+            React.useEffect(() => { const t = setTimeout(() => { safeRefreshIcons(); }, 100); return () => clearTimeout(t); }, [list]);
             return (
                 <div className="h-full bg-slate-50 flex flex-col md:max-w-4xl md:mx-auto md:my-8 md:rounded-3xl shadow-xl overflow-hidden">
                     <div className="p-6 bg-white shadow-sm flex items-center gap-4"><button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><Icon name="home" className="text-gray-600"/></button><h2 className="text-2xl font-bold text-gray-800">Community Gärten</h2></div>
@@ -515,7 +557,7 @@
             const [spectateCode, setSpectateCode] = React.useState(null);
 
             React.useEffect(() => {
-                if(!auth) return;
+                if(!auth) { setView('login'); return; }
                 const unsub = onAuthStateChanged(auth, async (u) => {
                     if (u) {
                         setUser(u);
@@ -538,6 +580,12 @@
                     setView('game');
                 } else if (action === 'community') setView('community');
             };
+
+            // Safety timeout
+            React.useEffect(() => {
+                const t = setTimeout(() => { if(view === 'loading') setView('login'); }, 3000);
+                return () => clearTimeout(t);
+            }, [view]);
 
             if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
             if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
