@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom</title>
+    <title>DuoBloom 11.0</title>
     
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
@@ -20,7 +20,6 @@
     <!-- Global Error Handler -->
     <script>
         window.onerror = function(msg, url, line, col, error) {
-            // Zeigt Fehler an, statt White Screen
             if (document.body) {
                 document.body.innerHTML = '<div style="padding:20px; color:red; font-family:sans-serif;"><h2>Kritischer Fehler!</h2><p>' + msg + '</p><p>Zeile: ' + line + '</p><button onclick="location.reload()" style="padding:10px; background:#eee; border:1px solid #ccc;">Neu laden</button></div>';
             }
@@ -71,7 +70,9 @@
             getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // DEINE KONFIGURATION
+        // =================================================================
+        // ⚠️ DEINE CONFIG HIER EINFÜGEN ⚠️
+        // =================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -80,14 +81,17 @@
             messagingSenderId: "118209789780",
             appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
             measurementId: "G-Z0W0LK6D88"
-        };
+          };
+        // =================================================================
 
         let app, auth, db;
         try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) { console.error("Firebase Init Error", e); }
+            if (firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("HIER_API_KEY")) {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+            }
+        } catch (e) { console.error("Init Error", e); }
 
         const safeRefreshIcons = () => {
             if (window.lucide && window.lucide.createIcons) {
@@ -97,7 +101,10 @@
 
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
 
-        // ITEMS MIT BILDERN
+        // --- HIER DAS HINTERGRUNDBILD ÄNDERN ---
+        const GARDEN_BG = "https://img.freepik.com/free-vector/green-meadow-background_1048-2679.jpg"; 
+        // Oder lokal: "assets/wiese.jpg"
+
         const ITEMS = {
             carrot_seed: { 
                 id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, 
@@ -139,7 +146,7 @@
             { id: 2, name: "Waldlichtung", price: 650 },
         ];
 
-        // --- BASIS KOMPONENTEN (Müssen VOR App definiert sein!) ---
+        // --- COMPONENTS ---
 
         const Icon = ({ name, size = 24, className = "" }) => {
             const ref = React.useRef(null);
@@ -161,12 +168,9 @@
         const ItemDisplay = ({ item, className = "" }) => {
             const [hasError, setHasError] = React.useState(false);
             if (!item) return null;
-            
-            // Zeige Bild wenn vorhanden und kein Fehler
             if (item.img && !hasError) {
                 return <img src={item.img} alt={item.name} className={`${className} object-contain drop-shadow-md`} onError={() => setHasError(true)} />;
             }
-            // Sonst Emoji
             return <span className={`flex items-center justify-center ${className} text-2xl`}>{item.icon || "•"}</span>;
         };
 
@@ -232,7 +236,8 @@
             );
         };
 
-        // --- HAUPT MENÜ ---
+        // --- MENUS ---
+
         const MainMenu = ({ user, onAction, currentRoom }) => {
             const [joinCode, setJoinCode] = React.useState("");
             const [isCreating, setIsCreating] = React.useState(false);
@@ -282,7 +287,6 @@
                     <div className="flex-1 bg-[#f8fafc] p-6 flex flex-col gap-6 overflow-y-auto">
                         <h2 className="text-2xl font-bold text-gray-700">Dashboard</h2>
                         
-                        {/* STREAK WIDGET */}
                         {currentRoom && (
                             <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-3xl shadow-lg flex items-center justify-between text-white relative overflow-hidden mb-2 flex-shrink-0 min-h-[100px]">
                                 <div className="z-10 relative">
@@ -317,7 +321,6 @@
             );
         };
 
-        // --- GRID CELL (WICHTIG: AUSGELAGERT FÜR STABILITÄT) ---
         const GridCell = ({ x, y, cell, handleGridClick, now }) => {
             const floorItem = cell.floor ? ITEMS[cell.floor] : null;
             const objectItem = cell.item ? ITEMS[cell.item] : null;
@@ -336,7 +339,7 @@
             }
 
             return (
-                <div onClick={() => handleGridClick(x, y)} className={`w-14 h-14 md:w-20 md:h-20 relative cursor-pointer ${floorItem ? floorItem.css : 'bg-[#8fbc8f] border border-black/5'}`}>
+                <div onClick={() => handleGridClick(x, y)} className={`w-14 h-14 md:w-20 md:h-20 relative cursor-pointer ${floorItem ? floorItem.css : 'bg-white/10 border border-white/20'}`}>
                     {objectItem && (
                         <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
                             {cell.grown || objectItem.type === 'deco' 
@@ -344,13 +347,11 @@
                                 : <div className="flex flex-col items-center relative"><ItemDisplay item={objectItem} className="w-8 h-8 md:w-12 md:h-12" />{showTimer ? <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">{timeLeftStr}</div> : <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>}<div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden"><div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} /></div></div>}
                         </div>
                     )}
-                    {/* Floor only selection highlight */}
                     {!objectItem && floorItem && <div className="absolute inset-0 hover:bg-white/20"></div>}
                 </div>
             );
         };
 
-        // --- GAME APP ---
         const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
             const [roomData, setRoomData] = React.useState(null);
             const [tab, setTab] = React.useState('garden');
@@ -493,13 +494,16 @@
                         {tab === 'garden' && (
                             <div className="p-4 md:p-8 flex flex-col items-center">
                                 <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">{GARDEN_UPGRADES.map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); if(!owned) return null; return <button key={g.id} onClick={() => setActiveGardenIdx(g.id)} className={`px-4 py-1 rounded-full text-sm font-bold border ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200'}`}>{g.name}</button> })}</div>
-                                <div className="bg-[#5c4033] p-4 rounded-xl shadow-2xl relative inline-block">
-                                    <div className="grid grid-cols-5 gap-0 border-2 border-[#3e2b22]">
+                                
+                                {/* GARDEN CONTAINER MIT BILD */}
+                                <div className="p-4 rounded-xl shadow-2xl relative inline-block bg-cover bg-center" style={{ backgroundImage: `url(${GARDEN_BG})`, backgroundColor: '#5c4033' }}>
+                                    <div className="grid grid-cols-5 gap-0 border-2 border-black/10 shadow-inner">
                                         {Array.from({ length: 25 }).map((_, i) => (
                                             <GridCell key={i} x={i%5} y={Math.floor(i/5)} cell={(getGardens()[activeGardenIdx] || {})[`${i%5},${Math.floor(i/5)}`] || {}} handleGridClick={handleGridClick} now={now} />
                                         ))}
                                     </div>
                                 </div>
+
                                 {!isSpectator && <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100"><h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3><div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">{Object.entries(getInventory()).map(([id, count]) => { if (count <= 0) return null; return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><ItemDisplay item={ITEMS[id]} className="w-8 h-8" /><span className="text-xs font-bold text-gray-600">{count}x</span></button> })}</div></div>}
                             </div>
                         )}
@@ -537,56 +541,6 @@
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                 </div>
-            );
-        };
-
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [view, setView] = React.useState('loading'); 
-            const [roomCode, setRoomCode] = React.useState(null);
-            const [spectateCode, setSpectateCode] = React.useState(null);
-
-            React.useEffect(() => {
-                if(!auth) { setView('login'); return; }
-                const unsub = onAuthStateChanged(auth, async (u) => {
-                    if (u) {
-                        setUser(u);
-                        if(view === 'loading') { const userSnap = await getDoc(doc(db, 'users', u.uid)); if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom); setView('menu'); }
-                    } else { setView('login'); }
-                }); return () => unsub();
-            }, []);
-
-            const handleAction = async (action, code, name) => {
-                if (action === 'resume') setView('game');
-                else if (action === 'create') {
-                    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    await setDoc(doc(db, 'rooms', newCode), { roomName: name, coins: 50, gems: 0, tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0], likes: 0, createdAt: new Date().toISOString(), owner: user.uid });
-                    setRoomCode(newCode);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
-                    setView('game');
-                } else if (action === 'join') {
-                    setRoomCode(code);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
-                    setView('game');
-                } else if (action === 'community') setView('community');
-            };
-
-            // Safety timeout
-            React.useEffect(() => {
-                const t = setTimeout(() => { if(view === 'loading') setView('login'); }, 3000);
-                return () => clearTimeout(t);
-            }, [view]);
-
-            if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
-            if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
-            
-            return (
-                <ErrorBoundary roomCode={roomCode}>
-                    {view === 'community' && <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />}
-                    {view === 'spectator' && <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />}
-                    {view === 'menu' && <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />}
-                    {view === 'game' && <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />}
-                </ErrorBoundary>
             );
         };
 
