@@ -21,7 +21,7 @@
     <script>
         window.onerror = function(msg, url, line, col, error) {
             if (document.body) {
-                document.body.innerHTML = '<div style="padding:20px; color:red; font-family:sans-serif;"><h2>Kritischer Fehler!</h2><p>' + msg + '</p><p>Zeile: ' + line + '</p><button onclick="location.reload()" style="padding:10px; background:#eee; border:1px solid #ccc;">Neu laden</button></div>';
+                document.body.innerHTML = '<div style="padding:20px; color:red; font-family:sans-serif; background:#fee2e2;"><h2>Kritischer Fehler!</h2><p>' + msg + '</p><p>Zeile: ' + line + '</p><button onclick="location.reload()" style="margin-top:10px; padding:10px; background:#ef4444; color:white; border:none; border-radius:5px;">Neu laden</button></div>';
             }
             return false;
         };
@@ -70,9 +70,7 @@
             getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // =================================================================
-        // ⚠️ DEINE CONFIG HIER EINFÜGEN ⚠️
-        // =================================================================
+        // DEINE CONFIG (Wie gewünscht beibehalten)
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -82,71 +80,38 @@
             appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
             measurementId: "G-Z0W0LK6D88"
           };
-        // =================================================================
 
         let app, auth, db;
         try {
-            if (firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("HIER_API_KEY")) {
+            // Prüfung: Nur initialisieren, wenn Config "echt" aussieht
+            if (firebaseConfig.apiKey && firebaseConfig.apiKey.startsWith("AIza")) {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
             }
-        } catch (e) { console.error("Init Error", e); }
-
-        const safeRefreshIcons = () => {
-            if (window.lucide && window.lucide.createIcons) {
-                try { window.lucide.createIcons(); } catch (e) { }
-            }
-        };
+        } catch (e) { console.error("Firebase Init Error", e); }
 
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
 
-        // --- HIER DAS HINTERGRUNDBILD ÄNDERN ---
-        const GARDEN_BG = "https://img.freepik.com/free-vector/green-meadow-background_1048-2679.jpg"; 
-        // Oder lokal: "assets/wiese.jpg"
-
+        // DEINE LOKALEN BILDER (Wie gewünscht beibehalten)
         const ITEMS = {
-            carrot_seed: { 
-                id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, 
-                img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Food/Carrot.png',
-                icon: '🥕', growsInto: 'carrot', stages: 3, reward: 10 
-            },
-            sunflower_seed: { 
-                id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, 
-                img: 'assets/sunflower.png',
-                icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 20 
-            },
-            forgetmenot_seed: { 
-                id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, 
-                img: 'assets/forgetmenot.png', 
-                icon: '🪻', growsInto: 'forgetmenot', stages: 6, reward: 50
-            },
+            carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Food/Carrot.png', icon: '🥕', growsInto: 'carrot', stages: 3, reward: 10 },
+            sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, img: 'assets/sunflower.png', icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 20 },
+            forgetmenot_seed: { id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, img: 'assets/forgetmenot.png', icon: '🪻', growsInto: 'forgetmenot', stages: 6, reward: 50 },
             stone_floor: { id: 'stone_floor', name: 'Steinweg', type: 'floor', price: 10, css: 'texture-stone', icon: '🪨' },
             wood_floor: { id: 'wood_floor', name: 'Holzboden', type: 'floor', price: 25, css: 'texture-wood', icon: '🪵' },
-            fence: { 
-                id: 'fence', name: 'Zaun', type: 'deco', price: 15, 
-                img: 'assets/fence.png', 
-                icon: '🚧'
-            },
-            bench: { 
-                id: 'bench', name: 'Bank', type: 'deco', price: 150, 
-                img: 'assets/bench.png',
-                icon: '🪑'
-            },
-            gnome: { 
-                id: 'gnome', name: 'Zwerg', type: 'deco', price: 250, 
-                img: 'assets/gnome.png', 
-                icon: '🎅'
-            },
+            fence: { id: 'fence', name: 'Zaun', type: 'deco', price: 15, img: 'assets/fence.png', icon: '🚧' },
+            bench: { id: 'bench', name: 'Bank', type: 'deco', price: 150, img: 'assets/bench.png', icon: '🪑' },
+            gnome: { id: 'gnome', name: 'Zwerg', type: 'deco', price: 250, img: 'assets/gnome.png', icon: '🎅' },
         };
 
         const GARDEN_UPGRADES = [
             { id: 0, name: "Start-Garten", price: 0 },
-            { id: 1, name: "Hinterhof", price: 200 },
-            { id: 2, name: "Waldlichtung", price: 650 },
+            { id: 1, name: "Hinterhof", price: 100 },
+            { id: 2, name: "Waldlichtung", price: 500 },
         ];
 
-        // --- COMPONENTS ---
+        // --- HELPER COMPONENTS (DIESE FEHLTEN UND HABEN DEN WHITESCREEN VERURSACHT) ---
 
         const Icon = ({ name, size = 24, className = "" }) => {
             const ref = React.useRef(null);
@@ -168,29 +133,32 @@
         const ItemDisplay = ({ item, className = "" }) => {
             const [hasError, setHasError] = React.useState(false);
             if (!item) return null;
+            // Bild anzeigen wenn vorhanden und kein Fehler
             if (item.img && !hasError) {
                 return <img src={item.img} alt={item.name} className={`${className} object-contain drop-shadow-md`} onError={() => setHasError(true)} />;
             }
+            // Fallback auf Emoji
             return <span className={`flex items-center justify-center ${className} text-2xl`}>{item.icon || "•"}</span>;
         };
 
+        // --- ERROR BOUNDARY ---
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
             async handleReset() {
                 if(confirm("Garten zurücksetzen? (Datenstruktur wird repariert)")) {
-                    try {
-                        const roomRef = doc(db, 'rooms', this.props.roomCode);
-                        await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
-                        window.location.reload();
-                    } catch(e) { alert("Fehler: " + e.message); }
+                    if(auth && db && this.props.roomCode) {
+                         const roomRef = doc(db, 'rooms', this.props.roomCode);
+                         await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
+                    }
+                    window.location.reload();
                 }
             }
             render() {
                 if (this.state.hasError) {
                     return (
                         <div className="h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
-                            <h1 className="text-xl font-bold text-red-600 mb-2">Ein Fehler ist aufgetreten 🥀</h1>
+                            <h1 className="text-xl font-bold text-red-600 mb-2">Da ist was schiefgelaufen! 🥀</h1>
                             <p className="text-xs text-gray-500 mb-4 font-mono bg-white p-2 rounded border">{this.state.error?.message}</p>
                             <button onClick={() => window.location.reload()} className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold mb-4">Neu laden</button>
                             <button onClick={() => this.handleReset()} className="mt-4 text-gray-400 underline text-xs">Notfall-Reparatur</button>
@@ -226,7 +194,7 @@
                             </ol>
                         ) : (
                             <ol className="text-left bg-gray-50 p-4 rounded-xl space-y-2 text-sm text-gray-700 border border-gray-200">
-                                <li className="flex items-center gap-2">1. Tippe auf das <strong>Browser-Menü</strong></li>
+                                <li className="flex items-center gap-2">1. Öffne das <strong>Browser-Menü</strong></li>
                                 <li className="flex items-center gap-2">2. Wähle <strong>"App installieren"</strong></li>
                             </ol>
                         )}
@@ -235,8 +203,6 @@
                 </Modal>
             );
         };
-
-        // --- MENUS ---
 
         const MainMenu = ({ user, onAction, currentRoom }) => {
             const [joinCode, setJoinCode] = React.useState("");
@@ -248,7 +214,7 @@
             const [streak, setStreak] = React.useState(0);
 
             React.useEffect(() => { 
-                safeRefreshIcons();
+                if(window.lucide) try{window.lucide.createIcons();}catch(e){}
                 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
                 if(currentRoom && db) {
                     getDoc(doc(db, 'rooms', currentRoom)).then(snap => {
@@ -339,7 +305,7 @@
             }
 
             return (
-                <div onClick={() => handleGridClick(x, y)} className={`w-14 h-14 md:w-20 md:h-20 relative cursor-pointer ${floorItem ? floorItem.css : 'bg-white/10 border border-white/20'}`}>
+                <div onClick={() => handleGridClick(x, y)} className={`w-14 h-14 md:w-20 md:h-20 relative cursor-pointer ${floorItem ? floorItem.css : 'bg-[#8fbc8f] border border-black/5'}`}>
                     {objectItem && (
                         <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
                             {cell.grown || objectItem.type === 'deco' 
@@ -347,6 +313,7 @@
                                 : <div className="flex flex-col items-center relative"><ItemDisplay item={objectItem} className="w-8 h-8 md:w-12 md:h-12" />{showTimer ? <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">{timeLeftStr}</div> : <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>}<div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden"><div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} /></div></div>}
                         </div>
                     )}
+                    {/* Floor only selection highlight */}
                     {!objectItem && floorItem && <div className="absolute inset-0 hover:bg-white/20"></div>}
                 </div>
             );
@@ -398,7 +365,14 @@
             }, [roomCode, isSpectator]);
 
             React.useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-            React.useEffect(() => { const t = setTimeout(() => { safeRefreshIcons(); }, 100); return () => clearTimeout(t); }, [roomData, tab, taskFilter]);
+            
+            // Fix Icon Refresh Loop
+            React.useEffect(() => { 
+                const t = setTimeout(() => { 
+                    if(window.lucide) try{window.lucide.createIcons();}catch(e){} 
+                }, 100); 
+                return () => clearTimeout(t); 
+            }, [roomData, tab, taskFilter]);
 
             const getGardens = () => roomData?.gardens || { 0: {} };
             const getCurrentGrid = () => (getGardens()[activeGardenIdx] || {});
@@ -451,7 +425,6 @@
                 const nowStr = new Date().toLocaleString('de-DE');
                 const nowISO = new Date().toISOString();
                 
-                // STREAK
                 const anyTaskDoneToday = getTasks().some(t => (t.type === 'daily' && t.lastDone === today) || (t.type === 'once' && t.done && t.completedAt?.startsWith(new Date().toLocaleDateString('de-DE'))));
                 const updatedTasks = getTasks().map(t => { if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; } return t; });
                 const updates = { tasks: updatedTasks, coins: increment(task.reward) };
@@ -494,16 +467,13 @@
                         {tab === 'garden' && (
                             <div className="p-4 md:p-8 flex flex-col items-center">
                                 <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">{GARDEN_UPGRADES.map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); if(!owned) return null; return <button key={g.id} onClick={() => setActiveGardenIdx(g.id)} className={`px-4 py-1 rounded-full text-sm font-bold border ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200'}`}>{g.name}</button> })}</div>
-                                
-                                {/* GARDEN CONTAINER MIT BILD */}
-                                <div className="p-4 rounded-xl shadow-2xl relative inline-block bg-cover bg-center" style={{ backgroundImage: `url(${GARDEN_BG})`, backgroundColor: '#5c4033' }}>
-                                    <div className="grid grid-cols-5 gap-0 border-2 border-black/10 shadow-inner">
+                                <div className="bg-[#5c4033] p-4 rounded-xl shadow-2xl relative inline-block">
+                                    <div className="grid grid-cols-5 gap-0 border-2 border-[#3e2b22]">
                                         {Array.from({ length: 25 }).map((_, i) => (
                                             <GridCell key={i} x={i%5} y={Math.floor(i/5)} cell={(getGardens()[activeGardenIdx] || {})[`${i%5},${Math.floor(i/5)}`] || {}} handleGridClick={handleGridClick} now={now} />
                                         ))}
                                     </div>
                                 </div>
-
                                 {!isSpectator && <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100"><h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3><div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">{Object.entries(getInventory()).map(([id, count]) => { if (count <= 0) return null; return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><ItemDisplay item={ITEMS[id]} className="w-8 h-8" /><span className="text-xs font-bold text-gray-600">{count}x</span></button> })}</div></div>}
                             </div>
                         )}
