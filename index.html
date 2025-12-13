@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 15.4 (Debug)</title>
+    <title>DuoBloom 15.5</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -441,14 +441,6 @@
 
             const handleLike = async () => { if(hasLiked || !isSpectator) return; await updateDoc(doc(db, 'rooms', roomCode), { likes: increment(1) }); localStorage.setItem(`liked_${roomCode}`, 'true'); setHasLiked(true); };
             
-            // --- DEBUG FEATURE ---
-            const resetStreakDate = async () => {
-                if(confirm("ACHTUNG: Dies setzt das 'Letzte Streak-Datum' zurück. Wenn du jetzt eine Aufgabe erledigst, sollte der Streak steigen. Machen?")) {
-                    await updateDoc(doc(db, 'rooms', roomCode), { lastStreakDate: "1999-01-01" });
-                    alert("Datum zurückgesetzt! Erledige jetzt eine Aufgabe.");
-                }
-            };
-            
             // --- GRID CLICK LOGIC (INKLUSIVE EINPACKEN) ---
             const handleGridClick = async (x, y) => {
                 if (isSpectator || !roomData) return;
@@ -540,8 +532,6 @@
                 // 4. Streak Logik (MIT ALERT FEEDBACK)
                 const lastStreakDate = roomData.lastStreakDate;
                 
-                console.log("Checking Streak: Last=", lastStreakDate, "Today=", today);
-
                 // Wenn heute noch KEIN Streak-Update war:
                 if (lastStreakDate !== today) {
                     let newStreak = Number(roomData.currentStreak || 0);
@@ -558,8 +548,6 @@
                     updates.lastStreakDate = today;
                     
                     alert(`Streak erhöht! 🔥 Neuer Streak: ${newStreak} Tage`);
-                } else {
-                    console.log("Streak heute schon abgeholt.");
                 }
                 
                 await updateDoc(doc(db, 'rooms', roomCode), updates);
@@ -634,11 +622,6 @@
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">{GARDEN_UPGRADES.filter(g => g.id > 0).map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); return <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}><div className="text-3xl mb-2">🏞️</div><div className="font-bold">{g.name}</div><button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>{owned ? 'Gekauft' : `${g.price} 💎`}</button></div> })}</div>
                                 <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><Icon name="store"/> Markt (Münzen)</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{item.icon && !item.img && item.icon}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
-                                
-                                <div className="mt-8 pt-8 border-t border-red-200">
-                                    <h3 className="text-red-500 font-bold text-sm uppercase mb-2">Debug Zone</h3>
-                                    <button onClick={resetStreakDate} className="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold text-xs w-full">Streak-Datum zurücksetzen (Test)</button>
-                                </div>
                             </div>
                         )}
                     </main>
@@ -663,7 +646,7 @@
                     <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
                         <Icon name="log-in" /> Mit Google starten
                     </button>
-                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 15.4 • Debug Edition</p>
+                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 15.5 • Final</p>
                 </div>
             </div>
         );
