@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 9.3</title>
+    <title>DuoBloom 9.4</title>
     
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
@@ -84,15 +84,9 @@
             }
         } catch (e) { console.error("Firebase Init Error", e); }
 
-        const safeRefreshIcons = () => {
-            if (window.lucide && window.lucide.createIcons) {
-                try { window.lucide.createIcons(); } catch (e) { console.warn(e); }
-            }
-        };
-
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
 
-        // ITEMS MIT BILDERN
+        // ITEMS MIT BILD-URLS UND EMOJI-FALLBACKS
         const ITEMS = {
             carrot_seed: { 
                 id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, 
@@ -154,13 +148,30 @@
             return <span ref={ref} style={{ display: 'inline-flex', verticalAlign: 'middle' }} />;
         };
 
-        // ITEM DISPLAY (FIXED: Missing in previous version)
+        // INTELLIGENT ITEM DISPLAY (Bild -> Fehler -> Emoji)
         const ItemDisplay = ({ item, className = "" }) => {
+            const [hasError, setHasError] = React.useState(false);
+            
             if (!item) return null;
-            if (item.img) {
-                return <img src={item.img} alt={item.name} className={`${className} object-contain drop-shadow-md`} />;
+            
+            // Wenn Bild vorhanden und kein Fehler aufgetreten
+            if (item.img && !hasError) {
+                return (
+                    <img 
+                        src={item.img} 
+                        alt={item.name} 
+                        className={`${className} object-contain drop-shadow-md`} 
+                        onError={() => setHasError(true)} 
+                    />
+                );
             }
-            return <span className={`flex items-center justify-center ${className}`}>{item.icon || "•"}</span>;
+            
+            // Fallback: Emoji (Größer für bessere Sichtbarkeit)
+            return (
+                <span className={`flex items-center justify-center ${className} text-3xl`}>
+                    {item.icon || "•"}
+                </span>
+            );
         };
 
         // ERROR BOUNDARY
@@ -234,7 +245,6 @@
             const [streak, setStreak] = React.useState(0);
 
             React.useEffect(() => { 
-                safeRefreshIcons();
                 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
                 if(currentRoom && db) {
                     getDoc(doc(db, 'rooms', currentRoom)).then(snap => {
@@ -273,7 +283,6 @@
                     <div className="flex-1 bg-[#f8fafc] p-6 flex flex-col gap-6 overflow-y-auto">
                         <h2 className="text-2xl font-bold text-gray-700">Dashboard</h2>
                         
-                        {/* STREAK WIDGET */}
                         {currentRoom && (
                             <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-3xl shadow-lg flex items-center justify-between text-white relative overflow-hidden mb-2 flex-shrink-0 min-h-[100px]">
                                 <div className="z-10 relative">
@@ -386,7 +395,6 @@
             }, [roomCode, isSpectator]);
 
             React.useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-            React.useEffect(() => { const t = setTimeout(() => { safeRefreshIcons(); }, 100); return () => clearTimeout(t); }, [roomData, tab, taskFilter]);
 
             const getGardens = () => roomData?.gardens || { 0: {} };
             const getCurrentGrid = () => (getGardens()[activeGardenIdx] || {});
@@ -439,6 +447,7 @@
                 const nowStr = new Date().toLocaleString('de-DE');
                 const nowISO = new Date().toISOString();
                 
+                // STREAK
                 const anyTaskDoneToday = getTasks().some(t => (t.type === 'daily' && t.lastDone === today) || (t.type === 'once' && t.done && t.completedAt?.startsWith(new Date().toLocaleDateString('de-DE'))));
                 const updatedTasks = getTasks().map(t => { if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; } return t; });
                 const updates = { tasks: updatedTasks, coins: increment(task.reward) };
@@ -525,76 +534,6 @@
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                 </div>
-            );
-        };
-
-        const CommunityList = ({ onVisit, onBack }) => {
-            const [list, setList] = React.useState([]);
-            const [loading, setLoading] = React.useState(true);
-            React.useEffect(() => {
-                const timer = setTimeout(() => { safeRefreshIcons(); }, 100);
-                const fetchG = async () => { try { const q = query(collection(db, 'rooms'), limit(50)); const snap = await getDocs(q); const sorted = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.likes||0) - (a.likes||0)); setList(sorted); } catch(e) { console.error(e); } setLoading(false); }; fetchG();
-                return () => clearTimeout(timer);
-            }, []);
-            React.useEffect(() => { const t = setTimeout(() => { safeRefreshIcons(); }, 100); return () => clearTimeout(t); }, [list]);
-            return (
-                <div className="h-full bg-slate-50 flex flex-col md:max-w-4xl md:mx-auto md:my-8 md:rounded-3xl shadow-xl overflow-hidden">
-                    <div className="p-6 bg-white shadow-sm flex items-center gap-4"><button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><Icon name="home" className="text-gray-600"/></button><h2 className="text-2xl font-bold text-gray-800">Community Gärten</h2></div>
-                    <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                        {loading && <div>Lade Liste...</div>}
-                        {list.map(g => (<div key={g.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow"><div><div className="font-bold text-lg text-gray-800">{g.roomName || "Unbenannter Garten"}</div><div className="text-sm text-gray-500 flex gap-3"><span className="text-red-500 flex items-center gap-1"><Icon name="heart" size={12}/> {g.likes||0}</span><span>Level {g.unlockedGardens?.length || 1}</span></div></div><button onClick={() => onVisit(g.id)} className="bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-bold hover:bg-purple-200">Besuchen</button></div>))}
-                    </div>
-                </div>
-            );
-        };
-
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [view, setView] = React.useState('loading'); 
-            const [roomCode, setRoomCode] = React.useState(null);
-            const [spectateCode, setSpectateCode] = React.useState(null);
-
-            React.useEffect(() => {
-                if(!auth) { setView('login'); return; }
-                const unsub = onAuthStateChanged(auth, async (u) => {
-                    if (u) {
-                        setUser(u);
-                        if(view === 'loading') { const userSnap = await getDoc(doc(db, 'users', u.uid)); if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom); setView('menu'); }
-                    } else { setView('login'); }
-                }); return () => unsub();
-            }, []);
-
-            const handleAction = async (action, code, name) => {
-                if (action === 'resume') setView('game');
-                else if (action === 'create') {
-                    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    await setDoc(doc(db, 'rooms', newCode), { roomName: name, coins: 50, gems: 0, tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0], likes: 0, createdAt: new Date().toISOString(), owner: user.uid });
-                    setRoomCode(newCode);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
-                    setView('game');
-                } else if (action === 'join') {
-                    setRoomCode(code);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
-                    setView('game');
-                } else if (action === 'community') setView('community');
-            };
-
-            // Safety timeout
-            React.useEffect(() => {
-                const t = setTimeout(() => { if(view === 'loading') setView('login'); }, 3000);
-                return () => clearTimeout(t);
-            }, [view]);
-
-            if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
-            if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
-            
-            return (
-                <ErrorBoundary roomCode={roomCode}>
-                    {view === 'community' && <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />}
-                    {view === 'spectator' && <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />}
-                    {view === 'menu' && <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />}
-                    {view === 'game' && <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />}
-                </ErrorBoundary>
             );
         };
 
