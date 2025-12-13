@@ -3,33 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 14.0 Fixed</title>
+    <title>DuoBloom 14.1</title>
     
+    <!-- PWA -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
     <link rel="apple-touch-icon" href="icon.png">
     
+    <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Global Error Handler -->
+    <!-- Error Handler -->
     <script>
         window.onerror = function(msg, url, line, col, error) {
-            const root = document.getElementById('root');
-            if (root) {
-                root.innerHTML = `
-                    <div style="padding:20px; color:#b91c1c; font-family:sans-serif; text-align:center; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#fef2f2;">
-                        <h2 style="font-size:24px; font-weight:bold; margin-bottom:10px;">Kritischer Fehler!</h2>
-                        <p style="background:white; padding:10px; border-radius:8px; border:1px solid #fca5a5;">${msg}</p>
-                        <p style="font-size:12px; color:gray; margin-top:10px;">Zeile: ${line}</p>
-                        <button onclick="location.reload()" style="margin-top:20px; padding:12px 24px; background:#ef4444; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">App neu laden</button>
-                    </div>
-                `;
+            if (document.body) {
+                document.body.innerHTML = '<div style="padding:20px; color:red; font-family:sans-serif; height:100vh; background:#fee2e2;"><h2>Kritischer Start-Fehler!</h2><p>' + msg + '</p><p>Zeile: ' + line + '</p><button onclick="location.reload()" style="padding:10px; background:#ef4444; color:white; border-radius:8px; margin-top:10px;">Neu laden</button></div>';
             }
-            return false; 
+            return false;
         };
     </script>
 
@@ -73,7 +67,7 @@
             messagingSenderId: "118209789780",
             appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
             measurementId: "G-Z0W0LK6D88"
-        };
+          };
 
         let app, auth, db;
         try {
@@ -102,7 +96,8 @@
             { id: 2, name: "Waldlichtung", price: 650 },
         ];
 
-        // --- 1. ICON & ITEM DISPLAY (MÜSSEN GANZ OBEN SEIN) ---
+        // --- 1. BASIS KOMPONENTEN (Müssen GANZ OBEN stehen!) ---
+
         const Icon = ({ name, size = 24, className = "" }) => {
             const ref = React.useRef(null);
             React.useEffect(() => {
@@ -129,43 +124,11 @@
             return <span className={`flex items-center justify-center ${className} text-2xl`}>{item.icon || "•"}</span>;
         };
 
-        // --- 2. GRID CELL (MUSS VOR GAMEAPP SEIN) ---
-        const GridCell = ({ x, y, cell, handleGridClick, now }) => {
-            const floorItem = cell.floor ? ITEMS[cell.floor] : null;
-            const objectItem = cell.item ? ITEMS[cell.item] : null;
-            let showTimer = false, timeLeftStr = "";
+        // --- 2. ERROR BOUNDARY ---
 
-            if (objectItem && objectItem.type === 'seed' && !cell.grown) {
-                const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
-                const diff = now - lastWatered;
-                if (diff < WATER_COOLDOWN) {
-                    showTimer = true;
-                    const ms = WATER_COOLDOWN - diff;
-                    const h = Math.floor(ms / 3600000);
-                    const m = Math.floor((ms % 3600000) / 60000);
-                    timeLeftStr = `${h}h ${m}m`;
-                }
-            }
-
-            return (
-                <div onClick={() => handleGridClick(x, y)} className={`w-14 h-14 md:w-20 md:h-20 relative cursor-pointer ${floorItem ? floorItem.css : 'bg-[#8fbc8f] border border-black/5'}`}>
-                    {objectItem && (
-                        <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
-                            {cell.grown || objectItem.type === 'deco' 
-                                ? <ItemDisplay item={objectItem} className="w-10 h-10 md:w-16 md:h-16" />
-                                : <div className="flex flex-col items-center relative"><ItemDisplay item={objectItem} className="w-8 h-8 md:w-12 md:h-12" />{showTimer ? <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">{timeLeftStr}</div> : <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>}<div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden"><div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} /></div></div>}
-                        </div>
-                    )}
-                    {/* Floor only selection highlight */}
-                    {!objectItem && floorItem && <div className="absolute inset-0 hover:bg-white/20"></div>}
-                </div>
-            );
-        };
-
-        // --- 3. ERROR BOUNDARY ---
         class ErrorBoundary extends React.Component {
-            constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-            static getDerivedStateFromError(error) { return { hasError: true, error }; }
+            constructor(props) { super(props); this.state = { hasError: false }; }
+            static getDerivedStateFromError(error) { return { hasError: true }; }
             async handleReset() {
                 if(confirm("Daten reparieren?")) {
                     const roomRef = doc(db, 'rooms', this.props.roomCode);
@@ -178,7 +141,6 @@
                     return (
                         <div className="h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
                             <h1 className="text-xl font-bold text-red-600">Fehler aufgetreten 🥀</h1>
-                            <p className="text-xs text-gray-500 mb-4 font-mono bg-white p-2 rounded border">{this.state.error?.message}</p>
                             <button onClick={() => this.handleReset()} className="bg-red-500 text-white px-6 py-3 rounded-xl mt-4 font-bold">Reparieren</button>
                             <button onClick={() => window.location.reload()} className="mt-4 text-gray-400 underline text-xs">Neu laden</button>
                         </div>
@@ -187,6 +149,8 @@
                 return this.props.children; 
             }
         }
+
+        // --- 3. MODALS ---
 
         const Modal = ({ children, onClose, title }) => (
             <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-pop">
@@ -213,7 +177,7 @@
                             </ol>
                         ) : (
                             <ol className="text-left bg-gray-50 p-4 rounded-xl space-y-2 text-sm text-gray-700 border border-gray-200">
-                                <li className="flex items-center gap-2">1. Tippe auf das <strong>Browser-Menü</strong></li>
+                                <li className="flex items-center gap-2">1. Tippe auf das <strong>Browser-Menü</strong> (⋮ / ≡)</li>
                                 <li className="flex items-center gap-2">2. Wähle <strong>"App installieren"</strong></li>
                             </ol>
                         )}
@@ -222,6 +186,41 @@
                 </Modal>
             );
         };
+
+        // --- 4. GRID CELL (MUSS vor GameApp definiert sein!) ---
+
+        const GridCell = ({ x, y, cell, handleGridClick, now }) => {
+            const floorItem = cell.floor ? ITEMS[cell.floor] : null;
+            const objectItem = cell.item ? ITEMS[cell.item] : null;
+            let showTimer = false, timeLeftStr = "";
+
+            if (objectItem && objectItem.type === 'seed' && !cell.grown) {
+                const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
+                const diff = now - lastWatered;
+                if (diff < WATER_COOLDOWN) {
+                    showTimer = true;
+                    const ms = WATER_COOLDOWN - diff;
+                    const h = Math.floor(ms / 3600000);
+                    const m = Math.floor((ms % 3600000) / 60000);
+                    timeLeftStr = `${h}h ${m}m`;
+                }
+            }
+
+            return (
+                <div onClick={() => handleGridClick(x, y)} className={`w-14 h-14 md:w-20 md:h-20 relative cursor-pointer ${floorItem ? floorItem.css : 'bg-[#8fbc8f] border border-black/5'}`}>
+                    {objectItem && (
+                        <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
+                            {cell.grown || objectItem.type === 'deco' 
+                                ? <ItemDisplay item={objectItem} className="w-10 h-10 md:w-16 md:h-16" />
+                                : <div className="flex flex-col items-center relative"><ItemDisplay item={objectItem} className="w-8 h-8 md:w-12 md:h-12" />{showTimer ? <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">{timeLeftStr}</div> : <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>}<div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden"><div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} /></div></div>}
+                        </div>
+                    )}
+                    {!objectItem && floorItem && <div className="absolute inset-0 hover:bg-white/20"></div>}
+                </div>
+            );
+        };
+
+        // --- 5. HAUPT-SCREENS ---
 
         const MainMenu = ({ user, onAction, currentRoom }) => {
             const [joinCode, setJoinCode] = React.useState("");
@@ -233,6 +232,7 @@
             const [streak, setStreak] = React.useState(0);
 
             React.useEffect(() => { 
+                if(window.lucide) try{window.lucide.createIcons();}catch(e){}
                 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
                 if(currentRoom && db) {
                     getDoc(doc(db, 'rooms', currentRoom)).then(snap => {
@@ -245,8 +245,7 @@
                 if(!newGardenName.trim()) return alert("Bitte Namen eingeben");
                 setIsBusy(true);
                 await onAction('create', null, newGardenName);
-                setIsBusy(false);
-                setIsCreating(false);
+                setIsBusy(false); setIsCreating(false);
             };
 
             const handleInstallClick = () => {
@@ -282,7 +281,7 @@
                                 <div><div className="text-green-800 text-sm font-bold uppercase mb-1">Letzte Sitzung</div><div className="text-2xl font-bold">Weitergärtnern</div><div className="text-sm opacity-80 font-mono mt-1">Code: {currentRoom}</div></div>
                                 <div className="bg-green-100 p-3 rounded-full"><Icon name="play" className="text-green-600" /></div>
                             </button>
-                        ) : <div className="bg-gray-100 p-4 rounded-xl text-center text-gray-500 italic flex-shrink-0">Kein Garten.</div>}
+                        ) : <div className="bg-gray-100 p-4 rounded-xl text-center text-gray-500 italic flex-shrink-0">Kein Garten besucht.</div>}
                         <hr className="border-gray-200" />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-20">
                             <button onClick={() => setIsCreating(true)} className="bg-white border-2 border-dashed border-gray-300 p-6 rounded-2xl text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center justify-center gap-2 h-32 flex-shrink-0"><div className="bg-blue-100 p-3 rounded-full text-blue-500"><Icon name="plus" /></div><span className="font-bold">Neuer Garten</span></button>
@@ -343,13 +342,7 @@
             }, [roomCode, isSpectator]);
 
             React.useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-            
-            React.useEffect(() => { 
-                const t = setTimeout(() => { 
-                    if(window.lucide) try{window.lucide.createIcons();}catch(e){} 
-                }, 100); 
-                return () => clearTimeout(t); 
-            }, [roomData, tab, taskFilter]);
+            React.useEffect(() => { const t = setTimeout(() => { if(window.lucide) try{window.lucide.createIcons();}catch(e){} }, 100); return () => clearTimeout(t); }, [roomData, tab, taskFilter]);
 
             const getGardens = () => roomData?.gardens || { 0: {} };
             const getCurrentGrid = () => (getGardens()[activeGardenIdx] || {});
@@ -402,6 +395,7 @@
                 const nowStr = new Date().toLocaleString('de-DE');
                 const nowISO = new Date().toISOString();
                 
+                // STREAK
                 const anyTaskDoneToday = getTasks().some(t => (t.type === 'daily' && t.lastDone === today) || (t.type === 'once' && t.done && t.completedAt?.startsWith(new Date().toLocaleDateString('de-DE'))));
                 const updatedTasks = getTasks().map(t => { if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; } return t; });
                 const updates = { tasks: updatedTasks, coins: increment(task.reward) };
@@ -488,6 +482,76 @@
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                 </div>
+            );
+        };
+
+        const CommunityList = ({ onVisit, onBack }) => {
+            const [list, setList] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
+            React.useEffect(() => {
+                const timer = setTimeout(() => { try { lucide.createIcons(); } catch(e) {} }, 100);
+                const fetchG = async () => { try { const q = query(collection(db, 'rooms'), limit(50)); const snap = await getDocs(q); const sorted = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.likes||0) - (a.likes||0)); setList(sorted); } catch(e) { console.error(e); } setLoading(false); }; fetchG();
+                return () => clearTimeout(timer);
+            }, []);
+            React.useEffect(() => { const t = setTimeout(() => { try { lucide.createIcons(); } catch(e) {} }, 100); return () => clearTimeout(t); }, [list]);
+            return (
+                <div className="h-full bg-slate-50 flex flex-col md:max-w-4xl md:mx-auto md:my-8 md:rounded-3xl shadow-xl overflow-hidden">
+                    <div className="p-6 bg-white shadow-sm flex items-center gap-4"><button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><Icon name="home" className="text-gray-600"/></button><h2 className="text-2xl font-bold text-gray-800">Community Gärten</h2></div>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                        {loading && <div>Lade Liste...</div>}
+                        {list.map(g => (<div key={g.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow"><div><div className="font-bold text-lg text-gray-800">{g.roomName || "Unbenannter Garten"}</div><div className="text-sm text-gray-500 flex gap-3"><span className="text-red-500 flex items-center gap-1"><Icon name="heart" size={12}/> {g.likes||0}</span><span>Level {g.unlockedGardens?.length || 1}</span></div></div><button onClick={() => onVisit(g.id)} className="bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-bold hover:bg-purple-200">Besuchen</button></div>))}
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const [view, setView] = React.useState('loading'); 
+            const [roomCode, setRoomCode] = React.useState(null);
+            const [spectateCode, setSpectateCode] = React.useState(null);
+
+            React.useEffect(() => {
+                if(!auth) { setView('login'); return; }
+                const unsub = onAuthStateChanged(auth, async (u) => {
+                    if (u) {
+                        setUser(u);
+                        if(view === 'loading') { const userSnap = await getDoc(doc(db, 'users', u.uid)); if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom); setView('menu'); }
+                    } else { setView('login'); }
+                }); return () => unsub();
+            }, []);
+
+            const handleAction = async (action, code, name) => {
+                if (action === 'resume') setView('game');
+                else if (action === 'create') {
+                    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    await setDoc(doc(db, 'rooms', newCode), { roomName: name, coins: 50, gems: 0, tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0], likes: 0, createdAt: new Date().toISOString(), owner: user.uid });
+                    setRoomCode(newCode);
+                    await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
+                    setView('game');
+                } else if (action === 'join') {
+                    setRoomCode(code);
+                    await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
+                    setView('game');
+                } else if (action === 'community') setView('community');
+            };
+
+            // Safety timeout
+            React.useEffect(() => {
+                const t = setTimeout(() => { if(view === 'loading') setView('login'); }, 3000);
+                return () => clearTimeout(t);
+            }, [view]);
+
+            if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
+            if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
+            
+            return (
+                <ErrorBoundary roomCode={roomCode}>
+                    {view === 'community' && <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />}
+                    {view === 'spectator' && <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />}
+                    {view === 'menu' && <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />}
+                    {view === 'game' && <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />}
+                </ErrorBoundary>
             );
         };
 
