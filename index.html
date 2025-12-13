@@ -3,20 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 13.0</title>
+    <title>DuoBloom</title>
     
+    <!-- PWA -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
     <link rel="apple-touch-icon" href="icon.png">
     
+    <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <!-- Globaler Fehler-Fänger (Zeigt Fehler an statt weißem Bildschirm) -->
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            const root = document.getElementById('root');
+            if (root) {
+                root.innerHTML = `
+                    <div style="padding:20px; color:red; font-family:sans-serif; text-align:center; margin-top:50px;">
+                        <h2 style="font-size:20px; font-weight:bold;">Kritischer Fehler!</h2>
+                        <p>${msg}</p>
+                        <p style="font-size:12px; color:gray;">Zeile: ${line}</p>
+                        <button onclick="localStorage.clear(); location.reload()" style="margin-top:20px; padding:10px 20px; background:red; color:white; border:none; border-radius:10px;">Cache löschen & Neustart</button>
+                    </div>
+                `;
+            }
+            return false;
+        };
+    </script>
+
     <style>
-        body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; }
+        body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; background-color: #f8fafc; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .texture-stone { background-color: #d1d5db; background-image: radial-gradient(circle, #9ca3af 20%, transparent 20%), radial-gradient(circle, #9ca3af 20%, transparent 20%); background-size: 10px 10px; background-position: 0 0, 5px 5px; border: 1px solid #9ca3af; }
@@ -27,7 +47,9 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
 
-    <div id="root" class="h-full w-full"></div>
+    <div id="root" class="h-full w-full flex items-center justify-center text-green-600 font-bold">
+        Lade App...
+    </div>
 
     <script>
         if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(console.error); }
@@ -39,9 +61,7 @@
         import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, arrayUnion, arrayRemove, increment, deleteField, query, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // ==========================================
-        // ⚠️ DEINE FIREBASE CONFIG HIER EINFÜGEN ⚠️
-        // ==========================================
+        // --- DEINE ORIGINAL CONFIG ---
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -50,22 +70,25 @@
             messagingSenderId: "118209789780",
             appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
             measurementId: "G-Z0W0LK6D88"
-          };
+        };
 
         let app, auth, db;
         try {
-            if (firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("HIER_API_KEY")) {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) { console.error("Firebase Init Error", e); }
+
+        const safeRefreshIcons = () => {
+            if (window.lucide && window.lucide.createIcons) {
+                try { window.lucide.createIcons(); } catch (e) { }
             }
-        } catch (e) { console.error("Init Error", e); }
+        };
 
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
-        
-        // HIER BILD ÄNDERN (Lokaler Pfad oder URL)
-        const GARDEN_BG = "assets/gardenbg.png"; 
+        const GARDEN_BG = "https://img.freepik.com/free-vector/green-meadow-background_1048-2679.jpg";
 
+        // --- DEINE ITEMS ---
         const ITEMS = {
             carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Food/Carrot.png', icon: '🥕', growsInto: 'carrot', stages: 3, reward: 10 },
             sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, img: 'assets/sunflower.png', icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 20 },
@@ -83,7 +106,7 @@
             { id: 2, name: "Waldlichtung", price: 650 },
         ];
 
-        // --- COMPONENTS ---
+        // --- BASIS KOMPONENTEN ---
 
         const Icon = ({ name, size = 24, className = "" }) => {
             const ref = React.useRef(null);
@@ -93,7 +116,7 @@
                     i.setAttribute('data-lucide', name);
                     i.setAttribute('width', size);
                     i.setAttribute('height', size);
-                    i.setAttribute('class', className);
+                    if(className) i.setAttribute('class', className);
                     ref.current.innerHTML = '';
                     ref.current.appendChild(i);
                     try { window.lucide.createIcons({ root: ref.current, nameAttr: 'data-lucide', attrs: { width: size, height: size, class: className } }); } catch(e){}
@@ -102,7 +125,6 @@
             return <span ref={ref} style={{ display: 'inline-flex', verticalAlign: 'middle' }} />;
         };
 
-        // Das hier hat gefehlt!
         const ItemDisplay = ({ item, className = "" }) => {
             const [hasError, setHasError] = React.useState(false);
             if (!item) return null;
@@ -112,13 +134,15 @@
             return <span className={`flex items-center justify-center ${className} text-2xl`}>{item.icon || "•"}</span>;
         };
 
+        // --- ERROR BOUNDARY ---
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
             async handleReset() {
-                if(confirm("Garten zurücksetzen? (Datenstruktur wird repariert)")) {
+                if(confirm("Garten reparieren?")) {
                     try {
                         const roomRef = doc(db, 'rooms', this.props.roomCode);
+                        // Nur Struktur resetten, nicht alles löschen wenn möglich
                         await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
                         window.location.reload();
                     } catch(e) { alert("Fehler: " + e.message); }
@@ -174,6 +198,7 @@
             );
         };
 
+        // --- HAUPT MENÜ ---
         const MainMenu = ({ user, onAction, currentRoom }) => {
             const [joinCode, setJoinCode] = React.useState("");
             const [isCreating, setIsCreating] = React.useState(false);
@@ -184,6 +209,7 @@
             const [streak, setStreak] = React.useState(0);
 
             React.useEffect(() => { 
+                safeRefreshIcons();
                 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
                 if(currentRoom && db) {
                     getDoc(doc(db, 'rooms', currentRoom)).then(snap => {
@@ -314,7 +340,7 @@
                         
                         const todayStr = new Date().toISOString().split('T')[0];
                         if (!isSpectator) {
-                            // CLEANUP TASKS (30 Days)
+                            // CLEANUP TASKS
                             const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
                             const currentTasks = Array.isArray(data.tasks) ? data.tasks : [];
                             const validTasks = currentTasks.filter(t => {
@@ -367,21 +393,30 @@
                     }
                     return;
                 }
+                
+                // Interaktion (Einpacken!)
                 if (cell.item) {
                     const itemDef = ITEMS[cell.item];
                     if(!itemDef) return; 
-                    if (cell.grown && itemDef.type === 'seed') { await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) }); }
-                    else if (itemDef.type === 'seed') {
+                    
+                    if (cell.grown && itemDef.type === 'seed') { 
+                        await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) }); 
+                    } else if (itemDef.type === 'seed') {
                         const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
                         if (now - lastWatered > WATER_COOLDOWN) { const newStage = (cell.stage || 0) + 1; await updateDoc(roomRef, { [`${path}.stage`]: newStage, [`${path}.grown`]: newStage >= itemDef.stages, [`${path}.lastWatered`]: new Date().toISOString() }); }
                     } else if (itemDef.type === 'deco') {
-                        if(confirm(`${itemDef.name} ins Inventar?`)) await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`inventory.${cell.item}`]: increment(1) });
+                        if(confirm(`${itemDef.name} ins Inventar zurück?`)) {
+                            await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`inventory.${cell.item}`]: increment(1) });
+                        }
                     }
                     return;
                 }
+                
                 if (cell.floor) {
                     const floorDef = ITEMS[cell.floor];
-                    if(confirm(`${floorDef.name} aufheben?`)) await updateDoc(roomRef, { [`${path}.floor`]: deleteField(), [`inventory.${cell.floor}`]: increment(1) });
+                    if(confirm(`${floorDef.name} aufheben?`)) {
+                        await updateDoc(roomRef, { [`${path}.floor`]: deleteField(), [`inventory.${cell.floor}`]: increment(1) });
+                    }
                 }
             };
 
@@ -436,7 +471,7 @@
                             <div className="p-4 md:p-8 flex flex-col items-center">
                                 <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">{GARDEN_UPGRADES.map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); if(!owned) return null; return <button key={g.id} onClick={() => setActiveGardenIdx(g.id)} className={`px-4 py-1 rounded-full text-sm font-bold border ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200'}`}>{g.name}</button> })}</div>
                                 
-                                {/* GARDEN CONTAINER MIT BILD */}
+                                {/* GARDEN MIT BILD */}
                                 <div className="p-4 rounded-xl shadow-2xl relative inline-block bg-cover bg-center" style={{ backgroundImage: `url(${GARDEN_BG})`, backgroundColor: '#5c4033' }}>
                                     <div className="grid grid-cols-5 gap-0 border-2 border-black/10 shadow-inner">
                                         {Array.from({ length: 25 }).map((_, i) => (
