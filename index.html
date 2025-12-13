@@ -3,35 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom</title>
+    <title>DuoBloom 13.2</title>
     
-    <!-- PWA -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
     <link rel="apple-touch-icon" href="icon.png">
     
-    <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Globaler Fehler-Fänger (Zeigt Fehler an statt weißem Bildschirm) -->
+    <!-- Global Error Handler (Zeigt Fehler direkt an, statt White Screen) -->
     <script>
         window.onerror = function(msg, url, line, col, error) {
             const root = document.getElementById('root');
             if (root) {
                 root.innerHTML = `
-                    <div style="padding:20px; color:red; font-family:sans-serif; text-align:center; margin-top:50px;">
-                        <h2 style="font-size:20px; font-weight:bold;">Kritischer Fehler!</h2>
-                        <p>${msg}</p>
-                        <p style="font-size:12px; color:gray;">Zeile: ${line}</p>
-                        <button onclick="localStorage.clear(); location.reload()" style="margin-top:20px; padding:10px 20px; background:red; color:white; border:none; border-radius:10px;">Cache löschen & Neustart</button>
+                    <div style="padding:20px; color:#b91c1c; font-family:sans-serif; text-align:center; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#fef2f2;">
+                        <h2 style="font-size:24px; font-weight:bold; margin-bottom:10px;">Start-Fehler!</h2>
+                        <p style="background:white; padding:10px; border-radius:8px; border:1px solid #fca5a5;">${msg}</p>
+                        <p style="font-size:12px; color:gray; margin-top:10px;">Zeile: ${line}</p>
+                        <button onclick="localStorage.clear(); location.reload()" style="margin-top:20px; padding:12px 24px; background:#ef4444; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">App zurücksetzen</button>
                     </div>
                 `;
             }
-            return false;
+            return false; // Fehler nicht unterdrücken
         };
     </script>
 
@@ -47,9 +45,7 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
 
-    <div id="root" class="h-full w-full flex items-center justify-center text-green-600 font-bold">
-        Lade App...
-    </div>
+    <div id="root" class="h-full w-full"></div>
 
     <script>
         if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(console.error); }
@@ -61,7 +57,7 @@
         import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, arrayUnion, arrayRemove, increment, deleteField, query, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // --- DEINE ORIGINAL CONFIG ---
+        // --- 1. CONFIG ---
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -88,7 +84,7 @@
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
         const GARDEN_BG = "https://img.freepik.com/free-vector/green-meadow-background_1048-2679.jpg";
 
-        // --- DEINE ITEMS ---
+        // --- 2. CONSTANTS ---
         const ITEMS = {
             carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Food/Carrot.png', icon: '🥕', growsInto: 'carrot', stages: 3, reward: 10 },
             sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, img: 'assets/sunflower.png', icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 20 },
@@ -106,7 +102,7 @@
             { id: 2, name: "Waldlichtung", price: 650 },
         ];
 
-        // --- BASIS KOMPONENTEN ---
+        // --- 3. HELPER COMPONENTS (MÜSSEN ZUERST KOMMEN) ---
 
         const Icon = ({ name, size = 24, className = "" }) => {
             const ref = React.useRef(null);
@@ -116,7 +112,7 @@
                     i.setAttribute('data-lucide', name);
                     i.setAttribute('width', size);
                     i.setAttribute('height', size);
-                    if(className) i.setAttribute('class', className);
+                    if (className) i.setAttribute('class', className);
                     ref.current.innerHTML = '';
                     ref.current.appendChild(i);
                     try { window.lucide.createIcons({ root: ref.current, nameAttr: 'data-lucide', attrs: { width: size, height: size, class: className } }); } catch(e){}
@@ -134,16 +130,16 @@
             return <span className={`flex items-center justify-center ${className} text-2xl`}>{item.icon || "•"}</span>;
         };
 
-        // --- ERROR BOUNDARY ---
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
             async handleReset() {
-                if(confirm("Garten reparieren?")) {
+                if(confirm("Garten reparieren? (Struktur wird zurückgesetzt)")) {
                     try {
-                        const roomRef = doc(db, 'rooms', this.props.roomCode);
-                        // Nur Struktur resetten, nicht alles löschen wenn möglich
-                        await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
+                        if (this.props.roomCode && db) {
+                             const roomRef = doc(db, 'rooms', this.props.roomCode);
+                             await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
+                        }
                         window.location.reload();
                     } catch(e) { alert("Fehler: " + e.message); }
                 }
@@ -152,7 +148,7 @@
                 if (this.state.hasError) {
                     return (
                         <div className="h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
-                            <h1 className="text-xl font-bold text-red-600 mb-2">Ein Fehler ist aufgetreten 🥀</h1>
+                            <h1 className="text-xl font-bold text-red-600 mb-2">Ein Fehler ist aufgetreten!</h1>
                             <p className="text-xs text-gray-500 mb-4 font-mono bg-white p-2 rounded border">{this.state.error?.message}</p>
                             <button onClick={() => window.location.reload()} className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold mb-4">Neu laden</button>
                             <button onClick={() => this.handleReset()} className="mt-4 text-gray-400 underline text-xs">Notfall-Reparatur</button>
@@ -198,7 +194,41 @@
             );
         };
 
-        // --- HAUPT MENÜ ---
+        // --- 4. GRID CELL (Verschoben nach oben, damit GameApp sie kennt) ---
+        const GridCell = ({ x, y, cell, handleGridClick, now }) => {
+            const floorItem = cell.floor ? ITEMS[cell.floor] : null;
+            const objectItem = cell.item ? ITEMS[cell.item] : null;
+            let showTimer = false, timeLeftStr = "";
+
+            if (objectItem && objectItem.type === 'seed' && !cell.grown) {
+                const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
+                const diff = now - lastWatered;
+                if (diff < WATER_COOLDOWN) {
+                    showTimer = true;
+                    const ms = WATER_COOLDOWN - diff;
+                    const h = Math.floor(ms / 3600000);
+                    const m = Math.floor((ms % 3600000) / 60000);
+                    timeLeftStr = `${h}h ${m}m`;
+                }
+            }
+
+            return (
+                <div onClick={() => handleGridClick(x, y)} className={`w-14 h-14 md:w-20 md:h-20 relative cursor-pointer ${floorItem ? floorItem.css : 'bg-white/10 border border-white/20'}`}>
+                    {objectItem && (
+                        <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
+                            {cell.grown || objectItem.type === 'deco' 
+                                ? <ItemDisplay item={objectItem} className="w-10 h-10 md:w-16 md:h-16" />
+                                : <div className="flex flex-col items-center relative"><ItemDisplay item={objectItem} className="w-8 h-8 md:w-12 md:h-12" />{showTimer ? <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">{timeLeftStr}</div> : <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>}<div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden"><div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} /></div></div>}
+                        </div>
+                    )}
+                    {/* Floor only selection highlight */}
+                    {!objectItem && floorItem && <div className="absolute inset-0 hover:bg-white/20"></div>}
+                </div>
+            );
+        };
+
+        // --- 5. MENÜS ---
+
         const MainMenu = ({ user, onAction, currentRoom }) => {
             const [joinCode, setJoinCode] = React.useState("");
             const [isCreating, setIsCreating] = React.useState(false);
@@ -282,33 +312,22 @@
             );
         };
 
-        const GridCell = ({ x, y, cell, handleGridClick, now }) => {
-            const floorItem = cell.floor ? ITEMS[cell.floor] : null;
-            const objectItem = cell.item ? ITEMS[cell.item] : null;
-            let showTimer = false, timeLeftStr = "";
-
-            if (objectItem && objectItem.type === 'seed' && !cell.grown) {
-                const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
-                const diff = now - lastWatered;
-                if (diff < WATER_COOLDOWN) {
-                    showTimer = true;
-                    const ms = WATER_COOLDOWN - diff;
-                    const h = Math.floor(ms / 3600000);
-                    const m = Math.floor((ms % 3600000) / 60000);
-                    timeLeftStr = `${h}h ${m}m`;
-                }
-            }
-
+        const CommunityList = ({ onVisit, onBack }) => {
+            const [list, setList] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
+            React.useEffect(() => {
+                const timer = setTimeout(() => { safeRefreshIcons(); }, 100);
+                const fetchG = async () => { try { const q = query(collection(db, 'rooms'), limit(50)); const snap = await getDocs(q); const sorted = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.likes||0) - (a.likes||0)); setList(sorted); } catch(e) { console.error(e); } setLoading(false); }; fetchG();
+                return () => clearTimeout(timer);
+            }, []);
+            React.useEffect(() => { const t = setTimeout(() => { safeRefreshIcons(); }, 100); return () => clearTimeout(t); }, [list]);
             return (
-                <div onClick={() => handleGridClick(x, y)} className={`w-14 h-14 md:w-20 md:h-20 relative cursor-pointer ${floorItem ? floorItem.css : 'bg-white/10 border border-white/20'}`}>
-                    {objectItem && (
-                        <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
-                            {cell.grown || objectItem.type === 'deco' 
-                                ? <ItemDisplay item={objectItem} className="w-10 h-10 md:w-16 md:h-16" />
-                                : <div className="flex flex-col items-center relative"><ItemDisplay item={objectItem} className="w-8 h-8 md:w-12 md:h-12" />{showTimer ? <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">{timeLeftStr}</div> : <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>}<div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden"><div className="h-full bg-blue-500 transition-all" style={{width: `${(cell.stage/objectItem.stages)*100}%`}} /></div></div>}
-                        </div>
-                    )}
-                    {!objectItem && floorItem && <div className="absolute inset-0 hover:bg-white/20"></div>}
+                <div className="h-full bg-slate-50 flex flex-col md:max-w-4xl md:mx-auto md:my-8 md:rounded-3xl shadow-xl overflow-hidden">
+                    <div className="p-6 bg-white shadow-sm flex items-center gap-4"><button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><Icon name="home" className="text-gray-600"/></button><h2 className="text-2xl font-bold text-gray-800">Community Gärten</h2></div>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                        {loading && <div>Lade Liste...</div>}
+                        {list.map(g => (<div key={g.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow"><div><div className="font-bold text-lg text-gray-800">{g.roomName || "Unbenannter Garten"}</div><div className="text-sm text-gray-500 flex gap-3"><span className="text-red-500 flex items-center gap-1"><Icon name="heart" size={12}/> {g.likes||0}</span><span>Level {g.unlockedGardens?.length || 1}</span></div></div><button onClick={() => onVisit(g.id)} className="bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-bold hover:bg-purple-200">Besuchen</button></div>))}
+                    </div>
                 </div>
             );
         };
@@ -340,7 +359,7 @@
                         
                         const todayStr = new Date().toISOString().split('T')[0];
                         if (!isSpectator) {
-                            // CLEANUP TASKS
+                            // CLEANUP TASKS (30 Days)
                             const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
                             const currentTasks = Array.isArray(data.tasks) ? data.tasks : [];
                             const validTasks = currentTasks.filter(t => {
@@ -375,6 +394,7 @@
 
             const handleLike = async () => { if(hasLiked || !isSpectator) return; await updateDoc(doc(db, 'rooms', roomCode), { likes: increment(1) }); localStorage.setItem(`liked_${roomCode}`, 'true'); setHasLiked(true); };
             
+            // --- GRID CLICK LOGIC (INKLUSIVE EINPACKEN) ---
             const handleGridClick = async (x, y) => {
                 if (isSpectator || !roomData) return;
                 const key = `${x},${y}`;
@@ -394,17 +414,20 @@
                     return;
                 }
                 
-                // Interaktion (Einpacken!)
+                // Interaktion (Gießen/Ernten/Einpacken)
                 if (cell.item) {
                     const itemDef = ITEMS[cell.item];
                     if(!itemDef) return; 
                     
                     if (cell.grown && itemDef.type === 'seed') { 
+                        // Ernten
                         await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) }); 
                     } else if (itemDef.type === 'seed') {
+                        // Gießen
                         const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
                         if (now - lastWatered > WATER_COOLDOWN) { const newStage = (cell.stage || 0) + 1; await updateDoc(roomRef, { [`${path}.stage`]: newStage, [`${path}.grown`]: newStage >= itemDef.stages, [`${path}.lastWatered`]: new Date().toISOString() }); }
                     } else if (itemDef.type === 'deco') {
+                        // Deko einpacken
                         if(confirm(`${itemDef.name} ins Inventar zurück?`)) {
                             await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`inventory.${cell.item}`]: increment(1) });
                         }
@@ -412,6 +435,7 @@
                     return;
                 }
                 
+                // Boden einpacken
                 if (cell.floor) {
                     const floorDef = ITEMS[cell.floor];
                     if(confirm(`${floorDef.name} aufheben?`)) {
@@ -471,7 +495,7 @@
                             <div className="p-4 md:p-8 flex flex-col items-center">
                                 <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">{GARDEN_UPGRADES.map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); if(!owned) return null; return <button key={g.id} onClick={() => setActiveGardenIdx(g.id)} className={`px-4 py-1 rounded-full text-sm font-bold border ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200'}`}>{g.name}</button> })}</div>
                                 
-                                {/* GARDEN MIT BILD */}
+                                {/* GARDEN CONTAINER MIT BILD */}
                                 <div className="p-4 rounded-xl shadow-2xl relative inline-block bg-cover bg-center" style={{ backgroundImage: `url(${GARDEN_BG})`, backgroundColor: '#5c4033' }}>
                                     <div className="grid grid-cols-5 gap-0 border-2 border-black/10 shadow-inner">
                                         {Array.from({ length: 25 }).map((_, i) => (
@@ -517,6 +541,56 @@
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                 </div>
+            );
+        };
+
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const [view, setView] = React.useState('loading'); 
+            const [roomCode, setRoomCode] = React.useState(null);
+            const [spectateCode, setSpectateCode] = React.useState(null);
+
+            React.useEffect(() => {
+                if(!auth) { setView('login'); return; }
+                const unsub = onAuthStateChanged(auth, async (u) => {
+                    if (u) {
+                        setUser(u);
+                        if(view === 'loading') { const userSnap = await getDoc(doc(db, 'users', u.uid)); if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom); setView('menu'); }
+                    } else { setView('login'); }
+                }); return () => unsub();
+            }, []);
+
+            const handleAction = async (action, code, name) => {
+                if (action === 'resume') setView('game');
+                else if (action === 'create') {
+                    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                    await setDoc(doc(db, 'rooms', newCode), { roomName: name, coins: 50, gems: 0, tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0], likes: 0, createdAt: new Date().toISOString(), owner: user.uid });
+                    setRoomCode(newCode);
+                    await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
+                    setView('game');
+                } else if (action === 'join') {
+                    setRoomCode(code);
+                    await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
+                    setView('game');
+                } else if (action === 'community') setView('community');
+            };
+
+            // Safety timeout
+            React.useEffect(() => {
+                const t = setTimeout(() => { if(view === 'loading') setView('login'); }, 3000);
+                return () => clearTimeout(t);
+            }, [view]);
+
+            if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
+            if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
+            
+            return (
+                <ErrorBoundary roomCode={roomCode}>
+                    {view === 'community' && <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />}
+                    {view === 'spectator' && <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />}
+                    {view === 'menu' && <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />}
+                    {view === 'game' && <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />}
+                </ErrorBoundary>
             );
         };
 
