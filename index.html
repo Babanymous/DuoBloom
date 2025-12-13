@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 9.4</title>
+    <title>DuoBloom 9.5</title>
     
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
@@ -76,17 +76,30 @@
         // =================================================================
 
         let app, auth, db;
+        let firebaseError = null;
+
         try {
-            if (firebaseConfig.apiKey.includes("AIza")) { 
+            if (firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("HIER_API_KEY")) { 
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
+            } else {
+                firebaseError = "Config fehlt (Platzhalter noch im Code)";
             }
-        } catch (e) { console.error("Firebase Init Error", e); }
+        } catch (e) { 
+            console.error("Firebase Init Error", e);
+            firebaseError = e.message;
+        }
+
+        const safeRefreshIcons = () => {
+            if (window.lucide && window.lucide.createIcons) {
+                try { window.lucide.createIcons(); } catch (e) { console.warn(e); }
+            }
+        };
 
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
 
-        // ITEMS MIT BILD-URLS UND EMOJI-FALLBACKS
+        // ITEMS MIT BILD-URLS
         const ITEMS = {
             carrot_seed: { 
                 id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, 
@@ -130,7 +143,6 @@
 
         // --- COMPONENTS ---
 
-        // SAFE ICON COMPONENT
         const Icon = ({ name, size = 24, className = "" }) => {
             const ref = React.useRef(null);
             React.useEffect(() => {
@@ -148,41 +160,27 @@
             return <span ref={ref} style={{ display: 'inline-flex', verticalAlign: 'middle' }} />;
         };
 
-        // INTELLIGENT ITEM DISPLAY (Bild -> Fehler -> Emoji)
         const ItemDisplay = ({ item, className = "" }) => {
             const [hasError, setHasError] = React.useState(false);
-            
             if (!item) return null;
-            
-            // Wenn Bild vorhanden und kein Fehler aufgetreten
             if (item.img && !hasError) {
-                return (
-                    <img 
-                        src={item.img} 
-                        alt={item.name} 
-                        className={`${className} object-contain drop-shadow-md`} 
-                        onError={() => setHasError(true)} 
-                    />
-                );
+                return <img src={item.img} alt={item.name} className={`${className} object-contain drop-shadow-md`} onError={() => setHasError(true)} />;
             }
-            
-            // Fallback: Emoji (Größer für bessere Sichtbarkeit)
-            return (
-                <span className={`flex items-center justify-center ${className} text-3xl`}>
-                    {item.icon || "•"}
-                </span>
-            );
+            return <span className={`flex items-center justify-center ${className} text-2xl`}>{item.icon || "•"}</span>;
         };
 
-        // ERROR BOUNDARY
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
             async handleReset() {
-                if(confirm("Daten reparieren?")) {
-                    const roomRef = doc(db, 'rooms', this.props.roomCode);
-                    await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
-                    window.location.reload();
+                if(confirm("Garten zurücksetzen? (Datenstruktur wird repariert)")) {
+                    if(auth && db) {
+                        try {
+                            const roomRef = doc(db, 'rooms', this.props.roomCode);
+                            await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
+                            window.location.reload();
+                        } catch(e) { alert("Fehler: " + e.message); }
+                    } else { window.location.reload(); }
                 }
             }
             render() {
@@ -395,6 +393,7 @@
             }, [roomCode, isSpectator]);
 
             React.useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+            React.useEffect(() => { const t = setTimeout(() => { safeRefreshIcons(); }, 100); return () => clearTimeout(t); }, [roomData, tab, taskFilter]);
 
             const getGardens = () => roomData?.gardens || { 0: {} };
             const getCurrentGrid = () => (getGardens()[activeGardenIdx] || {});
@@ -447,7 +446,6 @@
                 const nowStr = new Date().toLocaleString('de-DE');
                 const nowISO = new Date().toISOString();
                 
-                // STREAK
                 const anyTaskDoneToday = getTasks().some(t => (t.type === 'daily' && t.lastDone === today) || (t.type === 'once' && t.done && t.completedAt?.startsWith(new Date().toLocaleDateString('de-DE'))));
                 const updatedTasks = getTasks().map(t => { if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; } return t; });
                 const updates = { tasks: updatedTasks, coins: increment(task.reward) };
