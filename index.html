@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 15.1</title>
+    <title>DuoBloom 15.2</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -627,7 +627,7 @@
                     <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
                         <Icon name="log-in" /> Mit Google starten
                     </button>
-                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 15.1 • Multiplayer</p>
+                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 15.2 • Security Fix</p>
                 </div>
             </div>
         );
@@ -692,10 +692,23 @@
             };
 
             const enterRoom = (code, spectator) => {
+                // Fix 1: Nur speichern, wenn man KEIN Zuschauer ist
+                if (!spectator) {
+                    localStorage.setItem('lastRoom', code);
+                }
                 setCurrentRoom(code);
                 setIsSpectator(spectator);
-                localStorage.setItem('lastRoom', code);
                 setView('game');
+            };
+
+            const handleBackToMenu = () => {
+                // Fix 2: Wenn man Zuschauer war, den eigenen Garten wieder laden
+                if (isSpectator) {
+                    const myLastRoom = localStorage.getItem('lastRoom');
+                    setCurrentRoom(myLastRoom);
+                    setIsSpectator(false);
+                }
+                setView('menu');
             };
 
             if (loading) return <div className="h-full flex items-center justify-center bg-slate-50 text-green-600 animate-pulse"><Icon name="loader-2" className="animate-spin mr-2"/> Lade DuoBloom...</div>;
@@ -706,7 +719,7 @@
                 <ErrorBoundary roomCode={currentRoom}>
                     {view === 'menu' && <MainMenu user={user} currentRoom={currentRoom} onAction={handleMenuAction} />}
                     {view === 'community' && <CommunityList onVisit={(id) => enterRoom(id, true)} onBack={() => setView('menu')} />}
-                    {view === 'game' && <GameApp user={user} roomCode={currentRoom} isSpectator={isSpectator} onBackToMenu={() => setView('menu')} />}
+                    {view === 'game' && <GameApp user={user} roomCode={currentRoom} isSpectator={isSpectator} onBackToMenu={handleBackToMenu} />}
                 </ErrorBoundary>
             );
         };
