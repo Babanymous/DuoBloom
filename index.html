@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 15.0</title>
+    <title>DuoBloom 15.1</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -14,6 +14,16 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            const root = document.getElementById('root');
+            if (root) {
+                root.innerHTML = '<div style="padding:20px; color:#991b1b; font-family:sans-serif; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#fee2e2;"><h2>Fehler!</h2><p style="background:white; padding:10px; border-radius:8px;">' + msg + '</p><button onclick="location.reload()" style="margin-top:20px; padding:10px; background:#ef4444; color:white; border:none; border-radius:5px;">Neu laden</button></div>';
+            }
+            return false;
+        };
+    </script>
 
     <style>
         body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; background-color: #f8fafc; }
@@ -62,11 +72,10 @@
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
         const GARDEN_BG = "assets/gbg.png"; 
 
-        // DEINE ITEMS
         const ITEMS = {
             carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Food/Carrot.png', icon: '🥕', growsInto: 'carrot', stages: 3, reward: 10 },
             sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, img: 'assets/sunflower.png', icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 20 },
-            forgetmenot_seed: { id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, img: 'assets/forgetmenot.png', icon: '🪻', growsInto: 'forgetmenot', stages: 6, reward: 50},
+            forgetmenot_seed: { id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, img: 'assets/forgetmenot.png', icon: '🪻', growsInto: 'forgetmenot', stages: 6, reward: 50 },
             stone_floor: { id: 'stone_floor', name: 'Steinweg', type: 'floor', price: 10, css: 'texture-stone', icon: '🪨' },
             wood_floor: { id: 'wood_floor', name: 'Holzboden', type: 'floor', price: 25, css: 'texture-wood', icon: '🪵' },
             fence: { id: 'fence', name: 'Zaun', type: 'deco', price: 15, img: 'assets/fence.png', icon: '🚧' },
@@ -80,7 +89,34 @@
             { id: 2, name: "Waldlichtung", price: 650 },
         ];
 
-        // --- 1. HELPER COMPONENTS (MÜSSEN ZUERST DEFINIERT WERDEN) ---
+        // --- HELPER: KORREKTES LOKALES DATUM ---
+        const getLocalDate = () => {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const getYesterdayDate = () => {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const getStreakStyle = (streak) => {
+            if (streak === 0) return "from-slate-400 to-slate-500"; 
+            if (streak < 3) return "from-blue-400 to-indigo-500"; 
+            if (streak < 7) return "from-orange-500 to-red-500"; 
+            if (streak < 14) return "from-purple-500 to-pink-500"; 
+            if (streak < 30) return "from-cyan-400 to-blue-600"; 
+            return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
+        };
+
+        // --- COMPONENTS ---
 
         const Icon = ({ name, size = 24, className = "" }) => {
             const ref = React.useRef(null);
@@ -107,17 +143,6 @@
             }
             return <span className={`flex items-center justify-center ${className} text-2xl`}>{item.icon || "•"}</span>;
         };
-
-        const getStreakStyle = (streak) => {
-            if (streak === 0) return "from-slate-400 to-slate-500"; 
-            if (streak < 3) return "from-blue-400 to-indigo-500"; 
-            if (streak < 7) return "from-orange-500 to-red-500"; 
-            if (streak < 14) return "from-purple-500 to-pink-500"; 
-            if (streak < 30) return "from-cyan-400 to-blue-600"; 
-            return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
-        };
-
-        // --- 2. LOGIC COMPONENTS (MÜSSEN VOR DEN SCREENS KOMMEN) ---
 
         const GridCell = ({ x, y, cell, handleGridClick, now }) => {
             const floorItem = cell.floor ? ITEMS[cell.floor] : null;
@@ -150,21 +175,23 @@
             );
         };
 
-        const ErrorBoundary = class extends React.Component {
+        class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
             async handleReset() {
                 if(confirm("Daten reparieren?")) {
-                    const roomRef = doc(db, 'rooms', this.props.roomCode);
-                    await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
-                    window.location.reload();
+                    try {
+                        const roomRef = doc(db, 'rooms', this.props.roomCode);
+                        await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
+                        window.location.reload();
+                    } catch(e) { alert("Fehler: " + e.message); }
                 }
             }
             render() {
                 if (this.state.hasError) {
                     return (
                         <div className="h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
-                            <h1 className="text-xl font-bold text-red-600 mb-2">Fehler aufgetreten 🥀</h1>
+                            <h1 className="text-xl font-bold text-red-600">Fehler aufgetreten 🥀</h1>
                             <p className="text-xs text-gray-500 mb-4 font-mono bg-white p-2 rounded border">{this.state.error?.message}</p>
                             <button onClick={() => window.location.reload()} className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold mb-4">Neu laden</button>
                             <button onClick={() => this.handleReset()} className="mt-4 text-gray-400 underline text-xs">Notfall-Reparatur</button>
@@ -173,7 +200,7 @@
                 }
                 return this.props.children; 
             }
-        };
+        }
 
         const Modal = ({ children, onClose, title }) => (
             <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-pop">
@@ -209,8 +236,6 @@
                 </Modal>
             );
         };
-
-        // --- 5. SCREENS (Müssen nach den Helpern kommen) ---
 
         const CommunityList = ({ onVisit, onBack }) => {
             const [list, setList] = React.useState([]);
@@ -248,11 +273,15 @@
                     getDoc(doc(db, 'rooms', currentRoom)).then(snap => {
                         if(snap.exists()) {
                             const data = snap.data();
-                            const today = new Date().toISOString().split('T')[0];
-                            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                            const today = getLocalDate();
+                            const yesterday = getYesterdayDate();
                             let s = data.currentStreak || 0;
                             const last = data.lastStreakDate;
-                            if (last !== today && last !== yesterday) s = 0; 
+                            
+                            // WICHTIG: Nur resetten wenn gestern UND heute nicht gespielt wurde
+                            if (last !== today && last !== yesterday && s > 0) {
+                                s = 0; 
+                            }
                             setStreak(s);
                         }
                     }).catch(e => console.log("Streak error", e));
@@ -291,10 +320,12 @@
                     </div>
                     <div className="flex-1 bg-[#f8fafc] p-6 flex flex-col gap-6 overflow-y-auto">
                         <h2 className="text-2xl font-bold text-gray-700">Dashboard</h2>
+                        
+                        {/* WIDGET */}
                         {currentRoom && (
                             <div className={`bg-gradient-to-r ${streakBg} w-full flex-shrink-0 p-6 rounded-3xl shadow-lg flex items-center justify-between text-white relative overflow-hidden mb-4 min-h-[120px] transition-all duration-500`}>
                                 <div className="z-10 relative">
-                                    <div className="text-xs font-bold uppercase tracking-wider opacity-90 mb-1">Dein Streak</div>
+                                    <div className="text-xs font-bold uppercase tracking-wider opacity-90 mb-1">Euer Streak</div>
                                     <div className="text-4xl font-black flex items-baseline gap-2">{streak} <span className="text-base font-medium opacity-90">Tage</span></div>
                                     <div className="text-xs font-medium opacity-80 mt-1">{streak === 0 ? "Fang heute an!" : "Bleib dran! 🔥"}</div>
                                 </div>
@@ -302,6 +333,7 @@
                                 <div className="absolute -right-4 -bottom-8 bg-white opacity-10 w-32 h-32 rounded-full blur-2xl pointer-events-none"></div>
                             </div>
                         )}
+
                         {currentRoom ? (
                             <button onClick={() => onAction('resume', currentRoom)} className="bg-white border-2 border-green-500 text-green-600 p-6 rounded-2xl shadow-sm hover:bg-green-50 transition-all text-left flex items-center justify-between group flex-shrink-0">
                                 <div><div className="text-green-800 text-sm font-bold uppercase mb-1">Letzte Sitzung</div><div className="text-2xl font-bold">Weitergärtnern</div><div className="text-sm opacity-80 font-mono mt-1">Code: {currentRoom}</div></div>
@@ -348,17 +380,21 @@
                         if(!data.gardens) data.gardens = { 0: {} };
                         if(!data.unlockedGardens) data.unlockedGardens = [0];
                         
-                        const todayStr = new Date().toISOString().split('T')[0];
+                        // FIX: Nutze lokale Zeit für Berechnungen
+                        const today = getLocalDate();
+                        
                         if (!isSpectator) {
-                            const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                            const thirtyDaysAgo = new Date(); 
+                            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                            
                             const currentTasks = Array.isArray(data.tasks) ? data.tasks : [];
                             const validTasks = currentTasks.filter(t => {
-                                if (t.type === 'once' && t.deadline && !t.done && t.deadline < todayStr) return false;
-                                if (t.done && t.completedAtISO && new Date(t.completedAtISO) < thirtyDaysAgo) return false;
+                                if (t.type === 'once' && t.deadline && !t.done && t.deadline < today) return false;
                                 return true;
                             });
+                            
                             if (validTasks.length !== currentTasks.length) updateDoc(doc(db, 'rooms', roomCode), { tasks: validTasks });
-                            if (data.lastDailyReset !== todayStr) updateDoc(doc(db, 'rooms', roomCode), { lastDailyReset: todayStr });
+                            if (data.lastDailyReset !== today) updateDoc(doc(db, 'rooms', roomCode), { lastDailyReset: today });
                         }
                         setRoomData(data);
                     } else if (isSpectator) { alert("Raum nicht gefunden."); onBackToMenu(); }
@@ -431,24 +467,29 @@
             
             const toggleTask = async (task) => {
                 if (isSpectator) return;
-                const today = new Date().toISOString().split('T')[0];
+                const today = getLocalDate();
                 const nowStr = new Date().toLocaleString('de-DE');
-                const nowISO = new Date().toISOString();
                 
-                const anyTaskDoneToday = getTasks().some(t => (t.type === 'daily' && t.lastDone === today) || (t.type === 'once' && t.done && t.completedAt?.startsWith(new Date().toLocaleDateString('de-DE'))));
-                const updatedTasks = getTasks().map(t => { if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; } return t; });
+                const anyTaskDoneToday = getTasks().some(t => 
+                    (t.type === 'daily' && t.lastDone === today) || 
+                    (t.type === 'once' && t.done && t.completedAt?.startsWith(new Date().toLocaleDateString('de-DE')))
+                );
+
+                const updatedTasks = getTasks().map(t => { if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr }; } return t; });
                 const updates = { tasks: updatedTasks, coins: increment(task.reward) };
                 
                 if (!anyTaskDoneToday && !task.done) {
                     const lastStreakDate = roomData.lastStreakDate;
-                    const d = new Date();
-                    d.setDate(d.getDate() - 1);
-                    const yesterday = d.toISOString().split('T')[0];
+                    const yesterday = getYesterdayDate();
                     let newStreak = roomData.currentStreak || 0;
-                    if (lastStreakDate === yesterday) { newStreak++; } else if (lastStreakDate !== today) { newStreak = 1; }
+                    
+                    if (lastStreakDate === yesterday) { 
+                        newStreak++; 
+                    } else if (lastStreakDate !== today) { 
+                        newStreak = 1; 
+                    }
                     updates.currentStreak = newStreak; updates.lastStreakDate = today;
                 }
-                
                 await updateDoc(doc(db, 'rooms', roomCode), updates);
             };
 
@@ -496,7 +537,7 @@
                                 <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-700">Aufgaben</h2><button onClick={() => setTaskModalOpen(true)} className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><Icon name="plus" /> Neu</button></div>
                                 <div className="flex gap-2 mb-4 bg-white p-1 rounded-xl w-fit border border-gray-200"><button onClick={() => setTaskFilter('active')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${taskFilter === 'active' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>Offen</button><button onClick={() => setTaskFilter('done')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${taskFilter === 'done' ? 'bg-green-100 text-green-600' : 'text-gray-400 hover:text-gray-600'}`}>Erledigt</button></div>
                                 <div className="space-y-3 pb-12">
-                                    {getTasks().filter(task => { const today = new Date().toISOString().split('T')[0]; const isDoneToday = task.type === 'daily' && task.lastDone === today; const isDoneEver = task.type === 'once' && task.done; return taskFilter === 'active' ? (!isDoneEver && !isDoneToday) : (isDoneEver || isDoneToday); }).map(task => (
+                                    {getTasks().filter(task => { const today = getLocalDate(); const isDoneToday = task.type === 'daily' && task.lastDone === today; const isDoneEver = task.type === 'once' && task.done; return taskFilter === 'active' ? (!isDoneEver && !isDoneToday) : (isDoneEver || isDoneToday); }).map(task => (
                                         <div key={task.id} className={`bg-white p-5 rounded-2xl shadow-sm border ${taskFilter === 'done' ? 'border-green-100 opacity-80' : 'border-gray-100'} flex justify-between items-center`}>
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex items-center gap-2"><span className={`font-bold text-lg ${taskFilter === 'done' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{task.title}</span>{task.type === 'daily' && <span className="text-blue-500"><Icon name="repeat" size={14}/></span>}</div>
@@ -525,56 +566,6 @@
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                 </div>
-            );
-        };
-
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [view, setView] = React.useState('loading'); 
-            const [roomCode, setRoomCode] = React.useState(null);
-            const [spectateCode, setSpectateCode] = React.useState(null);
-
-            React.useEffect(() => {
-                if(!auth) { setView('login'); return; }
-                const unsub = onAuthStateChanged(auth, async (u) => {
-                    if (u) {
-                        setUser(u);
-                        if(view === 'loading') { const userSnap = await getDoc(doc(db, 'users', u.uid)); if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom); setView('menu'); }
-                    } else { setView('login'); }
-                }); return () => unsub();
-            }, []);
-
-            const handleAction = async (action, code, name) => {
-                if (action === 'resume') setView('game');
-                else if (action === 'create') {
-                    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    await setDoc(doc(db, 'rooms', newCode), { roomName: name, coins: 50, gems: 0, tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0], likes: 0, createdAt: new Date().toISOString(), owner: user.uid });
-                    setRoomCode(newCode);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
-                    setView('game');
-                } else if (action === 'join') {
-                    setRoomCode(code);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
-                    setView('game');
-                } else if (action === 'community') setView('community');
-            };
-
-            // Safety timeout
-            React.useEffect(() => {
-                const t = setTimeout(() => { if(view === 'loading') setView('login'); }, 3000);
-                return () => clearTimeout(t);
-            }, [view]);
-
-            if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
-            if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
-            
-            return (
-                <ErrorBoundary roomCode={roomCode}>
-                    {view === 'community' && <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />}
-                    {view === 'spectator' && <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />}
-                    {view === 'menu' && <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />}
-                    {view === 'game' && <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />}
-                </ErrorBoundary>
             );
         };
 
