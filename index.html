@@ -609,6 +609,103 @@
                 </div>
             );
         };
+                // --- 6. LOGIN & APP CONTROLLER (FEHLTE IM ORIGINAL) ---
+
+        const LoginScreen = ({ onLogin }) => (
+            <div className="h-full flex flex-col items-center justify-center bg-[#f0fdf4] p-6 text-center relative overflow-hidden">
+                <div className="absolute inset-0 z-0 opacity-10" style={{backgroundImage: `url(${GARDEN_BG})`, backgroundSize: '200px'}}></div>
+                <div className="z-10 bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-2xl border-2 border-white max-w-sm w-full animate-pop">
+                    <div className="mb-6 bg-green-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-inner">
+                        <Icon name="sprout" size={48} />
+                    </div>
+                    <h1 className="text-3xl font-black text-gray-800 mb-2">DuoBloom</h1>
+                    <p className="text-gray-500 mb-8 font-medium">Baue gemeinsam Gärten, erledige Aufgaben und sammle Belohnungen.</p>
+                    <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
+                        <Icon name="log-in" /> Mit Google starten
+                    </button>
+                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 15.0 • Multiplayer</p>
+                </div>
+            </div>
+        );
+
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const [loading, setLoading] = React.useState(true);
+            const [view, setView] = React.useState('login'); // login, menu, game, community
+            const [currentRoom, setCurrentRoom] = React.useState(localStorage.getItem('lastRoom') || null);
+            const [isSpectator, setIsSpectator] = React.useState(false);
+
+            React.useEffect(() => {
+                const unsub = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    setLoading(false);
+                    if (u) setView('menu');
+                    else setView('login');
+                });
+                return () => unsub();
+            }, []);
+
+            const handleLogin = async () => {
+                try {
+                    await signInWithPopup(auth, new GoogleAuthProvider());
+                } catch (e) {
+                    alert("Login fehlgeschlagen: " + e.message);
+                }
+            };
+
+            const handleMenuAction = async (action, payload, payload2) => {
+                if (action === 'community') {
+                    setView('community');
+                } else if (action === 'create') {
+                    // Payload2 ist hier der Name des Gartens
+                    const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+                    const gardenName = payload2 || "Mein Garten";
+                    
+                    await setDoc(doc(db, 'rooms', newCode), {
+                        roomName: gardenName,
+                        owner: user.uid,
+                        ownerName: user.displayName,
+                        createdAt: new Date().toISOString(),
+                        users: [user.uid],
+                        tasks: [],
+                        inventory: { carrot_seed: 2 }, // Start-Items
+                        coins: 50,
+                        gems: 0,
+                        gardens: { 0: {} },
+                        unlockedGardens: [0],
+                        likes: 0
+                    });
+                    enterRoom(newCode, false);
+                } else if (action === 'join' || action === 'resume') {
+                    const code = payload;
+                    const snap = await getDoc(doc(db, 'rooms', code));
+                    if (snap.exists()) {
+                        enterRoom(code, false);
+                    } else {
+                        alert("Garten nicht gefunden!");
+                    }
+                }
+            };
+
+            const enterRoom = (code, spectator) => {
+                setCurrentRoom(code);
+                setIsSpectator(spectator);
+                localStorage.setItem('lastRoom', code);
+                setView('game');
+            };
+
+            if (loading) return <div className="h-full flex items-center justify-center bg-slate-50 text-green-600 animate-pulse"><Icon name="loader-2" className="animate-spin mr-2"/> Lade DuoBloom...</div>;
+
+            if (!user) return <LoginScreen onLogin={handleLogin} />;
+
+            return (
+                <ErrorBoundary roomCode={currentRoom}>
+                    {view === 'menu' && <MainMenu user={user} currentRoom={currentRoom} onAction={handleMenuAction} />}
+                    {view === 'community' && <CommunityList onVisit={(id) => enterRoom(id, true)} onBack={() => setView('menu')} />}
+                    {view === 'game' && <GameApp user={user} roomCode={currentRoom} isSpectator={isSpectator} onBackToMenu={() => setView('menu')} />}
+                </ErrorBoundary>
+            );
+        };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
