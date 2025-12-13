@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 13.2</title>
+    <title>DuoBloom 14.0</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -15,26 +15,8 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Global Error Handler (Zeigt Fehler direkt an, statt White Screen) -->
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            const root = document.getElementById('root');
-            if (root) {
-                root.innerHTML = `
-                    <div style="padding:20px; color:#b91c1c; font-family:sans-serif; text-align:center; height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#fef2f2;">
-                        <h2 style="font-size:24px; font-weight:bold; margin-bottom:10px;">Start-Fehler!</h2>
-                        <p style="background:white; padding:10px; border-radius:8px; border:1px solid #fca5a5;">${msg}</p>
-                        <p style="font-size:12px; color:gray; margin-top:10px;">Zeile: ${line}</p>
-                        <button onclick="localStorage.clear(); location.reload()" style="margin-top:20px; padding:12px 24px; background:#ef4444; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">App zurücksetzen</button>
-                    </div>
-                `;
-            }
-            return false; // Fehler nicht unterdrücken
-        };
-    </script>
-
     <style>
-        body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; background-color: #f8fafc; }
+        body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .texture-stone { background-color: #d1d5db; background-image: radial-gradient(circle, #9ca3af 20%, transparent 20%), radial-gradient(circle, #9ca3af 20%, transparent 20%); background-size: 10px 10px; background-position: 0 0, 5px 5px; border: 1px solid #9ca3af; }
@@ -48,16 +30,23 @@
     <div id="root" class="h-full w-full"></div>
 
     <script>
-        if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(console.error); }
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(console.error);
+        }
     </script>
 
     <script type="text/babel" data-type="module">
         
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, arrayUnion, arrayRemove, increment, deleteField, query, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { 
+            getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs,
+            arrayUnion, arrayRemove, increment, deleteField, query, limit 
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { 
+            getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // --- 1. CONFIG ---
+        // DEINE CONFIG (UNVERÄNDERT)
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -66,29 +55,22 @@
             messagingSenderId: "118209789780",
             appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
             measurementId: "G-Z0W0LK6D88"
-        };
+          };
 
         let app, auth, db;
         try {
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
-        } catch (e) { console.error("Firebase Init Error", e); }
-
-        const safeRefreshIcons = () => {
-            if (window.lucide && window.lucide.createIcons) {
-                try { window.lucide.createIcons(); } catch (e) { }
-            }
-        };
+        } catch (e) { console.error(e); }
 
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
-        const GARDEN_BG = "assets/gbg.png";
 
-        // --- 2. CONSTANTS ---
+        // DEINE ITEMS
         const ITEMS = {
             carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Food/Carrot.png', icon: '🥕', growsInto: 'carrot', stages: 3, reward: 10 },
             sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, img: 'assets/sunflower.png', icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 20 },
-            forgetmenot_seed: { id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, img: 'assets/forgetmenot.png', icon: '🪻', growsInto: 'forgetmenot', stages: 6, reward: 50 },
+            forgetmenot_seed: { id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, img: 'assets/forgetmenot.png', icon: '🪻', growsInto: 'forgetmenot', stages: 6, reward: 50},
             stone_floor: { id: 'stone_floor', name: 'Steinweg', type: 'floor', price: 10, css: 'texture-stone', icon: '🪨' },
             wood_floor: { id: 'wood_floor', name: 'Holzboden', type: 'floor', price: 25, css: 'texture-wood', icon: '🪵' },
             fence: { id: 'fence', name: 'Zaun', type: 'deco', price: 15, img: 'assets/fence.png', icon: '🚧' },
@@ -102,7 +84,7 @@
             { id: 2, name: "Waldlichtung", price: 650 },
         ];
 
-        // --- 3. HELPER COMPONENTS (MÜSSEN ZUERST KOMMEN) ---
+        // --- COMPONENTS ---
 
         const Icon = ({ name, size = 24, className = "" }) => {
             const ref = React.useRef(null);
@@ -112,7 +94,7 @@
                     i.setAttribute('data-lucide', name);
                     i.setAttribute('width', size);
                     i.setAttribute('height', size);
-                    if (className) i.setAttribute('class', className);
+                    if(className) i.setAttribute('class', className);
                     ref.current.innerHTML = '';
                     ref.current.appendChild(i);
                     try { window.lucide.createIcons({ root: ref.current, nameAttr: 'data-lucide', attrs: { width: size, height: size, class: className } }); } catch(e){}
@@ -134,12 +116,10 @@
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
             static getDerivedStateFromError(error) { return { hasError: true, error }; }
             async handleReset() {
-                if(confirm("Garten reparieren? (Struktur wird zurückgesetzt)")) {
+                if(confirm("Garten reparieren?")) {
                     try {
-                        if (this.props.roomCode && db) {
-                             const roomRef = doc(db, 'rooms', this.props.roomCode);
-                             await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
-                        }
+                        const roomRef = doc(db, 'rooms', this.props.roomCode);
+                        await setDoc(roomRef, { tasks: [], inventory: {}, gardens: {0:{}} }, { merge: true });
                         window.location.reload();
                     } catch(e) { alert("Fehler: " + e.message); }
                 }
@@ -194,7 +174,117 @@
             );
         };
 
-        // --- 4. GRID CELL (Verschoben nach oben, damit GameApp sie kennt) ---
+        // --- HELPER FÜR STREAK FARBE ---
+        const getStreakStyle = (streak) => {
+            if (streak === 0) return "from-slate-400 to-slate-500"; // Grau
+            if (streak < 3) return "from-blue-400 to-indigo-500"; // Blau (Start)
+            if (streak < 7) return "from-orange-500 to-red-500"; // Feuer (Standard)
+            if (streak < 14) return "from-purple-500 to-pink-500"; // Magisch
+            if (streak < 30) return "from-cyan-400 to-blue-600"; // Eis
+            return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; // Gold
+        };
+
+        const MainMenu = ({ user, onAction, currentRoom }) => {
+            const [joinCode, setJoinCode] = React.useState("");
+            const [isCreating, setIsCreating] = React.useState(false);
+            const [newGardenName, setNewGardenName] = React.useState("");
+            const [isBusy, setIsBusy] = React.useState(false);
+            const [installPrompt, setInstallPrompt] = React.useState(null);
+            const [showInstallHelp, setShowInstallHelp] = React.useState(false);
+            const [streak, setStreak] = React.useState(0);
+
+            React.useEffect(() => { 
+                window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
+                
+                // STREAK PRÜFEN (VISUELL)
+                if(currentRoom && db) {
+                    getDoc(doc(db, 'rooms', currentRoom)).then(snap => {
+                        if(snap.exists()) {
+                            const data = snap.data();
+                            const today = new Date().toISOString().split('T')[0];
+                            const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                            
+                            // Wenn letzter Streak nicht heute und nicht gestern war -> 0 anzeigen
+                            let s = data.currentStreak || 0;
+                            const last = data.lastStreakDate;
+                            if (last !== today && last !== yesterday) {
+                                s = 0; 
+                            }
+                            setStreak(s);
+                        }
+                    }).catch(e => console.log("Streak load error", e));
+                }
+            }, [currentRoom]);
+
+            const handleCreate = async () => {
+                if(!newGardenName.trim()) return alert("Bitte Namen eingeben");
+                setIsBusy(true);
+                await onAction('create', null, newGardenName);
+                setIsBusy(false); setIsCreating(false);
+            };
+
+            const handleInstallClick = () => {
+                if (installPrompt) {
+                    installPrompt.prompt();
+                    installPrompt.userChoice.then((res) => { if (res.outcome === 'accepted') setInstallPrompt(null); });
+                } else { setShowInstallHelp(true); }
+            };
+
+            const streakBg = getStreakStyle(streak);
+
+            return (
+                <div className="h-full bg-slate-100 flex flex-col md:flex-row max-w-5xl mx-auto shadow-xl md:rounded-3xl md:my-8 overflow-hidden">
+                    <div className="bg-white p-6 flex flex-col items-center border-b md:border-b-0 md:border-r border-gray-100 shadow-sm z-10 md:w-1/3 flex-shrink-0">
+                        <div className="flex items-center gap-4 w-full md:flex-col">
+                            <img src={user.photoURL} className="w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-green-500 shadow-lg" />
+                            <div className="text-left md:text-center"><h1 className="text-xl md:text-2xl font-bold text-gray-800">{user.displayName}</h1><p className="text-xs text-gray-400">ID: {user.uid.slice(0,5)}</p></div>
+                            <button onClick={() => auth.signOut()} className="ml-auto md:ml-0 md:mt-auto text-red-500 font-bold bg-red-50 p-2 rounded-lg"><Icon name="log-out" /></button>
+                        </div>
+                        <div className="hidden md:flex flex-col w-full space-y-2 mt-8">
+                            <button onClick={() => onAction('community')} className="w-full bg-purple-50 border border-purple-200 p-3 rounded-xl text-purple-700 font-bold flex items-center justify-center gap-2 hover:bg-purple-100 transition-colors"><Icon name="globe" /> Community</button>
+                            <button onClick={handleInstallClick} className="w-full bg-green-50 border border-green-200 p-3 rounded-xl text-green-700 font-bold flex items-center justify-center gap-2 hover:bg-green-100 transition-colors"><Icon name="plus-square" /> App installieren</button>
+                        </div>
+                    </div>
+                    <div className="flex-1 bg-[#f8fafc] p-6 flex flex-col gap-6 overflow-y-auto">
+                        <h2 className="text-2xl font-bold text-gray-700">Dashboard</h2>
+                        
+                        {/* STREAK WIDGET (DYNAMISCHE FARBE) */}
+                        {currentRoom && (
+                            <div className={`bg-gradient-to-r ${streakBg} p-5 rounded-3xl shadow-lg flex items-center justify-between text-white relative overflow-hidden mb-2 flex-shrink-0 min-h-[100px] transition-all duration-500`}>
+                                <div className="z-10 relative">
+                                    <div className="text-xs font-bold uppercase tracking-wider opacity-90 mb-1">Dein Streak</div>
+                                    <div className="text-4xl font-black flex items-baseline gap-2">{streak} <span className="text-base font-medium opacity-90">Tage</span></div>
+                                    <div className="text-xs font-medium opacity-80 mt-1">
+                                        {streak === 0 ? "Fang heute an!" : "Bleib dran! 🔥"}
+                                    </div>
+                                </div>
+                                <div className="text-6xl animate-pulse z-10 drop-shadow-md transform translate-x-2">🔥</div>
+                                <div className="absolute -right-4 -bottom-8 bg-white opacity-10 w-32 h-32 rounded-full blur-2xl pointer-events-none"></div>
+                            </div>
+                        )}
+
+                        {currentRoom ? (
+                            <button onClick={() => onAction('resume', currentRoom)} className="bg-white border-2 border-green-500 text-green-600 p-6 rounded-2xl shadow-sm hover:bg-green-50 transition-all text-left flex items-center justify-between group flex-shrink-0">
+                                <div><div className="text-green-800 text-sm font-bold uppercase mb-1">Letzte Sitzung</div><div className="text-2xl font-bold">Weitergärtnern</div><div className="text-sm opacity-80 font-mono mt-1">Code: {currentRoom}</div></div>
+                                <div className="bg-green-100 p-3 rounded-full"><Icon name="play" className="text-green-600" /></div>
+                            </button>
+                        ) : <div className="bg-gray-100 p-4 rounded-xl text-center text-gray-500 italic flex-shrink-0">Kein Garten.</div>}
+                        <hr className="border-gray-200" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-20">
+                            <button onClick={() => setIsCreating(true)} className="bg-white border-2 border-dashed border-gray-300 p-6 rounded-2xl text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center justify-center gap-2 h-32 flex-shrink-0"><div className="bg-blue-100 p-3 rounded-full text-blue-500"><Icon name="plus" /></div><span className="font-bold">Neuer Garten</span></button>
+                            <div className="bg-white border border-gray-200 p-6 rounded-2xl flex flex-col justify-center h-32 flex-shrink-0"><label className="text-xs font-bold text-gray-400 uppercase mb-2">Code eingeben</label><div className="flex gap-2"><input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="CODE" className="w-full bg-gray-100 rounded-lg px-3 py-2 font-bold uppercase focus:ring-2 ring-blue-500 outline-none" /><button onClick={() => joinCode && onAction('join', joinCode)} className="bg-blue-500 text-white px-3 rounded-lg font-bold hover:bg-blue-600 transition-colors"><Icon name="arrow-right" /></button></div></div>
+                            <button onClick={() => onAction('community')} className="md:hidden bg-purple-50 border border-purple-200 p-4 rounded-2xl text-purple-700 font-bold flex items-center justify-center gap-2 hover:bg-purple-100 flex-shrink-0"><Icon name="globe" /> Community</button>
+                            <button onClick={handleInstallClick} className="md:hidden bg-green-50 border border-green-200 p-4 rounded-2xl text-green-700 font-bold flex items-center justify-center gap-2 hover:bg-green-100 flex-shrink-0"><Icon name="plus-square" /> App installieren</button>
+                        </div>
+                    </div>
+                    {isCreating && (
+                        <Modal title="Garten benennen" onClose={() => !isBusy && setIsCreating(false)}><div className="space-y-4"><input autoFocus value={newGardenName} onChange={e => setNewGardenName(e.target.value)} placeholder="Name..." className="w-full border rounded-xl p-3 outline-none" disabled={isBusy} /><button onClick={handleCreate} disabled={isBusy} className={`w-full text-white font-bold py-3 rounded-xl ${isBusy ? 'bg-gray-400' : 'bg-green-500'}`}>{isBusy ? '...' : 'Erstellen'}</button></div></Modal>
+                    )}
+                    {showInstallHelp && <InstallHelpModal onClose={() => setShowInstallHelp(false)} />}
+                </div>
+            );
+        };
+
         const GridCell = ({ x, y, cell, handleGridClick, now }) => {
             const floorItem = cell.floor ? ITEMS[cell.floor] : null;
             const objectItem = cell.item ? ITEMS[cell.item] : null;
@@ -227,111 +317,6 @@
             );
         };
 
-        // --- 5. MENÜS ---
-
-        const MainMenu = ({ user, onAction, currentRoom }) => {
-            const [joinCode, setJoinCode] = React.useState("");
-            const [isCreating, setIsCreating] = React.useState(false);
-            const [newGardenName, setNewGardenName] = React.useState("");
-            const [isBusy, setIsBusy] = React.useState(false);
-            const [installPrompt, setInstallPrompt] = React.useState(null);
-            const [showInstallHelp, setShowInstallHelp] = React.useState(false);
-            const [streak, setStreak] = React.useState(0);
-
-            React.useEffect(() => { 
-                safeRefreshIcons();
-                window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
-                if(currentRoom && db) {
-                    getDoc(doc(db, 'rooms', currentRoom)).then(snap => {
-                        if(snap.exists()) setStreak(snap.data().currentStreak || 0);
-                    }).catch(e => console.log("Streak load error", e));
-                }
-            }, [currentRoom]);
-
-            const handleCreate = async () => {
-                if(!newGardenName.trim()) return alert("Bitte Namen eingeben");
-                setIsBusy(true);
-                await onAction('create', null, newGardenName);
-                setIsBusy(false); setIsCreating(false);
-            };
-
-            const handleInstallClick = () => {
-                if (installPrompt) {
-                    installPrompt.prompt();
-                    installPrompt.userChoice.then((res) => { if (res.outcome === 'accepted') setInstallPrompt(null); });
-                } else { setShowInstallHelp(true); }
-            };
-
-            return (
-                <div className="h-full bg-slate-100 flex flex-col md:flex-row max-w-5xl mx-auto shadow-xl md:rounded-3xl md:my-8 overflow-hidden">
-                    <div className="bg-white p-6 flex flex-col items-center border-b md:border-b-0 md:border-r border-gray-100 shadow-sm z-10 md:w-1/3 flex-shrink-0">
-                        <div className="flex items-center gap-4 w-full md:flex-col">
-                            <img src={user.photoURL} className="w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-green-500 shadow-lg" />
-                            <div className="text-left md:text-center"><h1 className="text-xl md:text-2xl font-bold text-gray-800">{user.displayName}</h1><p className="text-xs text-gray-400">ID: {user.uid.slice(0,5)}</p></div>
-                            <button onClick={() => auth.signOut()} className="ml-auto md:ml-0 md:mt-auto text-red-500 font-bold bg-red-50 p-2 rounded-lg"><Icon name="log-out" /></button>
-                        </div>
-                        <div className="hidden md:flex flex-col w-full space-y-2 mt-8">
-                            <button onClick={() => onAction('community')} className="w-full bg-purple-50 border border-purple-200 p-3 rounded-xl text-purple-700 font-bold flex items-center justify-center gap-2 hover:bg-purple-100 transition-colors"><Icon name="globe" /> Community</button>
-                            <button onClick={handleInstallClick} className="w-full bg-green-50 border border-green-200 p-3 rounded-xl text-green-700 font-bold flex items-center justify-center gap-2 hover:bg-green-100 transition-colors"><Icon name="plus-square" /> App installieren</button>
-                        </div>
-                    </div>
-                    <div className="flex-1 bg-[#f8fafc] p-6 flex flex-col gap-6 overflow-y-auto">
-                        <h2 className="text-2xl font-bold text-gray-700">Dashboard</h2>
-                        
-                        {currentRoom && (
-                            <div className="bg-gradient-to-r from-orange-500 to-red-500 p-5 rounded-3xl shadow-lg flex items-center justify-between text-white relative overflow-hidden mb-2 flex-shrink-0 min-h-[100px]">
-                                <div className="z-10 relative">
-                                    <div className="text-xs font-bold uppercase tracking-wider opacity-90 mb-1">Dein Streak</div>
-                                    <div className="text-4xl font-black flex items-baseline gap-2">{streak} <span className="text-base font-medium opacity-90">Tage</span></div>
-                                    <div className="text-xs font-medium opacity-80 mt-1">Bleib dran! 🔥</div>
-                                </div>
-                                <div className="text-6xl animate-pulse z-10 drop-shadow-md transform translate-x-2">🔥</div>
-                                <div className="absolute -right-4 -bottom-8 bg-white opacity-10 w-32 h-32 rounded-full blur-2xl pointer-events-none"></div>
-                            </div>
-                        )}
-
-                        {currentRoom ? (
-                            <button onClick={() => onAction('resume', currentRoom)} className="bg-white border-2 border-green-500 text-green-600 p-6 rounded-2xl shadow-sm hover:bg-green-50 transition-all text-left flex items-center justify-between group flex-shrink-0">
-                                <div><div className="text-green-800 text-sm font-bold uppercase mb-1">Letzte Sitzung</div><div className="text-2xl font-bold">Weitergärtnern</div><div className="text-sm opacity-80 font-mono mt-1">Code: {currentRoom}</div></div>
-                                <div className="bg-green-100 p-3 rounded-full"><Icon name="play" className="text-green-600" /></div>
-                            </button>
-                        ) : <div className="bg-gray-100 p-4 rounded-xl text-center text-gray-500 italic flex-shrink-0">Kein Garten.</div>}
-                        <hr className="border-gray-200" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-20">
-                            <button onClick={() => setIsCreating(true)} className="bg-white border-2 border-dashed border-gray-300 p-6 rounded-2xl text-gray-500 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 transition-all flex flex-col items-center justify-center gap-2 h-32 flex-shrink-0"><div className="bg-blue-100 p-3 rounded-full text-blue-500"><Icon name="plus" /></div><span className="font-bold">Neuer Garten</span></button>
-                            <div className="bg-white border border-gray-200 p-6 rounded-2xl flex flex-col justify-center h-32 flex-shrink-0"><label className="text-xs font-bold text-gray-400 uppercase mb-2">Code eingeben</label><div className="flex gap-2"><input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="CODE" className="w-full bg-gray-100 rounded-lg px-3 py-2 font-bold uppercase focus:ring-2 ring-blue-500 outline-none" /><button onClick={() => joinCode && onAction('join', joinCode)} className="bg-blue-500 text-white px-3 rounded-lg font-bold hover:bg-blue-600 transition-colors"><Icon name="arrow-right" /></button></div></div>
-                            <button onClick={() => onAction('community')} className="md:hidden bg-purple-50 border border-purple-200 p-4 rounded-2xl text-purple-700 font-bold flex items-center justify-center gap-2 hover:bg-purple-100 flex-shrink-0"><Icon name="globe" /> Community</button>
-                            <button onClick={handleInstallClick} className="md:hidden bg-green-50 border border-green-200 p-4 rounded-2xl text-green-700 font-bold flex items-center justify-center gap-2 hover:bg-green-100 flex-shrink-0"><Icon name="plus-square" /> App installieren</button>
-                        </div>
-                    </div>
-                    {isCreating && (
-                        <Modal title="Garten benennen" onClose={() => !isBusy && setIsCreating(false)}><div className="space-y-4"><input autoFocus value={newGardenName} onChange={e => setNewGardenName(e.target.value)} placeholder="Name..." className="w-full border rounded-xl p-3 outline-none" disabled={isBusy} /><button onClick={handleCreate} disabled={isBusy} className={`w-full text-white font-bold py-3 rounded-xl ${isBusy ? 'bg-gray-400' : 'bg-green-500'}`}>{isBusy ? '...' : 'Erstellen'}</button></div></Modal>
-                    )}
-                    {showInstallHelp && <InstallHelpModal onClose={() => setShowInstallHelp(false)} />}
-                </div>
-            );
-        };
-
-        const CommunityList = ({ onVisit, onBack }) => {
-            const [list, setList] = React.useState([]);
-            const [loading, setLoading] = React.useState(true);
-            React.useEffect(() => {
-                const timer = setTimeout(() => { safeRefreshIcons(); }, 100);
-                const fetchG = async () => { try { const q = query(collection(db, 'rooms'), limit(50)); const snap = await getDocs(q); const sorted = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.likes||0) - (a.likes||0)); setList(sorted); } catch(e) { console.error(e); } setLoading(false); }; fetchG();
-                return () => clearTimeout(timer);
-            }, []);
-            React.useEffect(() => { const t = setTimeout(() => { safeRefreshIcons(); }, 100); return () => clearTimeout(t); }, [list]);
-            return (
-                <div className="h-full bg-slate-50 flex flex-col md:max-w-4xl md:mx-auto md:my-8 md:rounded-3xl shadow-xl overflow-hidden">
-                    <div className="p-6 bg-white shadow-sm flex items-center gap-4"><button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><Icon name="home" className="text-gray-600"/></button><h2 className="text-2xl font-bold text-gray-800">Community Gärten</h2></div>
-                    <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                        {loading && <div>Lade Liste...</div>}
-                        {list.map(g => (<div key={g.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center hover:shadow-md transition-shadow"><div><div className="font-bold text-lg text-gray-800">{g.roomName || "Unbenannter Garten"}</div><div className="text-sm text-gray-500 flex gap-3"><span className="text-red-500 flex items-center gap-1"><Icon name="heart" size={12}/> {g.likes||0}</span><span>Level {g.unlockedGardens?.length || 1}</span></div></div><button onClick={() => onVisit(g.id)} className="bg-purple-100 text-purple-700 px-4 py-2 rounded-xl font-bold hover:bg-purple-200">Besuchen</button></div>))}
-                    </div>
-                </div>
-            );
-        };
-
         const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
             const [roomData, setRoomData] = React.useState(null);
             const [tab, setTab] = React.useState('garden');
@@ -359,7 +344,7 @@
                         
                         const todayStr = new Date().toISOString().split('T')[0];
                         if (!isSpectator) {
-                            // CLEANUP TASKS (30 Days)
+                            // CLEANUP TASKS
                             const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
                             const currentTasks = Array.isArray(data.tasks) ? data.tasks : [];
                             const validTasks = currentTasks.filter(t => {
@@ -455,13 +440,33 @@
                 const anyTaskDoneToday = getTasks().some(t => (t.type === 'daily' && t.lastDone === today) || (t.type === 'once' && t.done && t.completedAt?.startsWith(new Date().toLocaleDateString('de-DE'))));
                 const updatedTasks = getTasks().map(t => { if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; } return t; });
                 const updates = { tasks: updatedTasks, coins: increment(task.reward) };
+                
+                // --- STREAK UPDATE ---
+                // Wenn heute noch KEINE Aufgabe erledigt wurde, und wir jetzt eine erledigen,
+                // prüfen wir, ob wir den Streak erhöhen oder resetten müssen.
                 if (!anyTaskDoneToday && !task.done) {
                     const lastStreakDate = roomData.lastStreakDate;
-                    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                    
+                    // Berechne Gestern korrekt
+                    const d = new Date();
+                    d.setDate(d.getDate() - 1);
+                    const yesterday = d.toISOString().split('T')[0];
+                    
                     let newStreak = roomData.currentStreak || 0;
-                    if (lastStreakDate === yesterday) { newStreak++; } else if (lastStreakDate !== today) { newStreak = 1; }
-                    updates.currentStreak = newStreak; updates.lastStreakDate = today;
+                    
+                    // Wenn der letzte Streak gestern war -> Erhöhe um 1
+                    if (lastStreakDate === yesterday) { 
+                        newStreak++; 
+                    } 
+                    // Wenn der letzte Streak NICHT heute und NICHT gestern war -> Reset auf 1 (Neustart)
+                    else if (lastStreakDate !== today) { 
+                        newStreak = 1; 
+                    }
+                    
+                    updates.currentStreak = newStreak; 
+                    updates.lastStreakDate = today;
                 }
+                
                 await updateDoc(doc(db, 'rooms', roomCode), updates);
             };
 
@@ -541,56 +546,6 @@
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                 </div>
-            );
-        };
-
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [view, setView] = React.useState('loading'); 
-            const [roomCode, setRoomCode] = React.useState(null);
-            const [spectateCode, setSpectateCode] = React.useState(null);
-
-            React.useEffect(() => {
-                if(!auth) { setView('login'); return; }
-                const unsub = onAuthStateChanged(auth, async (u) => {
-                    if (u) {
-                        setUser(u);
-                        if(view === 'loading') { const userSnap = await getDoc(doc(db, 'users', u.uid)); if(userSnap.exists() && userSnap.data().lastRoom) setRoomCode(userSnap.data().lastRoom); setView('menu'); }
-                    } else { setView('login'); }
-                }); return () => unsub();
-            }, []);
-
-            const handleAction = async (action, code, name) => {
-                if (action === 'resume') setView('game');
-                else if (action === 'create') {
-                    const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    await setDoc(doc(db, 'rooms', newCode), { roomName: name, coins: 50, gems: 0, tasks: [], inventory: {}, gardens: { 0: {} }, unlockedGardens: [0], likes: 0, createdAt: new Date().toISOString(), owner: user.uid });
-                    setRoomCode(newCode);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: newCode }, { merge: true });
-                    setView('game');
-                } else if (action === 'join') {
-                    setRoomCode(code);
-                    await setDoc(doc(db, 'users', user.uid), { lastRoom: code }, { merge: true });
-                    setView('game');
-                } else if (action === 'community') setView('community');
-            };
-
-            // Safety timeout
-            React.useEffect(() => {
-                const t = setTimeout(() => { if(view === 'loading') setView('login'); }, 3000);
-                return () => clearTimeout(t);
-            }, [view]);
-
-            if (view === 'loading') return <div className="h-full flex items-center justify-center animate-pulse text-green-600 font-bold">Lade DuoBloom...</div>;
-            if (view === 'login') return <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-400 to-teal-500 text-white text-center"><h1 className="text-6xl font-bold mb-4 drop-shadow-md">DuoBloom</h1><button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white text-green-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:scale-105 transition-transform flex items-center gap-3"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" /> Los geht's</button></div>;
-            
-            return (
-                <ErrorBoundary roomCode={roomCode}>
-                    {view === 'community' && <CommunityList onVisit={(id) => { setSpectateCode(id); setView('spectator'); }} onBack={() => setView('menu')} />}
-                    {view === 'spectator' && <GameApp user={user} roomCode={spectateCode} isSpectator={true} onBackToMenu={() => setView('community')} />}
-                    {view === 'menu' && <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />}
-                    {view === 'game' && <GameApp user={user} roomCode={roomCode} isSpectator={false} onBackToMenu={() => setView('menu')} />}
-                </ErrorBoundary>
             );
         };
 
