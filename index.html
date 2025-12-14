@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 16.1 (Smart Octo)</title>
+    <title>DuoBloom 17.0 (Super Brain)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -135,7 +135,75 @@
             return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
         };
 
-        // --- 2. SMART OCTO BOT COMPONENT (VERBESSERT!) ---
+        // --- 2. DAS OKTOPUS-GEHIRN (OCTO BRAIN) ---
+        // Dies ist das "Gehirn" als separates Modul
+        
+        const OCTO_BRAIN = {
+            fallback: [
+                "Blub? Das habe ich nicht ganz verstanden. Frag mich nach Gießen, Pflanzen oder Gems! 🐙",
+                "Meine Tentakel sind verwirrt. Kannst du das anders formulieren?",
+                "Ich bin Experte für Gärten, aber bei diesem Thema muss ich passen."
+            ],
+            knowledge: [
+                {
+                    keys: ["hallo", "hi", "hey", "moin", "servus"],
+                    answer: "Blub blub! 👋 Schön dich zu sehen! Wie kann ich dir im Garten helfen?"
+                },
+                {
+                    keys: ["pflanz", "säen", "samen", "anbau"],
+                    answer: "Pflanzen ist leicht: 1. Wähle unten einen Samen aus. 2. Tippe auf ein leeres Feld. 🌱 Vergiss das Gießen nicht!"
+                },
+                {
+                    keys: ["gieß", "wasser", "trocken", "braun"],
+                    answer: "Pflanzen brauchen Liebe und Wasser! 💧 Wenn das 'Gießen'-Schild hüpft, tippe auf die Pflanze. Das geht alle 6 Stunden."
+                },
+                {
+                    keys: ["ernt", "sammel", "fertig", "ausgewachsen"],
+                    answer: "Wenn der Balken voll ist, ist die Pflanze reif! 🌻 Tippe sie an, um zu ernten. Du bekommst dafür wertvolle Gems (Edelsteine)!"
+                },
+                {
+                    keys: ["geld", "münze", "coin", "pleite", "arm", "verdien"],
+                    answer: "Du brauchst Münzen? 💰 Erledige Aufgaben im 'Aufgaben'-Tab! Tägliche Aufgaben kommen jeden Morgen neu."
+                },
+                {
+                    keys: ["gem", "edelstein", "diamant", "kristall"],
+                    answer: "Gems 💎 sind super selten! Du kriegst sie NUR durch das Ernten von Pflanzen. Damit kaufst du neue Gärten."
+                },
+                {
+                    keys: ["streak", "flamme", "feuer", "serie"],
+                    answer: "Der Streak 🔥 zeigt deine Ausdauer. Erledige jeden Tag mindestens EINE Aufgabe, damit die Flamme nicht ausgeht!"
+                },
+                {
+                    keys: ["shop", "laden", "kaufen", "markt"],
+                    answer: "Im Shop gibt es zwei Abteilungen: Oben Immobilien (neue Gärten) für Gems, unten Waren (Samen/Deko) für Münzen. 🛒"
+                },
+                {
+                    keys: ["löschen", "weg", "entfern", "abbau"],
+                    answer: "Deko kannst du antippen zum Einpacken. Pflanzen verschwinden, wenn du einen neuen Bodenbelag (z.B. Stein) darüber legst. 🧹"
+                },
+                {
+                    keys: ["witz", "lachen", "spaß"],
+                    answer: "Was ist grün und klopft an die Tür? Ein Klopfsalat! 🥬 ... Haha, Oktopus-Humor ist speziell."
+                },
+                {
+                    keys: ["wer bist du", "name", "vorstellen"],
+                    answer: "Ich bin Octo, dein Garten-Assistent! Ich habe 8 Arme, aber keinen grünen Daumen. Dafür habe ich dich! 🐙"
+                },
+                {
+                    keys: ["freund", "multiplayer", "besuch", "code"],
+                    answer: "Teile deinen Code aus dem Hauptmenü! Freunde können 'Beitreten' wählen und deinen Garten live sehen. 👀"
+                }
+            ],
+            think: function(input) {
+                const text = input.toLowerCase();
+                for (const entry of this.knowledge) {
+                    if (entry.keys.some(k => text.includes(k))) {
+                        return entry.answer;
+                    }
+                }
+                return this.fallback[Math.floor(Math.random() * this.fallback.length)];
+            }
+        };
 
         const OctoBot = () => {
             const [showBubble, setShowBubble] = React.useState(false);
@@ -144,55 +212,17 @@
             const [input, setInput] = React.useState("");
 
             const handleAsk = () => {
-                const q = input.toLowerCase().trim();
+                const q = input.trim();
                 if(!q) return;
 
-                let reply = "Entschuldigung, das habe ich nicht verstanden. Ich weiß alles über Gärten, Pflanzen, Aufgaben und Streaks! 🐙";
-
-                // Verbesserte Logik mit RegEx für bessere Erkennung
-                if (q.match(/(hallo|hi|hey|moin|guten tag)/)) {
-                    reply = "Blub! Hallo Gärtner! 🌊 Frag mich ruhig, wie man pflanzt, gießt oder wie der Streak funktioniert.";
-                }
-                else if (q.match(/(pflanz|samen|säen|karotte|sonnenblume|blume)/)) {
-                    reply = "Ganz einfach: Wähle unten im Menü einen Samen aus (kostet Münzen 💰) und tippe auf ein leeres Feld. Vergiss nicht, danach zu gießen, damit sie wachsen!";
-                }
-                else if (q.match(/(gieß|wasser|trocken|zeit|wann|uhr)/)) {
-                    reply = "Pflanzen werden durstig! Alle 6 Stunden musst du gießen. Achte auf das hüpfende 'Gießen!'-Schild. Ohne Wasser wachsen sie nicht weiter.";
-                }
-                else if (q.match(/(ernt|sammeln|fertig|ausgewachsen|blau|balken)/)) {
-                    reply = "Wenn der blaue Balken voll ist, ist Erntezeit! Tippe die Pflanze an, um Edelsteine (Gems 💎) zu bekommen. Die brauchst du für neue Gärten.";
-                }
-                else if (q.match(/(geld|münze|coin|verdien|reich|kaufen)/)) {
-                    reply = "Münzen 💰 verdienst du durch das Erledigen von Aufgaben im 'Aufgaben'-Tab. Mit Münzen kaufst du Samen, Zäune und Deko.";
-                }
-                else if (q.match(/(gem|edelstein|diamant|kristall)/)) {
-                    reply = "Edelsteine 💎 sind selten! Du bekommst sie NUR durch das Ernten von fertigen Pflanzen. Spare sie, um teure Gärten wie die Waldlichtung freizuschalten.";
-                }
-                else if (q.match(/(aufgabe|mission|quest|täg|erledig)/)) {
-                    reply = "Schau unten in den Tab 'Aufgaben'. Tägliche Aufgaben (blau) kommen jeden Tag wieder. Einmalige Aufgaben geben oft viele Münzen, haben aber manchmal eine Frist!";
-                }
-                else if (q.match(/(streak|flamme|feuer|tagen|reihe|konstant)/)) {
-                    reply = "Der Streak 🔥 zeigt, wie viele Tage du in Folge aktiv warst. Erledige jeden Tag mindestens EINE Aufgabe, um ihn zu erhöhen. Ab Tag 3 wird er orange!";
-                }
-                else if (q.match(/(shop|laden|markt|angebot)/)) {
-                    reply = "Im Shop gibt es zwei Bereiche: Oben kaufst du neue Gärten für Edelsteine 💎, unten kaufst du Samen und Deko für Münzen 💰.";
-                }
-                else if (q.match(/(löschen|weg|entfernen|abbauen|kaputt|falsch)/)) {
-                    reply = "Deko kannst du antippen, um sie ins Inventar zu packen. Pflanzen kannst du nicht verschieben, aber wenn du einen Bodenbelag darüber legst, verschwinden sie.";
-                }
-                else if (q.match(/(freund|besuch|multiplayer|zusammen|code)/)) {
-                    reply = "Du kannst deinen Garten-Code (oben im Menü) teilen! Freunde können ihn eingeben und dich besuchen. Sie können zuschauen, aber nichts kaputt machen. 👀";
-                }
-                else if (q.match(/(wetter|essen|leben|sinn|mathe|rezept)/)) {
-                    reply = "Oh, da bin ich überfragt. Ich bin nur ein kleiner Oktopus im Handy. Ich kenne mich nur mit DuoBloom aus! 🌸";
-                }
+                // Hier nutzen wir das ausgelagerte Gehirn
+                const reply = OCTO_BRAIN.think(q);
 
                 setMessage(reply);
                 setShowBubble(true);
                 setIsInputOpen(false);
                 setInput("");
                 
-                // Längere Anzeigezeit für längere Texte (15 Sekunden)
                 setTimeout(() => setShowBubble(false), 15000);
             };
 
@@ -209,7 +239,7 @@
                             <div className="bg-white p-2 rounded-xl shadow-xl mb-2 flex gap-2 animate-pop border border-blue-100 items-center">
                                 <input 
                                     className="border border-gray-200 rounded-lg px-2 py-1 text-sm w-48 outline-none focus:border-blue-400 focus:ring-1 ring-blue-100" 
-                                    placeholder="Stell eine Frage..." 
+                                    placeholder="Frag Octo..." 
                                     value={input} 
                                     onChange={e => setInput(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleAsk()}
@@ -221,10 +251,10 @@
 
                         <button 
                             onClick={() => { setIsInputOpen(!isInputOpen); setShowBubble(false); }} 
-                            className="hover:scale-110 hover:-rotate-6 transition-all active:scale-95 cursor-pointer"
+                            className="hover:scale-110 hover:-rotate-6 transition-all active:scale-95 cursor-pointer group"
                             title="Frag den Oktopus!"
                         >
-                            <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" className="w-20 h-20 drop-shadow-2xl" alt="Octo-Help" />
+                            <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" className="w-20 h-20 drop-shadow-2xl group-hover:animate-bounce" alt="Octo-Help" />
                         </button>
                     </div>
                 </div>
@@ -699,7 +729,7 @@
                     <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
                         <Icon name="log-in" /> Mit Google starten
                     </button>
-                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 16.1 • Smart Octo</p>
+                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 17.0 • Super Brain</p>
                 </div>
             </div>
         );
