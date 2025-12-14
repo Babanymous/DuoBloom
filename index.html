@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 25.0 (Genius Octo)</title>
+    <title>DuoBloom 24.0 (Chatty AI)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -15,6 +15,22 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <!-- Global Error Handler -->
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            const root = document.getElementById('root');
+            if (root) {
+                root.innerHTML = '<div style="padding:20px; color:#b91c1c; font-family:sans-serif; text-align:center; height:100vh; display:flex; flex-direction:column; justify-content:center; background:#fef2f2;">' +
+                    '<h2 style="font-size:20px; font-weight:bold; margin-bottom:10px;">Start-Fehler!</h2>' +
+                    '<p style="background:white; padding:15px; border-radius:8px; border:1px solid #fca5a5; font-family:monospace;">' + msg + '</p>' +
+                    '<p style="font-size:12px; color:gray; margin-top:10px;">Zeile: ' + line + '</p>' +
+                    '<button onclick="location.reload()" style="margin-top:20px; padding:12px 24px; background:#ef4444; color:white; border:none; border-radius:8px; font-weight:bold;">Neu laden</button>' +
+                    '</div>';
+            }
+            return false;
+        };
+    </script>
+
     <style>
         body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; background-color: #f8fafc; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -25,10 +41,14 @@
         @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         
         /* CHAT STYLES */
-        .chat-bubble { max-width: 85%; padding: 12px 16px; border-radius: 18px; margin-bottom: 8px; font-size: 14px; line-height: 1.5; animation: pop 0.2s ease-out; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .chat-octo { background-color: white; color: #374151; border-bottom-left-radius: 4px; border: 1px solid #e5e7eb; align-self: flex-start; }
-        .chat-user { background-color: #3b82f6; color: white; border-bottom-right-radius: 4px; align-self: flex-end; }
-        .code-block { font-family: monospace; background: #1e293b; color: #4ade80; padding: 8px; border-radius: 8px; font-size: 11px; margin-top: 5px; display: block; white-space: pre-wrap; }
+        .chat-container { display: flex; flex-direction: column; height: 100%; background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%); }
+        .chat-bubble { max-width: 80%; padding: 12px 16px; border-radius: 18px; margin-bottom: 8px; font-size: 14px; line-height: 1.5; animation: pop 0.2s ease-out; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.05); word-wrap: break-word; }
+        .chat-octo { background-color: white; color: #1f2937; border-bottom-left-radius: 4px; border: 1px solid #e5e7eb; margin-left: 8px; }
+        .chat-user { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border-bottom-right-radius: 4px; align-self: flex-end; margin-right: 8px; }
+        .typing-indicator span { display: inline-block; width: 6px; height: 6px; background-color: #9ca3af; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; margin: 0 2px; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -116,174 +136,200 @@
             return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
         };
 
-        // --- 2. GENIUS OCTO BRAIN ---
-        // Hier ist das "Wissen" über den Code gespeichert
+        // --- 2. ADVANCED OCTO BRAIN ---
         
-        const GAME_KNOWLEDGE = {
-            "shop": {
-                location: "Tab 'Shop' (Einkaufswagen-Icon)",
-                description: "Hier kannst du Items kaufen. Oben 'Immobilien' (neue Gärten) für Gems, unten 'Markt' (Samen/Deko) für Münzen.",
-                codeRef: "buy(itemId)"
-            },
-            "garden": {
-                location: "Tab 'Garten' (Blumen-Icon)",
-                description: "Dein Hauptbereich. Hier pflanzt, gießt und erntest du.",
-                codeRef: "handleGridClick(x, y)"
-            },
-            "tasks": {
-                location: "Tab 'Aufgaben' (Checklisten-Icon)",
-                description: "Erledige Missionen für Münzen. Klicke auf 'Neu', um Aufgaben zu erstellen.",
-                codeRef: "toggleTask(task)"
-            },
-            "streak": {
-                location: "Hauptmenü Dashboard",
-                description: "Zeigt aufeinanderfolgende Tage mit Aktivität. Berechnet aus 'lastStreakDate'.",
-                codeRef: "roomData.currentStreak"
-            }
-        };
-
         const OCTO_BRAIN = {
+            memory: {
+                lastTopic: null,
+                userName: "Gärtner"
+            },
+
+            getRandom: function(arr) {
+                return arr[Math.floor(Math.random() * arr.length)];
+            },
+
             greet: function(name) {
                 const h = new Date().getHours();
-                const timeGreeting = h < 12 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend";
-                const shortName = name ? name.split(' ')[0] : "Gärtner";
-                return "Blub! " + timeGreeting + ", " + shortName + "! 🐙 Ich habe vollen Zugriff auf das System.";
+                const timeGreeting = h < 12 ? "Guten Morgen" : h < 18 ? "Hallo" : "N'abend";
+                this.memory.userName = name;
+                return this.getRandom([
+                    "Blub! " + timeGreeting + ", " + name + "! 🐙 Schön dich zu sehen!",
+                    "Ahoi " + name + "! Bereit zum Gärtnern? 🌿",
+                    "Blub blub! Ich bin bereit für deine Fragen! 🌊"
+                ]);
             },
             
-            analyzeSystem: function(ctx) {
-                if (!ctx || !ctx.roomData) return "System-Daten werden geladen...";
+            analyzeState: function(ctx) {
+                if (!ctx || !ctx.roomData) return "Blub! Ich sortiere noch meine Tentakel... (Lade Daten)";
                 
-                // Wir simulieren einen "Code-Scan"
-                const gardenCount = ctx.roomData.unlockedGardens ? ctx.roomData.unlockedGardens.length : 1;
+                const idx = ctx.activeGardenIdx || 0;
+                const garden = (ctx.roomData.gardens && ctx.roomData.gardens[idx]) ? ctx.roomData.gardens[idx] : {};
                 const coins = ctx.roomData.coins || 0;
-                const gems = ctx.roomData.gems || 0;
-                const streak = ctx.roomData.currentStreak || 0;
+                const tasks = ctx.tasks || [];
+                const now = Date.now();
                 
-                return "🔍 SYSTEM-DIAGNOSE:\n" +
-                       "• User: " + (ctx.user ? ctx.user.displayName : 'Unknown') + "\n" +
-                       "• Coins: " + coins + " | Gems: " + gems + "\n" +
-                       "• Streak: " + streak + " Tage\n" +
-                       "• Freigeschaltete Gärten: " + gardenCount + "\n" +
-                       "• Status: Alles operational. 🟢";
-            },
+                let thirsty = 0;
+                let ready = 0;
+                let plantCount = 0;
 
-            explainFeature: function(keyword) {
-                for (const key in GAME_KNOWLEDGE) {
-                    if (keyword.includes(key)) {
-                        const info = GAME_KNOWLEDGE[key];
-                        return "ℹ️ INFO ZU '" + key.toUpperCase() + "':\n" +
-                               "📍 Ort: " + info.location + "\n" +
-                               "📝 Funktion: " + info.description + "\n" +
-                               "⚙️ Code: `" + info.codeRef + "`";
+                Object.values(garden).forEach(function(c) {
+                    if(c.item && ITEMS[c.item] && ITEMS[c.item].type === 'seed') {
+                        plantCount++;
+                        if(c.grown) ready++;
+                        else {
+                            const lw = c.lastWatered ? new Date(c.lastWatered).getTime() : 0;
+                            if (now - lw > WATER_COOLDOWN) thirsty++;
+                        }
                     }
-                }
-                return null;
+                });
+
+                if (plantCount === 0) return "Hier ist es ja ganz leer! 🏜️ Wir sollten dringend etwas pflanzen. Hast du genug Münzen für Samen?";
+                if (thirsty > 0) return "Oh nein! Alarm! 🚨 " + thirsty + " Pflanzen lassen die Köpfe hängen. Sie brauchen dringend Wasser! 💦";
+                if (ready > 0) return "Juhuu! 🌾 " + ready + " Pflanzen sind bereit für die Ernte. Hol dir die Edelsteine! 💎";
+                if (coins < 20) return "Dein Sparschwein sieht mager aus (" + coins + " Münzen). 💸 Wie wäre es mit einer kleinen Aufgabe?";
+                
+                return "Dein Garten sieht fantastisch aus! 🌿 Alles grünt und blüht. Kann ich dir bei etwas anderem helfen?";
             },
 
             think: function(input, ctx) {
                 const text = input.toLowerCase();
+                const self = this; // Referenz für Closures
+
+                // --- 1. SMALLTALK & PERSÖNLICHKEIT ---
+                if (text.match(/(hallo|hi|hey|moin|servus|grüß)/)) {
+                    return this.getRandom(["Blub blub! 👋", "Hallöchen! 🐙", "Ahoi! Bereit für Gartenarbeit?"]);
+                }
                 
-                // 1. System & Debug
-                if (text.match(/(system|status|debug|info|analyse)/)) {
-                    return this.analyzeSystem(ctx);
+                if (text.match(/(wie geht|alles klar|fit)/)) {
+                    return this.getRandom([
+                        "Mir geht's blendend! 🌊 Das Wasser ist herrlich heute.",
+                        "Ein bisschen müde vom vielen Schwimmen, aber für dich bin ich wach! 🐙",
+                        "Super! Ich habe gerade einen neuen Korallengarten entdeckt."
+                    ]);
                 }
 
-                // 2. Erklärungen ("Wie funktioniert...", "Wo finde ich...")
-                if (text.match(/(wo|wie|was)/)) {
-                    // Suche nach Keywords im Knowledge
-                    if (text.match(/(shop|kauf|laden)/)) return this.explainFeature("shop");
-                    if (text.match(/(aufgabe|quest|mission)/)) return this.explainFeature("tasks");
-                    if (text.match(/(garten|pflanz)/)) return this.explainFeature("garden");
-                    if (text.match(/(streak|flamme)/)) return this.explainFeature("streak");
+                if (text.match(/(was machst du|wer bist du)/)) {
+                    return "Ich bin Octo, dein persönlicher Garten-Assistent! 🧠 Ich habe 8 Arme, um dir bei allem gleichzeitig zu helfen. (Naja, fast allem).";
                 }
 
-                // 3. Kontext-Hilfe
-                if (text.match(/(geld|münze|reich|arm|leisten|konto)/)) {
+                if (text.match(/(witz|lachen|spaß)/)) {
+                    return this.getRandom([
+                        "Was ist grün und klopft an die Tür? Ein Klopfsalat! 🥬",
+                        "Warum gießen Gärtner so ungern? Weil sie Angst vor dem Wasserhahn haben! 🚰",
+                        "Was sagt der große Stift zum kleinen Stift? Wachs mal! 🌱"
+                    ]);
+                }
+
+                if (text.match(/(danke|cool|super|top)/)) {
+                    return this.getRandom(["Gerne doch! 🐙", "Freut mich! 💙", "Jederzeit wieder! 🌊"]);
+                }
+
+                if (text.match(/(blub|fisch|oktopus|tintenfisch)/)) {
+                    return "Blub blub! 🫧 Wir Meeresbewohner müssen zusammenhalten!";
+                }
+
+                // --- 2. KONTEXT & HILFE ---
+                
+                // Geld / Finanzen
+                if (text.match(/(geld|münze|reich|arm|leisten|konto|finanz|kosten)/)) {
+                    this.memory.lastTopic = "money";
                     const c = (ctx && ctx.roomData) ? (ctx.roomData.coins || 0) : 0;
-                    return "Variable `roomData.coins` = " + c + ". 💰 Brauchst du mehr? Geh zu `tasks` (Aufgaben)!";
+                    if (c < 50) return "Du hast aktuell " + c + " Münzen. 🪙 Das ist nicht viel. Soll ich dir sagen, wie du mehr bekommst?";
+                    return "Du bist flüssig! 💰 " + c + " Münzen auf dem Konto. Gönn dir doch was Schönes im Shop!";
                 }
 
-                if (text.match(/(durst|wasser|gieß)/)) {
-                    // Echte Analyse
-                    const idx = ctx.activeGardenIdx || 0;
-                    const garden = (ctx.roomData.gardens && ctx.roomData.gardens[idx]) ? ctx.roomData.gardens[idx] : {};
-                    const now = Date.now();
-                    let thirsty = 0;
-                    Object.values(garden).forEach(function(c) {
-                        if(c.item && ITEMS[c.item] && ITEMS[c.item].type === 'seed' && !c.grown) {
-                            const lw = c.lastWatered ? new Date(c.lastWatered).getTime() : 0;
-                            if (now - lw > WATER_COOLDOWN) thirsty++;
-                        }
-                    });
-                    if (thirsty > 0) return "⚠️ ALERT: `thirstyCount` = " + thirsty + ". Bitte führe Funktion `waterPlant()` aus (Tippen)!";
-                    return "Status: Hydration Level optimal. 💧";
+                // Follow-up: "Wie?" nach Geld
+                if (this.memory.lastTopic === "money" && text.match(/(wie|mehr|woher|bekommen)/)) {
+                    return "Ganz einfach: Erledige Aufgaben! 📋 Schau unten in den Tab 'Aufgaben'. Für jede erledigte Mission gibt es Münzen.";
                 }
 
-                // 4. Smalltalk
-                if (text.match(/(hallo|hi|moin)/)) return "Initiiere Begrüßungsprotokoll... Blub! 👋";
-                if (text.match(/(danke|super)/)) return "Positives Feedback registriert. ✅";
+                // Status Check
+                if (text.match(/(status|garten|pflanze|wie geht|bericht|durst|wasser)/)) {
+                    return this.analyzeState(ctx);
+                }
 
-                return "Fehler 404: Antwort nicht gefunden. 🐙 Frag mich nach 'Systemstatus', 'Shop' oder 'Aufgaben'.";
+                // Aufgaben
+                if (text.match(/(tun|machen|aufgabe|quest|mission|langweil)/)) {
+                    if(!ctx || !ctx.tasks) return "Keine Aufgaben da. Ruh dich aus!";
+                    const openTasks = ctx.tasks.filter(function(t) { return !t.done; });
+                    if(openTasks.length > 0) {
+                        const t = openTasks[0];
+                        return "Keine Müdigkeit vortäuschen! 📢 Mach die Aufgabe: '" + t.title + "'. Das bringt dir " + t.reward + " Münzen!";
+                    }
+                    return "Wow, du hast alles erledigt! 🌟 Du bist der fleißigste Gärtner, den ich kenne.";
+                }
+
+                // --- 3. ANLEITUNGEN ---
+                if (text.match(/(pflanz|säen|samen|anbau)/)) return "Pflanzen geht so: 1. Geh in den Shop (unten rechts). 2. Kauf Samen. 3. Wähle sie im Garten-Tab unten aus. 4. Tippe auf ein freies Feld. 🌱";
+                if (text.match(/(ernt|sammel|fertig)/)) return "Siehst du den vollen blauen Balken über einer Pflanze? 📏 Das heißt, sie ist reif! Tippe sie an, um wertvolle Gems 💎 zu ernten.";
+                if (text.match(/(gem|edelstein|diamant)/)) return "Gems 💎 sind die Premium-Währung hier. Du findest sie nicht auf der Straße, sondern musst sie ernten! Damit kannst du neue, größere Gärten kaufen.";
+                if (text.match(/(streak|flamme|feuer)/)) return "Der Streak 🔥 zeigt, wie viele Tage du in Folge aktiv warst. Wenn du mal einen Tag nichts machst... pffft... geht die Flamme aus! 🕯️";
+                if (text.match(/(löschen|weg|entfern|abbau)/)) return "Willst du umdekorieren? 🎨 Deko kannst du antippen, um sie einzupacken. Pflanzen sind hartnäckiger – die musst du mit einem Bodenbelag 'überbauen', um sie loszuwerden.";
+                if (text.match(/(code|freund|teilen)/)) return "Oben links steht dein Garten-Code. 🎫 Gib ihn deinen Freunden, damit sie deinen Garten besuchen können!";
+
+                // --- 4. FALLBACK ---
+                return this.getRandom([
+                    "Das habe ich akustisch nicht ganz verstanden. Hier unten im Wasser blubbert es so laut. 🌊 Frag mich nochmal nach Garten, Geld oder Pflanzen!",
+                    "Hm, spannende Frage. Aber ich bin nur ein Experte für DuoBloom. 🌸 Frag mich lieber, wie man reich wird!",
+                    "Meine 8 Arme kratzen sich am Kopf. 🐙 Was meinst du damit? Geht es um Pflanzen oder Aufgaben?"
+                ]);
             }
         };
 
         const OctoChatInterface = ({ context }) => {
             const [messages, setMessages] = React.useState([
-                { sender: 'octo', text: 'Verbinde mit Mainframe... 🐙' }
+                { sender: 'octo', text: 'Lade Gehirn...' }
             ]);
             const [input, setInput] = React.useState("");
+            const [isTyping, setIsTyping] = React.useState(false);
             const messagesEndRef = React.useRef(null);
 
             React.useEffect(() => {
                 if(context && context.roomData) {
-                    setTimeout(() => {
-                        setMessages(prev => [...prev, { sender: 'octo', text: OCTO_BRAIN.greet(context.user ? context.user.displayName : "") }]);
-                    }, 800);
+                    const initialMsg = OCTO_BRAIN.analyzeState(context);
+                    setMessages([{ sender: 'octo', text: initialMsg }]);
                 }
             }, []);
 
             React.useEffect(() => {
                 if(messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-            }, [messages]);
+            }, [messages, isTyping]);
 
             const handleSend = () => {
                 if(!input.trim()) return;
                 const userMsg = { sender: 'user', text: input };
                 setMessages(prev => [...prev, userMsg]);
-                
-                setTimeout(() => {
-                    let reply = "Processing...";
-                    try {
-                        reply = OCTO_BRAIN.think(input, context);
-                    } catch(e) { console.error(e); }
-                    setMessages(prev => [...prev, { sender: 'octo', text: reply }]);
-                }, 600);
-
                 setInput("");
-            };
+                setIsTyping(true);
+                
+                // Dynamische Antwortzeit für "menschliches" Gefühl
+                const thinkTime = 600 + Math.random() * 800;
 
-            // Helfer für Code-Blöcke in Nachrichten
-            const renderMessage = (text) => {
-                if (text.includes("SYSTEM-DIAGNOSE") || text.includes("INFO ZU")) {
-                    return <span className="whitespace-pre-wrap font-mono text-xs">{text}</span>;
-                }
-                return text;
+                setTimeout(() => {
+                    let reply = "Blub...";
+                    try {
+                        reply = OCTO_BRAIN.think(userMsg.text, context);
+                    } catch(e) { console.error(e); }
+                    
+                    setIsTyping(false);
+                    setMessages(prev => [...prev, { sender: 'octo', text: reply }]);
+                }, thinkTime);
             };
 
             return (
-                <div className="flex flex-col h-full bg-[#f0f9ff] relative">
+                <div className="chat-container">
                     <div className="bg-white p-4 shadow-sm border-b flex items-center gap-3 sticky top-0 z-10">
-                        <div className="relative">
-                            <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" className="w-12 h-12 drop-shadow-md" />
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                        <div className="relative group cursor-pointer">
+                            <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" className="w-12 h-12 drop-shadow-md group-hover:scale-110 transition-transform" />
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
                         </div>
                         <div>
-                            <h2 className="font-bold text-gray-800 text-lg">Octo-Bot v2.5</h2>
-                            <p className="text-xs text-blue-500 font-bold uppercase tracking-wider">System-Admin</p>
+                            <h2 className="font-bold text-gray-800 text-lg">Octo-Bot</h2>
+                            <p className="text-xs text-blue-500 font-bold uppercase tracking-wider">Dein Assistent</p>
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
+                    <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 pb-24">
                         {messages.map((msg, i) => (
                             <div key={i} className={`flex items-end gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 {msg.sender === 'octo' && (
@@ -293,20 +339,29 @@
                                     />
                                 )}
                                 <div className={`chat-bubble ${msg.sender === 'user' ? 'chat-user' : 'chat-octo'}`}>
-                                    {renderMessage(msg.text)}
+                                    {msg.text}
                                 </div>
                             </div>
                         ))}
+                        
+                        {isTyping && (
+                            <div className="flex items-end gap-2 justify-start">
+                                <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" className="w-8 h-8 mb-1 drop-shadow-sm" />
+                                <div className="chat-bubble chat-octo typing-indicator">
+                                    <span></span><span></span><span></span>
+                                </div>
+                            </div>
+                        )}
                         <div ref={messagesEndRef} />
                     </div>
 
-                    <div className="p-4 bg-white border-t flex gap-2 items-center absolute bottom-0 w-full">
+                    <div className="p-4 bg-white border-t flex gap-2 items-center absolute bottom-0 w-full shadow-lg">
                         <input 
                             value={input}
                             onChange={e => setInput(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleSend()}
-                            placeholder="Gib einen Befehl ein..."
-                            className="flex-1 bg-gray-100 border-0 rounded-full px-4 py-3 text-sm focus:ring-2 focus:ring-blue-400 outline-none font-mono text-gray-600"
+                            placeholder="Schreib mit Octo..."
+                            className="flex-1 bg-gray-100 border-0 rounded-full px-5 py-3 text-sm focus:ring-2 focus:ring-blue-400 outline-none"
                         />
                         <button onClick={handleSend} className="bg-blue-500 text-white p-3 rounded-full hover:bg-blue-600 transition-transform active:scale-95 shadow-md">
                             <Icon name="send" size={20} />
@@ -783,8 +838,99 @@
             );
         };
 
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const [loading, setLoading] = React.useState(true);
+            const [view, setView] = React.useState('login'); // login, menu, game, community
+            const [currentRoom, setCurrentRoom] = React.useState(localStorage.getItem('lastRoom') || null);
+            const [isSpectator, setIsSpectator] = React.useState(false);
+
+            React.useEffect(() => {
+                const unsub = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    setLoading(false);
+                    if (u) setView('menu');
+                    else setView('login');
+                });
+                return () => unsub();
+            }, []);
+
+            const handleLogin = async () => {
+                try {
+                    await signInWithPopup(auth, new GoogleAuthProvider());
+                } catch (e) {
+                    alert("Login fehlgeschlagen: " + e.message);
+                }
+            };
+
+            const handleMenuAction = async (action, payload, payload2) => {
+                if (action === 'community') {
+                    setView('community');
+                } else if (action === 'create') {
+                    // Payload2 ist hier der Name des Gartens
+                    const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+                    const gardenName = payload2 || "Mein Garten";
+                    
+                    await setDoc(doc(db, 'rooms', newCode), {
+                        roomName: gardenName,
+                        owner: user.uid,
+                        ownerName: user.displayName,
+                        createdAt: new Date().toISOString(),
+                        users: [user.uid],
+                        tasks: [],
+                        inventory: { carrot_seed: 2 }, // Start-Items
+                        coins: 50,
+                        gems: 0,
+                        gardens: { 0: {} },
+                        unlockedGardens: [0],
+                        likes: 0
+                    });
+                    enterRoom(newCode, false);
+                } else if (action === 'join' || action === 'resume') {
+                    const code = payload;
+                    const snap = await getDoc(doc(db, 'rooms', code));
+                    if (snap.exists()) {
+                        enterRoom(code, false);
+                    } else {
+                        alert("Garten nicht gefunden!");
+                    }
+                }
+            };
+
+            const enterRoom = (code, spectator) => {
+                if (!spectator) {
+                    localStorage.setItem('lastRoom', code);
+                }
+                setCurrentRoom(code);
+                setIsSpectator(spectator);
+                setView('game');
+            };
+
+            const handleBackToMenu = () => {
+                if (isSpectator) {
+                    const myLastRoom = localStorage.getItem('lastRoom');
+                    setCurrentRoom(myLastRoom);
+                    setIsSpectator(false);
+                }
+                setView('menu');
+            };
+
+            if (loading) return <div className="h-full flex items-center justify-center bg-slate-50 text-green-600 animate-pulse"><Icon name="loader-2" className="animate-spin mr-2"/> Lade DuoBloom...</div>;
+
+            if (!user) return <LoginScreen onLogin={handleLogin} />;
+
+            return (
+                <ErrorBoundary roomCode={currentRoom}>
+                    {view === 'menu' && <MainMenu user={user} currentRoom={currentRoom} onAction={handleMenuAction} />}
+                    {view === 'community' && <CommunityList onVisit={(id) => enterRoom(id, true)} onBack={() => setView('menu')} />}
+                    {view === 'game' && <GameApp user={user} roomCode={currentRoom} isSpectator={isSpectator} onBackToMenu={handleBackToMenu} />}
+                </ErrorBoundary>
+            );
+        };
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
 </html>
+
