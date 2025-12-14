@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 15.5</title>
+    <title>DuoBloom 16.0 (Octo-Bot)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -39,8 +39,9 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .texture-stone { background-color: #d1d5db; background-image: radial-gradient(circle, #9ca3af 20%, transparent 20%), radial-gradient(circle, #9ca3af 20%, transparent 20%); background-size: 10px 10px; background-position: 0 0, 5px 5px; border: 1px solid #9ca3af; }
         .texture-wood { background-color: #78350f; background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.1) 5px, rgba(255,255,255,0.1) 10px); border: 1px solid #451a03; box-shadow: inset 0 0 10px rgba(0,0,0,0.2); }
-        .animate-pop { animation: pop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes pop { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .bubble-tail::after { content: ''; position: absolute; bottom: -8px; right: 20px; border-width: 8px 8px 0; border-style: solid; border-color: white transparent transparent transparent; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -88,7 +89,7 @@
             wood_floor: { id: 'wood_floor', name: 'Holzboden', type: 'floor', price: 25, css: 'texture-wood', icon: '🪵' },
             fence: { id: 'fence', name: 'Zaun', type: 'deco', price: 15, img: 'assets/fence.png', icon: '🚧' },
             bench: { id: 'bench', name: 'Bank', type: 'deco', price: 150, img: 'assets/bench.png', icon: '🪑' },
-            gnome: { id: 'gnome', name: 'Zwerg', type: 'deco', price: 250, img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/People/Man%20Mage.png', icon: '🎅' },
+            gnome: { id: 'gnome', name: 'Zwerg', type: 'deco', price: 250, img: 'assets/gnome.png', icon: '🎅' },
         };
 
         const GARDEN_UPGRADES = [
@@ -134,7 +135,78 @@
             return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
         };
 
-        // --- 2. GRID CELL ---
+        // --- 2. OCTO BOT COMPONENT (NEU!) ---
+
+        const OctoBot = () => {
+            const [showBubble, setShowBubble] = React.useState(false);
+            const [message, setMessage] = React.useState("Blub! Brauchst du Hilfe?");
+            const [isInputOpen, setIsInputOpen] = React.useState(false);
+            const [input, setInput] = React.useState("");
+
+            const handleAsk = () => {
+                const q = input.toLowerCase().trim();
+                if(!q) return;
+
+                let reply = "Tut mir leid, ich bin nur ein einfacher Garten-Oktopus. Ich kann dir nur Fragen zu DuoBloom beantworten.";
+
+                // Logik für Antworten
+                if (q.includes("hallo") || q.includes("hi") || q.includes("hey")) reply = "Hallo! 🐙 Frag mich etwas über den Garten!";
+                else if (q.includes("pflanz") || q.includes("samen") || q.includes("säen")) reply = "Um zu pflanzen, klicke unten auf ein Item im Werkzeugkasten und dann auf ein leeres Feld im Garten.";
+                else if (q.includes("gieß") || q.includes("wasser")) reply = "Pflanzen brauchen Wasser! Klicke auf eine Pflanze, um sie zu gießen. Das geht alle 6 Stunden.";
+                else if (q.includes("ernt") || q.includes("sammeln")) reply = "Wenn der blaue Balken voll ist, ist die Pflanze ausgewachsen. Klicke darauf, um Edelsteine (Gems) zu ernten!";
+                else if (q.includes("münze") || q.includes("geld")) reply = "Münzen bekommst du, wenn du Aufgaben erledigst. Damit kannst du Samen und Deko kaufen.";
+                else if (q.includes("gem") || q.includes("edelstein")) reply = "Gems bekommst du durch Ernten. Damit kannst du neue Gärten freischalten!";
+                else if (q.includes("aufgabe")) reply = "Im Aufgaben-Tab findest du tägliche Missionen. Erledige sie für Münzen!";
+                else if (q.includes("streak") || q.includes("flamme")) reply = "Dein Streak steigt, wenn du jeden Tag mindestens eine Aufgabe erledigst. Bleib dran!";
+                else if (q.includes("shop") || q.includes("kaufen")) reply = "Im Shop gibt es neue Gärten (für Gems) und Items (für Münzen).";
+                else if (q.includes("löschen") || q.includes("weg") || q.includes("entfernen")) reply = "Wenn du etwas entfernen willst, klicke es an. Oder setze einfach einen Bodenbelag darüber.";
+                else if (q.includes("freund") || q.includes("besuchen")) reply = "Teile deinen Code im Hauptmenü, damit Freunde dich besuchen können!";
+
+                setMessage(reply);
+                setShowBubble(true);
+                setIsInputOpen(false);
+                setInput("");
+                
+                // Sprechblase nach 10 Sekunden ausblenden
+                setTimeout(() => setShowBubble(false), 12000);
+            };
+
+            return (
+                <div className="absolute -bottom-6 -right-6 md:-right-16 md:bottom-0 z-50 flex flex-col items-end pointer-events-none">
+                    <div className="pointer-events-auto flex flex-col items-end">
+                        {showBubble && (
+                            <div className="bg-white text-gray-700 p-4 rounded-2xl shadow-xl mb-3 max-w-[220px] text-sm animate-pop border-2 border-blue-100 relative bubble-tail font-medium">
+                                {message}
+                            </div>
+                        )}
+                        
+                        {isInputOpen && (
+                            <div className="bg-white p-2 rounded-xl shadow-xl mb-2 flex gap-2 animate-pop border border-blue-100">
+                                <input 
+                                    className="border border-gray-200 rounded-lg px-2 py-1 text-sm w-40 outline-none focus:border-blue-400" 
+                                    placeholder="Frage stellen..." 
+                                    value={input} 
+                                    onChange={e => setInput(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleAsk()}
+                                    autoFocus
+                                />
+                                <button onClick={handleAsk} className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg px-2 py-1"><Icon name="send" size={16}/></button>
+                            </div>
+                        )}
+
+                        <button 
+                            onClick={() => { setIsInputOpen(!isInputOpen); setShowBubble(false); }} 
+                            className="hover:scale-110 hover:-rotate-6 transition-all active:scale-95 cursor-pointer"
+                            title="Frag den Oktopus!"
+                        >
+                            <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" className="w-20 h-20 drop-shadow-2xl" alt="Octo-Help" />
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 3. GRID CELL ---
 
         const GridCell = ({ x, y, cell, handleGridClick, now }) => {
             const floorItem = cell.floor ? ITEMS[cell.floor] : null;
@@ -179,7 +251,7 @@
             );
         };
 
-        // --- 3. ERROR BOUNDARY ---
+        // --- 4. ERROR BOUNDARY & MODALS ---
 
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -192,21 +264,10 @@
                 }
             }
             render() {
-                if (this.state.hasError) {
-                    return (
-                        <div className="h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
-                            <h1 className="text-xl font-bold text-red-600">Fehler aufgetreten 🥀</h1>
-                            <p className="text-xs text-gray-500 mb-4 font-mono bg-white p-2 rounded border">{this.state.error?.message}</p>
-                            <button onClick={() => window.location.reload()} className="bg-red-500 text-white px-6 py-3 rounded-xl font-bold mb-4">Neu laden</button>
-                            <button onClick={() => this.handleReset()} className="mt-4 text-gray-400 underline text-xs">Notfall-Reparatur</button>
-                        </div>
-                    );
-                }
+                if (this.state.hasError) { return <div className="p-4 text-red-500">Fehler! <button onClick={()=>window.location.reload()} className="underline">Neustart</button></div>; }
                 return this.props.children; 
             }
         }
-
-        // --- 4. MODALS ---
 
         const Modal = ({ children, onClose, title }) => (
             <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-pop">
@@ -274,7 +335,6 @@
             const [showInstallHelp, setShowInstallHelp] = React.useState(false);
             const [streak, setStreak] = React.useState(0);
 
-            // FIX: Verwende onSnapshot für Echtzeit-Updates des Streaks
             React.useEffect(() => { 
                 if(window.lucide) try{window.lucide.createIcons();}catch(e){}
                 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
@@ -301,7 +361,6 @@
                             setStreak(s);
                         }
                     }, (err) => console.log("Streak error", err));
-                    
                     return () => unsub();
                 }
             }, [currentRoom]);
@@ -338,7 +397,6 @@
                     </div>
                     <div className="flex-1 bg-[#f8fafc] p-6 flex flex-col gap-6 overflow-y-auto">
                         <h2 className="text-2xl font-bold text-gray-700">Dashboard</h2>
-                        
                         {currentRoom && (
                             <div className={`bg-gradient-to-r ${streakBg} w-full flex-shrink-0 p-6 rounded-3xl shadow-lg flex items-center justify-between text-white relative overflow-hidden mb-4 min-h-[120px] transition-all duration-500`}>
                                 <div className="z-10 relative">
@@ -350,7 +408,6 @@
                                 <div className="absolute -right-4 -bottom-8 bg-white opacity-10 w-32 h-32 rounded-full blur-2xl pointer-events-none"></div>
                             </div>
                         )}
-
                         {currentRoom ? (
                             <button onClick={() => onAction('resume', currentRoom)} className="bg-white border-2 border-green-500 text-green-600 p-6 rounded-2xl shadow-sm hover:bg-green-50 transition-all text-left flex items-center justify-between group flex-shrink-0">
                                 <div><div className="text-green-800 text-sm font-bold uppercase mb-1">Letzte Sitzung</div><div className="text-2xl font-bold">Weitergärtnern</div><div className="text-sm opacity-80 font-mono mt-1">Code: {currentRoom}</div></div>
@@ -392,13 +449,11 @@
                 const unsub = onSnapshot(doc(db, 'rooms', roomCode), (snap) => {
                     if (snap.exists()) {
                         const data = snap.data();
-                        // Init Defaults safely
                         if(!data.tasks) data.tasks = [];
                         if(!data.inventory) data.inventory = {};
                         if(!data.gardens) data.gardens = { 0: {} };
                         if(!data.unlockedGardens) data.unlockedGardens = [0];
                         
-                        // FIX: Nutze lokale Zeit für Berechnungen
                         const d = new Date();
                         const year = d.getFullYear();
                         const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -441,7 +496,6 @@
 
             const handleLike = async () => { if(hasLiked || !isSpectator) return; await updateDoc(doc(db, 'rooms', roomCode), { likes: increment(1) }); localStorage.setItem(`liked_${roomCode}`, 'true'); setHasLiked(true); };
             
-            // --- GRID CLICK LOGIC (INKLUSIVE EINPACKEN) ---
             const handleGridClick = async (x, y) => {
                 if (isSpectator || !roomData) return;
                 const key = `${x},${y}`;
@@ -461,20 +515,16 @@
                     return;
                 }
                 
-                // Interaktion (Gießen/Ernten/Einpacken)
                 if (cell.item) {
                     const itemDef = ITEMS[cell.item];
                     if(!itemDef) return; 
                     
                     if (cell.grown && itemDef.type === 'seed') { 
-                        // Ernten
                         await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) }); 
                     } else if (itemDef.type === 'seed') {
-                        // Gießen
                         const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
                         if (now - lastWatered > WATER_COOLDOWN) { const newStage = (cell.stage || 0) + 1; await updateDoc(roomRef, { [`${path}.stage`]: newStage, [`${path}.grown`]: newStage >= itemDef.stages, [`${path}.lastWatered`]: new Date().toISOString() }); }
                     } else if (itemDef.type === 'deco') {
-                        // Deko einpacken
                         if(confirm(`${itemDef.name} ins Inventar zurück?`)) {
                             await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`inventory.${cell.item}`]: increment(1) });
                         }
@@ -482,7 +532,6 @@
                     return;
                 }
                 
-                // Boden einpacken
                 if (cell.floor) {
                     const floorDef = ITEMS[cell.floor];
                     if(confirm(`${floorDef.name} aufheben?`)) {
@@ -496,14 +545,12 @@
             const toggleTask = async (task) => {
                 if (isSpectator) return;
                 
-                // 1. Datum bestimmen (YYYY-MM-DD)
                 const d = new Date();
                 const year = d.getFullYear();
                 const month = String(d.getMonth() + 1).padStart(2, '0');
                 const day = String(d.getDate()).padStart(2, '0');
                 const today = `${year}-${month}-${day}`;
 
-                // 2. Gestern bestimmen
                 const yesterdayDate = new Date();
                 yesterdayDate.setDate(yesterdayDate.getDate() - 1);
                 const yYear = yesterdayDate.getFullYear();
@@ -511,42 +558,19 @@
                 const yDay = String(yesterdayDate.getDate()).padStart(2, '0');
                 const yesterday = `${yYear}-${yMonth}-${yDay}`;
 
-                // 3. Task Update vorbereiten
                 const nowStr = new Date().toLocaleString('de-DE');
                 const nowISO = new Date().toISOString();
 
-                const updatedTasks = getTasks().map(t => { 
-                    if (t.id === task.id) { 
-                        return t.type === 'daily' 
-                            ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } 
-                            : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; 
-                    } 
-                    return t; 
-                });
-
-                const updates = { 
-                    tasks: updatedTasks, 
-                    coins: increment(task.reward) 
-                };
+                const updatedTasks = getTasks().map(t => { if (t.id === task.id) { return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr, completedAtISO: nowISO }; } return t; });
+                const updates = { tasks: updatedTasks, coins: increment(task.reward) };
                 
-                // 4. Streak Logik (MIT ALERT FEEDBACK)
                 const lastStreakDate = roomData.lastStreakDate;
-                
-                // Wenn heute noch KEIN Streak-Update war:
                 if (lastStreakDate !== today) {
                     let newStreak = Number(roomData.currentStreak || 0);
-
-                    if (lastStreakDate === yesterday) {
-                        // Gestern war da -> Streak +1
-                        newStreak += 1;
-                    } else {
-                        // Gestern nicht da (oder neuer Raum) -> Reset auf 1
-                        newStreak = 1;
-                    }
-                    
+                    if (lastStreakDate === yesterday) newStreak += 1;
+                    else newStreak = 1;
                     updates.currentStreak = newStreak;
                     updates.lastStreakDate = today;
-                    
                     alert(`Streak erhöht! 🔥 Neuer Streak: ${newStreak} Tage`);
                 }
                 
@@ -580,16 +604,20 @@
                             <div className="flex gap-4 ml-auto items-center">{isSpectator ? <button onClick={handleLike} className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold transition-all ${hasLiked ? 'bg-red-100 text-red-500' : 'bg-white border hover:bg-red-50 text-gray-500'}`}><Icon name="heart" className={hasLiked ? "fill-red-500" : ""}/> {roomData.likes || 0}</button> : <div className="flex flex-col items-end"><span className="font-bold text-yellow-600 text-lg flex items-center gap-1">💰 {roomData.coins}</span><span className="font-bold text-purple-600 text-lg flex items-center gap-1">💎 {roomData.gems}</span></div>}</div>
                         </header>
                         {tab === 'garden' && (
-                            <div className="p-4 md:p-8 flex flex-col items-center">
+                            <div className="p-4 md:p-8 flex flex-col items-center relative">
                                 <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">{GARDEN_UPGRADES.map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); if(!owned) return null; return <button key={g.id} onClick={() => setActiveGardenIdx(g.id)} className={`px-4 py-1 rounded-full text-sm font-bold border ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200'}`}>{g.name}</button> })}</div>
                                 
-                                {/* GARDEN CONTAINER MIT BILD */}
-                                <div className="p-4 rounded-xl shadow-2xl relative inline-block bg-cover bg-center" style={{ backgroundImage: `url(${GARDEN_BG})`, backgroundColor: '#5c4033' }}>
-                                    <div className="grid grid-cols-5 gap-0 border-2 border-black/10 shadow-inner">
-                                        {Array.from({ length: 25 }).map((_, i) => (
-                                            <GridCell key={i} x={i%5} y={Math.floor(i/5)} cell={(getGardens()[activeGardenIdx] || {})[`${i%5},${Math.floor(i/5)}`] || {}} handleGridClick={handleGridClick} now={now} />
-                                        ))}
+                                {/* GARDEN CONTAINER MIT BILD UND OCTO-BOT */}
+                                <div className="relative inline-block">
+                                    <div className="p-4 rounded-xl shadow-2xl relative bg-cover bg-center" style={{ backgroundImage: `url(${GARDEN_BG})`, backgroundColor: '#5c4033' }}>
+                                        <div className="grid grid-cols-5 gap-0 border-2 border-black/10 shadow-inner">
+                                            {Array.from({ length: 25 }).map((_, i) => (
+                                                <GridCell key={i} x={i%5} y={Math.floor(i/5)} cell={(getGardens()[activeGardenIdx] || {})[`${i%5},${Math.floor(i/5)}`] || {}} handleGridClick={handleGridClick} now={now} />
+                                            ))}
+                                        </div>
                                     </div>
+                                    {/* Octo-Bot sitzt hier */}
+                                    <OctoBot />
                                 </div>
 
                                 {!isSpectator && <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100"><h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3><div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">{Object.entries(getInventory()).map(([id, count]) => { if (count <= 0) return null; return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><ItemDisplay item={ITEMS[id]} className="w-8 h-8" /><span className="text-xs font-bold text-gray-600">{count}x</span></button> })}</div></div>}
@@ -646,7 +674,7 @@
                     <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
                         <Icon name="log-in" /> Mit Google starten
                     </button>
-                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 15.5 • Final</p>
+                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 16.0 • Octo-Bot</p>
                 </div>
             </div>
         );
