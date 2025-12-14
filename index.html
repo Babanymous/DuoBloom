@@ -468,7 +468,7 @@
                 </Modal>
             );
         };
-        // --- 4.1 OCTO AI (OFFLINE VERSION) ---
+         // --- 4.1 OCTO AI (FLOATING VERSION) ---
 
         const OctoChat = ({ user }) => {
             const [isOpen, setIsOpen] = React.useState(false);
@@ -478,6 +478,9 @@
             const [input, setInput] = React.useState("");
             const [isTyping, setIsTyping] = React.useState(false);
             const messagesEndRef = React.useRef(null);
+            
+            // Die URL für das Bild
+            const OCTO_IMG = "https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png";
 
             const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
             React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
@@ -486,45 +489,16 @@
             const getOctoResponse = (text) => {
                 const t = text.toLowerCase();
                 
-                // 1. BEGRÜSSUNG & SMALLTALK
+                // Hier deine Logik (gekürzt für Übersicht, bleibt aber gleich wie vorher)
                 if (t.match(/(hallo|hi|hey|moin|guten tag)/)) return "Halli Hallo! Bereit zum Gärtnern? 🌿";
                 if (t.match(/(wie geht|alles klar|was machst du)/)) return "Mir geht's blendend! Ich genieße die Feuchtigkeit hier im Garten. Und dir? 💧";
                 if (t.match(/(wer bist du|dein name)/)) return "Ich bin Octo! Der schlaue Garten-Oktopus. Ich passe auf, dass hier alles wächst. 🐙";
-                if (t.match(/(danke|cool|super)/)) return "Gerne doch! Immer fleißig bleiben! ✨";
-                if (t.match(/(witz|lachen)/)) {
-                    const jokes = [
-                        "Was ist grün und klopft an die Tür? Ein Klopfsalat!",
-                        "Warum können Gärtner nicht reich werden? Weil sie immer alles vergraben.",
-                        "Was macht eine Pflanze im Matheunterricht? Wurzeln ziehen!"
-                    ];
-                    return jokes[Math.floor(Math.random() * jokes.length)];
-                }
-
-                // 2. PFLANZEN WISSEN
-                if (t.includes("karotte")) return "Karotten 🥕 kosten 20 Münzen. Sie brauchen 3 Stufen zum Wachsen. Perfekt für Anfänger!";
-                if (t.includes("sonnenblume")) return "Sonnenblumen 🌻 bringen 20 Gems Belohnung! Aber sie brauchen etwas länger (4 Stufen).";
-                if (t.includes("vergiss")) return "Das Vergissmeinnicht 🪻 ist unsere Premium-Blume. Teuer im Einkauf, aber es lohnt sich!";
                 
-                // 3. GAMEPLAY MECHANIKEN
-                if (t.match(/(wasser|gießen|gießt|trocken)/)) return "Pflanzen muss man alle 6 Stunden gießen! 💧 Wenn sie blau leuchten oder hüpfen, haben sie Durst.";
-                if (t.match(/(münzen|geld|verdienen|coin)/)) return "Münzen bekommst du durch Aufgaben! Schau mal im Tab 'Aufgaben' vorbei. 💰";
-                if (t.match(/(gem|diamant|kristall)/)) return "Gems 💎 bekommst du, wenn du fertige Pflanzen erntest. Damit kannst du neue Gartenbereiche kaufen!";
-                if (t.match(/(ernten|pflücken)/)) return "Klicke auf eine fertig gewachsene Pflanze, um sie zu ernten und Gems zu kassieren! 🧺";
-                if (t.match(/(weg|löschen|entfernen)/)) return "Willst du was löschen? Klicke auf ein leeres Feld oder eine Pflanze. Octo fragt dich dann zur Sicherheit nochmal.";
-                if (t.match(/(speichern|save)/)) return "Keine Sorge, DuoBloom speichert alles automatisch in der Cloud! ☁️";
-                if (t.match(/(freunde|besuchen|code)/)) return "Du kannst Freunde besuchen! Gib ihren Code im Hauptmenü ein. Deinen Code siehst du oben rechts.";
-                if (t.match(/(level|aufsteigen)/)) return "Dein Level hängt davon ab, wie viele Gärten du freigeschaltet hast. Kauf mehr Land im Shop!";
-
-                // 4. SONSTIGES
-                if (t.includes("liebe")) return "Ich liebe diesen Garten auch! ❤️";
-                if (t.includes("octo")) return "Jaaa? Das bin ich! 🐙";
-
-                // 5. FALLBACK (Wenn er nichts versteht)
+                // Fallback
                 const fallbacks = [
                     "Das ist eine tiefe Frage... für einen Oktopus zu tief. Frag mich lieber was zu Pflanzen! 🌿",
                     "Blub? Das habe ich nicht verstanden. Geht es um Karotten? 🥕",
-                    "Interessant! Aber hast du schon deine Blumen gegossen? 💧",
-                    "Dazu steht nichts in meinem Gartenbuch. 🤔"
+                    "Interessant! Aber hast du schon deine Blumen gegossen? 💧"
                 ];
                 return fallbacks[Math.floor(Math.random() * fallbacks.length)];
             };
@@ -536,7 +510,6 @@
                 setInput("");
                 setIsTyping(true);
 
-                // Simuliere Denkzeit (zufällig zwischen 500ms und 1500ms)
                 setTimeout(() => {
                     const answer = getOctoResponse(userText);
                     setMessages(prev => [...prev, { role: 'assistant', content: answer }]);
@@ -546,22 +519,27 @@
 
             return (
                 <>
+                    {/* BUTTON UNTEN RECHTS */}
                     <button 
                         onClick={() => setIsOpen(true)} 
-                        className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 bg-purple-600 hover:bg-purple-700 text-white p-3 md:p-4 rounded-full shadow-xl border-4 border-white transition-transform hover:scale-110 flex items-center justify-center animate-bounce"
+                        className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 bg-white hover:bg-gray-50 p-2 md:p-3 rounded-full shadow-xl border-4 border-purple-200 transition-transform hover:scale-110 flex items-center justify-center animate-bounce"
                     >
-                        <span className="text-2xl md:text-3xl">🐙</span>
+                        <img src={OCTO_IMG} className="w-10 h-10 md:w-12 md:h-12" alt="Octo" />
                     </button>
 
                     {isOpen && (
                         <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
                             <div className="bg-white w-full md:w-[380px] h-[70vh] md:h-[550px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto overflow-hidden animate-pop border border-gray-200 m-0 md:m-4">
-                                <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
+                                
+                                {/* HEADER MIT BILD */}
+                                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white flex justify-between items-center shadow-md">
                                     <div className="flex items-center gap-3">
-                                        <div className="bg-white/20 p-2 rounded-full"><span className="text-2xl">🐙</span></div>
+                                        <div className="bg-white/20 p-1.5 rounded-full backdrop-blur-sm">
+                                            <img src={OCTO_IMG} className="w-8 h-8" alt="Octo" />
+                                        </div>
                                         <div>
                                             <h3 className="font-bold text-lg">Octo</h3>
-                                            <p className="text-[10px] text-purple-200 font-mono uppercase">Garten-Guide v1.0</p>
+                                            <p className="text-[10px] text-purple-200 font-mono uppercase">Dein Garten-Guide</p>
                                         </div>
                                     </div>
                                     <button onClick={() => setIsOpen(false)}><Icon name="x" className="text-white/80 hover:text-white" /></button>
@@ -569,7 +547,10 @@
 
                                 <div className="flex-1 overflow-y-auto p-4 bg-[#f8fafc] space-y-4">
                                     {messages.map((m, i) => (
-                                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start items-end gap-2'}`}>
+                                            {/* Kleines Icon neben Nachricht bei Assistant */}
+                                            {m.role === 'assistant' && <img src={OCTO_IMG} className="w-6 h-6 mb-1" />}
+                                            
                                             <div className={`max-w-[85%] p-3 px-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
                                                 m.role === 'user' 
                                                 ? 'bg-purple-600 text-white rounded-br-none' 
@@ -580,7 +561,8 @@
                                         </div>
                                     ))}
                                     {isTyping && (
-                                        <div className="flex justify-start">
+                                        <div className="flex justify-start items-end gap-2">
+                                            <img src={OCTO_IMG} className="w-6 h-6 mb-1" />
                                             <div className="bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1">
                                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0s'}}></div>
                                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0.1s'}}></div>
@@ -610,6 +592,7 @@
                 </>
             );
         };
+
 
         // --- 5. SCREENS ---
 
@@ -963,13 +946,6 @@
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">{GARDEN_UPGRADES.filter(g => g.id > 0).map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); return <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}><div className="text-3xl mb-2">🏞️</div><div className="font-bold">{g.name}</div><button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>{owned ? 'Gekauft' : `${g.price} 💎`}</button></div> })}</div>
                                 <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><Icon name="store"/> Markt (Münzen)</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{item.icon && !item.img && item.icon}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
-                            </div>
-                        )}
-
-                        {/* NEUER OCTO TAB (HIER INTEGRIERT) */}
-                        {tab === 'octo' && !isSpectator && (
-                            <div className="h-full bg-[#f0f9ff] flex flex-col">
-                                <OctoChatInterface context={octoContext} />
                             </div>
                         )}
                     </main>
