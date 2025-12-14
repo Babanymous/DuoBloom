@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 18.0 (Living Octo)</title>
+    <title>DuoBloom 18.1 (Stable)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -71,11 +71,12 @@
             measurementId: "G-Z0W0LK6D88"
         };
 
-        let app, auth, db;
+        // Firebase Init (Variable renamed to avoid conflict)
+        let firebaseApp, auth, db;
         try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
+            firebaseApp = initializeApp(firebaseConfig);
+            auth = getAuth(firebaseApp);
+            db = getFirestore(firebaseApp);
         } catch (e) { console.error("Init Error", e); }
 
         const WATER_COOLDOWN = 6 * 60 * 60 * 1000; 
@@ -141,10 +142,12 @@
             greet: (name) => {
                 const h = new Date().getHours();
                 const timeGreeting = h < 12 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend";
-                return `Blub! ${timeGreeting}, ${name.split(' ')[0]}! 🐙 Was liegt an?`;
+                const shortName = name ? name.split(' ')[0] : "Gärtner";
+                return `Blub! ${timeGreeting}, ${shortName}! 🐙 Was liegt an?`;
             },
             
             analyzeGarden: (ctx) => {
+                if (!ctx || !ctx.roomData || !ctx.roomData.gardens) return "Ich kann den Garten gerade nicht sehen. 👀";
                 const garden = ctx.roomData.gardens[ctx.activeGardenIdx] || {};
                 const now = Date.now();
                 let thirstyCount = 0;
@@ -152,7 +155,7 @@
                 let plantCount = 0;
 
                 Object.values(garden).forEach(cell => {
-                    if (cell.item && ITEMS[cell.item].type === 'seed') {
+                    if (cell.item && ITEMS[cell.item] && ITEMS[cell.item].type === 'seed') {
                         plantCount++;
                         if (cell.grown) {
                             readyCount++;
@@ -170,6 +173,7 @@
             },
 
             analyzeFinances: (ctx) => {
+                if (!ctx || !ctx.roomData) return "Ich sehe deine Geldbörse nicht.";
                 const coins = ctx.roomData.coins || 0;
                 const gems = ctx.roomData.gems || 0;
                 
@@ -181,6 +185,7 @@
             },
 
             recommendTask: (ctx) => {
+                if (!ctx || !ctx.tasks) return "Keine Aufgaben in Sicht.";
                 const tasks = ctx.tasks.filter(t => !t.done);
                 if (tasks.length === 0) return "Du bist fleißig! Alle Aufgaben erledigt. 🎉 Ruh dich aus.";
                 
@@ -192,7 +197,7 @@
                 const text = input.toLowerCase();
                 
                 // 1. Kontext-Checks (Dynamisch)
-                if (text.match(/(hallo|hi|hey|moin|servus)/)) return this.greet(ctx.user.displayName);
+                if (text.match(/(hallo|hi|hey|moin|servus)/)) return this.greet(ctx?.user?.displayName);
                 
                 if (text.match(/(status|garten|pflanze|wie geht|alles ok)/)) return this.analyzeGarden(ctx);
                 
@@ -201,9 +206,10 @@
                 if (text.match(/(tun|machen|aufgabe|quest|langweil)/)) return this.recommendTask(ctx);
 
                 if (text.match(/(durst|wasser|gieß)/)) {
+                    if (!ctx || !ctx.roomData) return "Ich brauche erst meine Brille... (Lade Daten)";
                     const garden = ctx.roomData.gardens[ctx.activeGardenIdx] || {};
                     const now = Date.now();
-                    const thirsty = Object.values(garden).filter(c => c.item && ITEMS[c.item].type === 'seed' && !c.grown && (now - (c.lastWatered ? new Date(c.lastWatered).getTime() : 0) > WATER_COOLDOWN)).length;
+                    const thirsty = Object.values(garden).filter(c => c.item && ITEMS[c.item] && ITEMS[c.item].type === 'seed' && !c.grown && (now - (c.lastWatered ? new Date(c.lastWatered).getTime() : 0) > WATER_COOLDOWN)).length;
                     return thirsty > 0 ? `Ja! ${thirsty} Pflanzen schreien nach Wasser! 💦` : "Nein, alle sind gut versorgt. 💧";
                 }
 
@@ -211,7 +217,7 @@
                 if (text.match(/(pflanz|säen|samen)/)) return "Wähle unten einen Samen (z.B. Karotte) und tippe auf ein leeres Feld. Kostet Münzen!";
                 if (text.match(/(ernt|sammel)/)) return "Tippe auf Pflanzen mit vollem blauen Balken. Das bringt Gems 💎!";
                 if (text.match(/(gem|edelstein)/)) return "Gems 💎 kriegst du nur durch Ernten. Damit kaufst du neue Gärten.";
-                if (text.match(/(streak|flamme)/)) return `Dein Streak ist aktuell bei ${ctx.roomData.currentStreak || 0} Tagen 🔥. Bleib dran!`;
+                if (text.match(/(streak|flamme)/)) return `Dein Streak ist aktuell bei ${ctx?.roomData?.currentStreak || 0} Tagen 🔥. Bleib dran!`;
                 if (text.match(/(shop|kauf)/)) return "Oben im Shop gibt's Gärten (Gems), unten Samen & Deko (Münzen).";
                 if (text.match(/(löschen|weg)/)) return "Tippe auf Deko zum Einpacken. Pflanzen verschwinden, wenn du Boden drüber baust.";
                 if (text.match(/(witz)/)) return "Warum gießen Gärtner so ungern? Weil sie Angst vor dem Wasserhahn haben! ... Okay, der war flach. 🐙";
@@ -243,7 +249,6 @@
 
             // Initiale Begrüßung beim Laden
             React.useEffect(() => {
-                // Zufällige Chance auf Begrüßung
                 if (Math.random() > 0.7) {
                     setMessage(`Blub! 👋`);
                     setShowBubble(true);
@@ -671,7 +676,7 @@
 
             if (!roomData) return <div className="h-full flex items-center justify-center animate-pulse">Lade Garten...</div>;
 
-            // OCTOBOT CONTEXT INJECTION (WICHTIG!)
+            // OCTOBOT CONTEXT INJECTION
             const octoContext = {
                 roomData,
                 user,
