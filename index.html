@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 18.1 (Stable)</title>
+    <title>DuoBloom 18.2 (Safe)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -14,24 +14,6 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-
-    <!-- Global Error Handler -->
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            const root = document.getElementById('root');
-            if (root) {
-                root.innerHTML = `
-                    <div style="padding:20px; color:#b91c1c; font-family:sans-serif; text-align:center; height:100vh; display:flex; flex-direction:column; justify-content:center; background:#fef2f2;">
-                        <h2 style="font-size:20px; font-weight:bold; margin-bottom:10px;">Start-Fehler!</h2>
-                        <p style="background:white; padding:15px; border-radius:8px; border:1px solid #fca5a5; font-family:monospace;">${msg}</p>
-                        <p style="font-size:12px; color:gray; margin-top:10px;">Zeile: ${line}</p>
-                        <button onclick="location.reload()" style="margin-top:20px; padding:12px 24px; background:#ef4444; color:white; border:none; border-radius:8px; font-weight:bold;">Neu laden</button>
-                    </div>
-                `;
-            }
-            return false;
-        };
-    </script>
 
     <style>
         body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; background-color: #f8fafc; }
@@ -47,12 +29,6 @@
 <body class="bg-slate-50 text-slate-800 font-sans">
 
     <div id="root" class="h-full w-full"></div>
-
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(console.error);
-        }
-    </script>
 
     <script type="text/babel" data-type="module">
         
@@ -71,7 +47,7 @@
             measurementId: "G-Z0W0LK6D88"
         };
 
-        // Firebase Init (Variable renamed to avoid conflict)
+        // Init Firebase
         let firebaseApp, auth, db;
         try {
             firebaseApp = initializeApp(firebaseConfig);
@@ -136,7 +112,8 @@
             return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
         };
 
-        // --- 2. DAS LEBENDIGE GEHIRN (LIVING BRAIN) ---
+        // --- 2. OCTO BRAIN (SAFE MODE) ---
+        // Keine Optional Chaining Operatoren (?.) verwenden!
         
         const OCTO_BRAIN = {
             greet: (name) => {
@@ -196,8 +173,12 @@
             think: function(input, ctx) {
                 const text = input.toLowerCase();
                 
-                // 1. Kontext-Checks (Dynamisch)
-                if (text.match(/(hallo|hi|hey|moin|servus)/)) return this.greet(ctx?.user?.displayName);
+                // 1. Kontext-Checks (Safe)
+                if (text.match(/(hallo|hi|hey|moin|servus)/)) {
+                    let name = "Gast";
+                    if(ctx && ctx.user) name = ctx.user.displayName;
+                    return this.greet(name);
+                }
                 
                 if (text.match(/(status|garten|pflanze|wie geht|alles ok)/)) return this.analyzeGarden(ctx);
                 
@@ -217,7 +198,11 @@
                 if (text.match(/(pflanz|säen|samen)/)) return "Wähle unten einen Samen (z.B. Karotte) und tippe auf ein leeres Feld. Kostet Münzen!";
                 if (text.match(/(ernt|sammel)/)) return "Tippe auf Pflanzen mit vollem blauen Balken. Das bringt Gems 💎!";
                 if (text.match(/(gem|edelstein)/)) return "Gems 💎 kriegst du nur durch Ernten. Damit kaufst du neue Gärten.";
-                if (text.match(/(streak|flamme)/)) return `Dein Streak ist aktuell bei ${ctx?.roomData?.currentStreak || 0} Tagen 🔥. Bleib dran!`;
+                if (text.match(/(streak|flamme)/)) {
+                    let streak = 0;
+                    if(ctx && ctx.roomData) streak = ctx.roomData.currentStreak || 0;
+                    return `Dein Streak ist aktuell bei ${streak} Tagen 🔥. Bleib dran!`;
+                }
                 if (text.match(/(shop|kauf)/)) return "Oben im Shop gibt's Gärten (Gems), unten Samen & Deko (Münzen).";
                 if (text.match(/(löschen|weg)/)) return "Tippe auf Deko zum Einpacken. Pflanzen verschwinden, wenn du Boden drüber baust.";
                 if (text.match(/(witz)/)) return "Warum gießen Gärtner so ungern? Weil sie Angst vor dem Wasserhahn haben! ... Okay, der war flach. 🐙";
