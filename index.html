@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 18.3 (Fixed)</title>
+    <title>DuoBloom 19.0 (Safe & Smart)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -14,6 +14,22 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Global Error Handler -->
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            const root = document.getElementById('root');
+            if (root) {
+                root.innerHTML = '<div style="padding:20px; color:#b91c1c; font-family:sans-serif; text-align:center; height:100vh; display:flex; flex-direction:column; justify-content:center; background:#fef2f2;">' +
+                    '<h2 style="font-size:20px; font-weight:bold; margin-bottom:10px;">Start-Fehler!</h2>' +
+                    '<p style="background:white; padding:15px; border-radius:8px; border:1px solid #fca5a5; font-family:monospace;">' + msg + '</p>' +
+                    '<p style="font-size:12px; color:gray; margin-top:10px;">Zeile: ' + line + '</p>' +
+                    '<button onclick="location.reload()" style="margin-top:20px; padding:12px 24px; background:#ef4444; color:white; border:none; border-radius:8px; font-weight:bold;">Neu laden</button>' +
+                    '</div>';
+            }
+            return false;
+        };
+    </script>
 
     <style>
         body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; background-color: #f8fafc; }
@@ -47,7 +63,6 @@
             measurementId: "G-Z0W0LK6D88"
         };
 
-        // Init Firebase
         let firebaseApp, auth, db;
         try {
             firebaseApp = initializeApp(firebaseConfig);
@@ -113,24 +128,29 @@
         };
 
         // --- 2. OCTO BRAIN (SAFE MODE) ---
+        // Dies ist die Datenbank für den Oktopus. Keine modernen JS-Features verwenden!
         
         const OCTO_BRAIN = {
-            greet: (name) => {
+            greet: function(name) {
                 const h = new Date().getHours();
                 const timeGreeting = h < 12 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend";
                 const shortName = name ? name.split(' ')[0] : "Gärtner";
-                return `Blub! ${timeGreeting}, ${shortName}! 🐙 Was liegt an?`;
+                return "Blub! " + timeGreeting + ", " + shortName + "! 🐙 Was liegt an?";
             },
             
-            analyzeGarden: (ctx) => {
+            analyzeGarden: function(ctx) {
                 if (!ctx || !ctx.roomData || !ctx.roomData.gardens) return "Ich kann den Garten gerade nicht sehen. 👀";
-                const garden = ctx.roomData.gardens[ctx.activeGardenIdx] || {};
+                
+                // Sicherer Zugriff auf activeGardenIdx
+                const idx = ctx.activeGardenIdx || 0;
+                const garden = ctx.roomData.gardens[idx] || {};
+                
                 const now = Date.now();
                 let thirstyCount = 0;
                 let readyCount = 0;
                 let plantCount = 0;
 
-                Object.values(garden).forEach(cell => {
+                Object.values(garden).forEach(function(cell) {
                     if (cell.item && ITEMS[cell.item] && ITEMS[cell.item].type === 'seed') {
                         plantCount++;
                         if (cell.grown) {
@@ -143,39 +163,39 @@
                 });
 
                 if (plantCount === 0) return "Hier wächst ja gar nichts! 🏜️ Kauf dir ein paar Samen im Shop.";
-                if (readyCount > 0) return `Erntezeit! 🌾 ${readyCount} Pflanzen sind fertig. Hol dir die Gems!`;
-                if (thirstyCount > 0) return `Alarm! 💧 ${thirstyCount} Pflanzen sind durstig. Schnell gießen!`;
+                if (readyCount > 0) return "Erntezeit! 🌾 " + readyCount + " Pflanzen sind fertig. Hol dir die Gems!";
+                if (thirstyCount > 0) return "Alarm! 💧 " + thirstyCount + " Pflanzen sind durstig. Schnell gießen!";
                 return "Alles im grünen Bereich. Deine Pflanzen wachsen glücklich vor sich hin. 🌱";
             },
 
-            analyzeFinances: (ctx) => {
+            analyzeFinances: function(ctx) {
                 if (!ctx || !ctx.roomData) return "Ich sehe deine Geldbörse nicht.";
                 const coins = ctx.roomData.coins || 0;
                 const gems = ctx.roomData.gems || 0;
                 
-                if (coins < 20) return `Oje, du hast nur ${coins} Münzen. 💸 Mach schnell ein paar Aufgaben!`;
-                if (coins < 100) return `Du hast ${coins} Münzen. Das reicht für ein paar Karotten 🥕.`;
-                if (coins > 1000) return `Wow! ${coins} Münzen! 🤑 Du bist der reichste Gärtner hier. Gönn dir mal einen Zwerg!`;
+                if (coins < 20) return "Oje, du hast nur " + coins + " Münzen. 💸 Mach schnell ein paar Aufgaben!";
+                if (coins < 100) return "Du hast " + coins + " Münzen. Das reicht für ein paar Karotten 🥕.";
+                if (coins > 1000) return "Wow! " + coins + " Münzen! 🤑 Du bist der reichste Gärtner hier.";
                 
-                return `Finanz-Check: ${coins} Münzen 💰 und ${gems} Gems 💎. Solide!`;
+                return "Finanz-Check: " + coins + " Münzen 💰 und " + gems + " Gems 💎. Solide!";
             },
 
-            recommendTask: (ctx) => {
+            recommendTask: function(ctx) {
                 if (!ctx || !ctx.tasks) return "Keine Aufgaben in Sicht.";
-                const tasks = ctx.tasks.filter(t => !t.done);
+                const tasks = ctx.tasks.filter(function(t) { return !t.done; });
                 if (tasks.length === 0) return "Du bist fleißig! Alle Aufgaben erledigt. 🎉 Ruh dich aus.";
                 
-                const bestTask = tasks.sort((a,b) => b.reward - a.reward)[0];
-                return `Tipp: Mach die Aufgabe "${bestTask.title}". Die bringt ${bestTask.reward} Münzen! 📈`;
+                const bestTask = tasks.sort(function(a,b) { return b.reward - a.reward; })[0];
+                return "Tipp: Mach die Aufgabe '" + bestTask.title + "'. Die bringt " + bestTask.reward + " Münzen! 📈";
             },
 
             think: function(input, ctx) {
                 const text = input.toLowerCase();
                 
-                // 1. Kontext-Checks (Safe)
+                // 1. Kontext-Checks (Safe Logic)
                 if (text.match(/(hallo|hi|hey|moin|servus)/)) {
                     let name = "Gast";
-                    if(ctx && ctx.user) name = ctx.user.displayName;
+                    if(ctx && ctx.user && ctx.user.displayName) name = ctx.user.displayName;
                     return this.greet(name);
                 }
                 
@@ -187,10 +207,17 @@
 
                 if (text.match(/(durst|wasser|gieß)/)) {
                     if (!ctx || !ctx.roomData) return "Ich brauche erst meine Brille... (Lade Daten)";
-                    const garden = ctx.roomData.gardens[ctx.activeGardenIdx] || {};
+                    const idx = ctx.activeGardenIdx || 0;
+                    const garden = (ctx.roomData.gardens && ctx.roomData.gardens[idx]) ? ctx.roomData.gardens[idx] : {};
                     const now = Date.now();
-                    const thirsty = Object.values(garden).filter(c => c.item && ITEMS[c.item] && ITEMS[c.item].type === 'seed' && !c.grown && (now - (c.lastWatered ? new Date(c.lastWatered).getTime() : 0) > WATER_COOLDOWN)).length;
-                    return thirsty > 0 ? `Ja! ${thirsty} Pflanzen schreien nach Wasser! 💦` : "Nein, alle sind gut versorgt. 💧";
+                    let thirsty = 0;
+                    Object.values(garden).forEach(function(c) {
+                        if(c.item && ITEMS[c.item] && ITEMS[c.item].type === 'seed' && !c.grown) {
+                            const lw = c.lastWatered ? new Date(c.lastWatered).getTime() : 0;
+                            if (now - lw > WATER_COOLDOWN) thirsty++;
+                        }
+                    });
+                    return thirsty > 0 ? "Ja! " + thirsty + " Pflanzen schreien nach Wasser! 💦" : "Nein, alle sind gut versorgt. 💧";
                 }
 
                 // 2. Statisches Wissen
@@ -200,7 +227,7 @@
                 if (text.match(/(streak|flamme)/)) {
                     let streak = 0;
                     if(ctx && ctx.roomData) streak = ctx.roomData.currentStreak || 0;
-                    return `Dein Streak ist aktuell bei ${streak} Tagen 🔥. Bleib dran!`;
+                    return "Dein Streak ist aktuell bei " + streak + " Tagen 🔥. Bleib dran!";
                 }
                 if (text.match(/(shop|kauf)/)) return "Oben im Shop gibt's Gärten (Gems), unten Samen & Deko (Münzen).";
                 if (text.match(/(löschen|weg)/)) return "Tippe auf Deko zum Einpacken. Pflanzen verschwinden, wenn du Boden drüber baust.";
@@ -221,7 +248,13 @@
                 const q = input.trim();
                 if(!q) return;
 
-                const reply = OCTO_BRAIN.think(q, context);
+                // Error Catching im Gehirn
+                let reply = "Blub... mein Gehirn hat einen Knoten.";
+                try {
+                    reply = OCTO_BRAIN.think(q, context);
+                } catch(e) {
+                    console.error("Octo Error", e);
+                }
 
                 setMessage(reply);
                 setShowBubble(true);
@@ -234,7 +267,7 @@
             // Initiale Begrüßung beim Laden
             React.useEffect(() => {
                 if (Math.random() > 0.7) {
-                    setMessage(`Blub! 👋`);
+                    setMessage("Blub! 👋");
                     setShowBubble(true);
                     setTimeout(() => setShowBubble(false), 5000);
                 }
@@ -290,7 +323,7 @@
                     const ms = WATER_COOLDOWN - diff;
                     const h = Math.floor(ms / 3600000);
                     const m = Math.floor((ms % 3600000) / 60000);
-                    timeLeftStr = `${h}h ${m}m`;
+                    timeLeftStr = h + "h " + m + "m";
                 }
             }
 
@@ -660,13 +693,12 @@
 
             if (!roomData) return <div className="h-full flex items-center justify-center animate-pulse">Lade Garten...</div>;
 
-            // OCTOBOT CONTEXT INJECTION (HIER IST DIE LÖSUNG)
-            // Wir erstellen den Context IN DER GameApp, wo die Daten auch existieren.
+            // OCTOBOT CONTEXT INJECTION
             const octoContext = {
-                roomData,
-                user,
+                roomData: roomData,
+                user: user,
                 tasks: getTasks(),
-                activeGardenIdx
+                activeGardenIdx: activeGardenIdx
             };
 
             return (
@@ -694,7 +726,7 @@
                                             ))}
                                         </div>
                                     </div>
-                                    {/* Octo-Bot sitzt hier und bekommt den Context! */}
+                                    {/* Octo-Bot mit dem neuen Kontext-Gehirn! */}
                                     <OctoBot context={octoContext} />
                                 </div>
 
