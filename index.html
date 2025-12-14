@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 17.0 (Super Brain)</title>
+    <title>DuoBloom 18.0 (Living Octo)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -135,79 +135,95 @@
             return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
         };
 
-        // --- 2. DAS OKTOPUS-GEHIRN (OCTO BRAIN) ---
-        // Dies ist das "Gehirn" als separates Modul
+        // --- 2. DAS LEBENDIGE GEHIRN (LIVING BRAIN) ---
         
         const OCTO_BRAIN = {
-            fallback: [
-                "Blub? Das habe ich nicht ganz verstanden. Frag mich nach Gießen, Pflanzen oder Gems! 🐙",
-                "Meine Tentakel sind verwirrt. Kannst du das anders formulieren?",
-                "Ich bin Experte für Gärten, aber bei diesem Thema muss ich passen."
-            ],
-            knowledge: [
-                {
-                    keys: ["hallo", "hi", "hey", "moin", "servus"],
-                    answer: "Blub blub! 👋 Schön dich zu sehen! Wie kann ich dir im Garten helfen?"
-                },
-                {
-                    keys: ["pflanz", "säen", "samen", "anbau"],
-                    answer: "Pflanzen ist leicht: 1. Wähle unten einen Samen aus. 2. Tippe auf ein leeres Feld. 🌱 Vergiss das Gießen nicht!"
-                },
-                {
-                    keys: ["gieß", "wasser", "trocken", "braun"],
-                    answer: "Pflanzen brauchen Liebe und Wasser! 💧 Wenn das 'Gießen'-Schild hüpft, tippe auf die Pflanze. Das geht alle 6 Stunden."
-                },
-                {
-                    keys: ["ernt", "sammel", "fertig", "ausgewachsen"],
-                    answer: "Wenn der Balken voll ist, ist die Pflanze reif! 🌻 Tippe sie an, um zu ernten. Du bekommst dafür wertvolle Gems (Edelsteine)!"
-                },
-                {
-                    keys: ["geld", "münze", "coin", "pleite", "arm", "verdien"],
-                    answer: "Du brauchst Münzen? 💰 Erledige Aufgaben im 'Aufgaben'-Tab! Tägliche Aufgaben kommen jeden Morgen neu."
-                },
-                {
-                    keys: ["gem", "edelstein", "diamant", "kristall"],
-                    answer: "Gems 💎 sind super selten! Du kriegst sie NUR durch das Ernten von Pflanzen. Damit kaufst du neue Gärten."
-                },
-                {
-                    keys: ["streak", "flamme", "feuer", "serie"],
-                    answer: "Der Streak 🔥 zeigt deine Ausdauer. Erledige jeden Tag mindestens EINE Aufgabe, damit die Flamme nicht ausgeht!"
-                },
-                {
-                    keys: ["shop", "laden", "kaufen", "markt"],
-                    answer: "Im Shop gibt es zwei Abteilungen: Oben Immobilien (neue Gärten) für Gems, unten Waren (Samen/Deko) für Münzen. 🛒"
-                },
-                {
-                    keys: ["löschen", "weg", "entfern", "abbau"],
-                    answer: "Deko kannst du antippen zum Einpacken. Pflanzen verschwinden, wenn du einen neuen Bodenbelag (z.B. Stein) darüber legst. 🧹"
-                },
-                {
-                    keys: ["witz", "lachen", "spaß"],
-                    answer: "Was ist grün und klopft an die Tür? Ein Klopfsalat! 🥬 ... Haha, Oktopus-Humor ist speziell."
-                },
-                {
-                    keys: ["wer bist du", "name", "vorstellen"],
-                    answer: "Ich bin Octo, dein Garten-Assistent! Ich habe 8 Arme, aber keinen grünen Daumen. Dafür habe ich dich! 🐙"
-                },
-                {
-                    keys: ["freund", "multiplayer", "besuch", "code"],
-                    answer: "Teile deinen Code aus dem Hauptmenü! Freunde können 'Beitreten' wählen und deinen Garten live sehen. 👀"
-                }
-            ],
-            think: function(input) {
-                const text = input.toLowerCase();
-                for (const entry of this.knowledge) {
-                    if (entry.keys.some(k => text.includes(k))) {
-                        return entry.answer;
+            greet: (name) => {
+                const h = new Date().getHours();
+                const timeGreeting = h < 12 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend";
+                return `Blub! ${timeGreeting}, ${name.split(' ')[0]}! 🐙 Was liegt an?`;
+            },
+            
+            analyzeGarden: (ctx) => {
+                const garden = ctx.roomData.gardens[ctx.activeGardenIdx] || {};
+                const now = Date.now();
+                let thirstyCount = 0;
+                let readyCount = 0;
+                let plantCount = 0;
+
+                Object.values(garden).forEach(cell => {
+                    if (cell.item && ITEMS[cell.item].type === 'seed') {
+                        plantCount++;
+                        if (cell.grown) {
+                            readyCount++;
+                        } else {
+                            const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
+                            if (now - lastWatered > WATER_COOLDOWN) thirstyCount++;
+                        }
                     }
+                });
+
+                if (plantCount === 0) return "Hier wächst ja gar nichts! 🏜️ Kauf dir ein paar Samen im Shop.";
+                if (readyCount > 0) return `Erntezeit! 🌾 ${readyCount} Pflanzen sind fertig. Hol dir die Gems!`;
+                if (thirstyCount > 0) return `Alarm! 💧 ${thirstyCount} Pflanzen sind durstig. Schnell gießen!`;
+                return "Alles im grünen Bereich. Deine Pflanzen wachsen glücklich vor sich hin. 🌱";
+            },
+
+            analyzeFinances: (ctx) => {
+                const coins = ctx.roomData.coins || 0;
+                const gems = ctx.roomData.gems || 0;
+                
+                if (coins < 20) return `Oje, du hast nur ${coins} Münzen. 💸 Mach schnell ein paar Aufgaben!`;
+                if (coins < 100) return `Du hast ${coins} Münzen. Das reicht für ein paar Karotten 🥕.`;
+                if (coins > 1000) return `Wow! ${coins} Münzen! 🤑 Du bist der reichste Gärtner hier. Gönn dir mal einen Zwerg!`;
+                
+                return `Finanz-Check: ${coins} Münzen 💰 und ${gems} Gems 💎. Solide!`;
+            },
+
+            recommendTask: (ctx) => {
+                const tasks = ctx.tasks.filter(t => !t.done);
+                if (tasks.length === 0) return "Du bist fleißig! Alle Aufgaben erledigt. 🎉 Ruh dich aus.";
+                
+                const bestTask = tasks.sort((a,b) => b.reward - a.reward)[0];
+                return `Tipp: Mach die Aufgabe "${bestTask.title}". Die bringt ${bestTask.reward} Münzen! 📈`;
+            },
+
+            think: function(input, ctx) {
+                const text = input.toLowerCase();
+                
+                // 1. Kontext-Checks (Dynamisch)
+                if (text.match(/(hallo|hi|hey|moin|servus)/)) return this.greet(ctx.user.displayName);
+                
+                if (text.match(/(status|garten|pflanze|wie geht|alles ok)/)) return this.analyzeGarden(ctx);
+                
+                if (text.match(/(geld|münze|reich|arm|leisten|konto|finanz)/)) return this.analyzeFinances(ctx);
+                
+                if (text.match(/(tun|machen|aufgabe|quest|langweil)/)) return this.recommendTask(ctx);
+
+                if (text.match(/(durst|wasser|gieß)/)) {
+                    const garden = ctx.roomData.gardens[ctx.activeGardenIdx] || {};
+                    const now = Date.now();
+                    const thirsty = Object.values(garden).filter(c => c.item && ITEMS[c.item].type === 'seed' && !c.grown && (now - (c.lastWatered ? new Date(c.lastWatered).getTime() : 0) > WATER_COOLDOWN)).length;
+                    return thirsty > 0 ? `Ja! ${thirsty} Pflanzen schreien nach Wasser! 💦` : "Nein, alle sind gut versorgt. 💧";
                 }
-                return this.fallback[Math.floor(Math.random() * this.fallback.length)];
+
+                // 2. Statisches Wissen
+                if (text.match(/(pflanz|säen|samen)/)) return "Wähle unten einen Samen (z.B. Karotte) und tippe auf ein leeres Feld. Kostet Münzen!";
+                if (text.match(/(ernt|sammel)/)) return "Tippe auf Pflanzen mit vollem blauen Balken. Das bringt Gems 💎!";
+                if (text.match(/(gem|edelstein)/)) return "Gems 💎 kriegst du nur durch Ernten. Damit kaufst du neue Gärten.";
+                if (text.match(/(streak|flamme)/)) return `Dein Streak ist aktuell bei ${ctx.roomData.currentStreak || 0} Tagen 🔥. Bleib dran!`;
+                if (text.match(/(shop|kauf)/)) return "Oben im Shop gibt's Gärten (Gems), unten Samen & Deko (Münzen).";
+                if (text.match(/(löschen|weg)/)) return "Tippe auf Deko zum Einpacken. Pflanzen verschwinden, wenn du Boden drüber baust.";
+                if (text.match(/(witz)/)) return "Warum gießen Gärtner so ungern? Weil sie Angst vor dem Wasserhahn haben! ... Okay, der war flach. 🐙";
+                if (text.match(/(wer bist|name)/)) return "Ich bin Octo, dein Assistent mit Kontext-Bewusstsein! 🧠";
+
+                return "Blub? Dazu fällt mir nichts ein. Frag mich nach deinem Garten, Geld oder Aufgaben! 🐙";
             }
         };
 
-        const OctoBot = () => {
+        const OctoBot = ({ context }) => {
             const [showBubble, setShowBubble] = React.useState(false);
-            const [message, setMessage] = React.useState("Blub! Ich erkläre dir alles!");
+            const [message, setMessage] = React.useState("");
             const [isInputOpen, setIsInputOpen] = React.useState(false);
             const [input, setInput] = React.useState("");
 
@@ -215,8 +231,7 @@
                 const q = input.trim();
                 if(!q) return;
 
-                // Hier nutzen wir das ausgelagerte Gehirn
-                const reply = OCTO_BRAIN.think(q);
+                const reply = OCTO_BRAIN.think(q, context);
 
                 setMessage(reply);
                 setShowBubble(true);
@@ -225,6 +240,16 @@
                 
                 setTimeout(() => setShowBubble(false), 15000);
             };
+
+            // Initiale Begrüßung beim Laden
+            React.useEffect(() => {
+                // Zufällige Chance auf Begrüßung
+                if (Math.random() > 0.7) {
+                    setMessage(`Blub! 👋`);
+                    setShowBubble(true);
+                    setTimeout(() => setShowBubble(false), 5000);
+                }
+            }, []);
 
             return (
                 <div className="absolute -bottom-6 -right-6 md:-right-16 md:bottom-0 z-50 flex flex-col items-end pointer-events-none">
@@ -646,6 +671,14 @@
 
             if (!roomData) return <div className="h-full flex items-center justify-center animate-pulse">Lade Garten...</div>;
 
+            // OCTOBOT CONTEXT INJECTION (WICHTIG!)
+            const octoContext = {
+                roomData,
+                user,
+                tasks: getTasks(),
+                activeGardenIdx
+            };
+
             return (
                 <div className={`flex h-full bg-slate-100 overflow-hidden md:max-w-7xl md:mx-auto md:my-8 md:rounded-3xl md:shadow-2xl md:border ${isSpectator ? 'border-purple-300 ring-4 ring-purple-100' : 'border-slate-200'}`}>
                     <nav className="fixed bottom-0 left-0 w-full bg-white border-t z-40 flex justify-around p-2 pb-safe md:relative md:w-64 md:flex-col md:justify-start md:border-t-0 md:border-r md:p-6 md:gap-4">
@@ -671,8 +704,8 @@
                                             ))}
                                         </div>
                                     </div>
-                                    {/* Octo-Bot sitzt hier */}
-                                    <OctoBot />
+                                    {/* Octo-Bot mit dem neuen Kontext-Gehirn! */}
+                                    <OctoBot context={octoContext} />
                                 </div>
 
                                 {!isSpectator && <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100"><h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3><div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">{Object.entries(getInventory()).map(([id, count]) => { if (count <= 0) return null; return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><ItemDisplay item={ITEMS[id]} className="w-8 h-8" /><span className="text-xs font-bold text-gray-600">{count}x</span></button> })}</div></div>}
@@ -712,115 +745,6 @@
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                 </div>
-            );
-        };
-        
-        // --- 6. LOGIN & APP CONTROLLER ---
-
-        const LoginScreen = ({ onLogin }) => (
-            <div className="h-full flex flex-col items-center justify-center bg-[#f0fdf4] p-6 text-center relative overflow-hidden">
-                <div className="absolute inset-0 z-0 opacity-10" style={{backgroundImage: `url(${GARDEN_BG})`, backgroundSize: '200px'}}></div>
-                <div className="z-10 bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-2xl border-2 border-white max-w-sm w-full animate-pop">
-                    <div className="mb-6 bg-green-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-inner">
-                        <Icon name="sprout" size={48} />
-                    </div>
-                    <h1 className="text-3xl font-black text-gray-800 mb-2">DuoBloom</h1>
-                    <p className="text-gray-500 mb-8 font-medium">Baue gemeinsam Gärten, erledige Aufgaben und sammle Belohnungen.</p>
-                    <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
-                        <Icon name="log-in" /> Mit Google starten
-                    </button>
-                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 17.0 • Super Brain</p>
-                </div>
-            </div>
-        );
-
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [loading, setLoading] = React.useState(true);
-            const [view, setView] = React.useState('login'); // login, menu, game, community
-            const [currentRoom, setCurrentRoom] = React.useState(localStorage.getItem('lastRoom') || null);
-            const [isSpectator, setIsSpectator] = React.useState(false);
-
-            React.useEffect(() => {
-                const unsub = onAuthStateChanged(auth, (u) => {
-                    setUser(u);
-                    setLoading(false);
-                    if (u) setView('menu');
-                    else setView('login');
-                });
-                return () => unsub();
-            }, []);
-
-            const handleLogin = async () => {
-                try {
-                    await signInWithPopup(auth, new GoogleAuthProvider());
-                } catch (e) {
-                    alert("Login fehlgeschlagen: " + e.message);
-                }
-            };
-
-            const handleMenuAction = async (action, payload, payload2) => {
-                if (action === 'community') {
-                    setView('community');
-                } else if (action === 'create') {
-                    // Payload2 ist hier der Name des Gartens
-                    const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-                    const gardenName = payload2 || "Mein Garten";
-                    
-                    await setDoc(doc(db, 'rooms', newCode), {
-                        roomName: gardenName,
-                        owner: user.uid,
-                        ownerName: user.displayName,
-                        createdAt: new Date().toISOString(),
-                        users: [user.uid],
-                        tasks: [],
-                        inventory: { carrot_seed: 2 }, // Start-Items
-                        coins: 50,
-                        gems: 0,
-                        gardens: { 0: {} },
-                        unlockedGardens: [0],
-                        likes: 0
-                    });
-                    enterRoom(newCode, false);
-                } else if (action === 'join' || action === 'resume') {
-                    const code = payload;
-                    const snap = await getDoc(doc(db, 'rooms', code));
-                    if (snap.exists()) {
-                        enterRoom(code, false);
-                    } else {
-                        alert("Garten nicht gefunden!");
-                    }
-                }
-            };
-
-            const enterRoom = (code, spectator) => {
-                if (!spectator) {
-                    localStorage.setItem('lastRoom', code);
-                }
-                setCurrentRoom(code);
-                setIsSpectator(spectator);
-                setView('game');
-            };
-
-            const handleBackToMenu = () => {
-                if (isSpectator) {
-                    const myLastRoom = localStorage.getItem('lastRoom');
-                    setCurrentRoom(myLastRoom);
-                    setIsSpectator(false);
-                }
-                setView('menu');
-            };
-
-            if (loading) return <div className="h-full flex items-center justify-center bg-slate-50 text-green-600 animate-pulse"><Icon name="loader-2" className="animate-spin mr-2"/> Lade DuoBloom...</div>;
-
-            if (!user) return <LoginScreen onLogin={handleLogin} />;
-
-            return (
-                <ErrorBoundary roomCode={currentRoom}>
-                    {view === 'menu' && <MainMenu user={user} currentRoom={currentRoom} onAction={handleMenuAction} />}
-                    {view === 'community' && <CommunityList onVisit={(id) => enterRoom(id, true)} onBack={() => setView('menu')} />}
-                    {view === 'game' && <GameApp user={user} roomCode={currentRoom} isSpectator={isSpectator} onBackToMenu={handleBackToMenu} />}
-                </ErrorBoundary>
             );
         };
 
