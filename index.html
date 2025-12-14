@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 21.0 (Octo Tab)</title>
+    <title>DuoBloom 22.0 (Octo Chat)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -15,22 +15,6 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Global Error Handler -->
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            const root = document.getElementById('root');
-            if (root) {
-                root.innerHTML = '<div style="padding:20px; color:#b91c1c; font-family:sans-serif; text-align:center; height:100vh; display:flex; flex-direction:column; justify-content:center; background:#fef2f2;">' +
-                    '<h2 style="font-size:20px; font-weight:bold; margin-bottom:10px;">Start-Fehler!</h2>' +
-                    '<p style="background:white; padding:15px; border-radius:8px; border:1px solid #fca5a5; font-family:monospace;">' + msg + '</p>' +
-                    '<p style="font-size:12px; color:gray; margin-top:10px;">Zeile: ' + line + '</p>' +
-                    '<button onclick="location.reload()" style="margin-top:20px; padding:12px 24px; background:#ef4444; color:white; border:none; border-radius:8px; font-weight:bold;">Neu laden</button>' +
-                    '</div>';
-            }
-            return false;
-        };
-    </script>
-
     <style>
         body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; background-color: #f8fafc; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -40,10 +24,10 @@
         .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         
-        /* CHAT STYLES */
-        .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 18px; margin-bottom: 8px; font-size: 14px; line-height: 1.4; animation: pop 0.2s ease-out; position: relative; }
-        .chat-octo { background-color: white; color: #374151; border-bottom-left-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; align-self: flex-start; }
-        .chat-user { background-color: #3b82f6; color: white; border-bottom-right-radius: 4px; align-self: flex-end; box-shadow: 0 2px 5px rgba(59, 130, 246, 0.3); }
+        /* Chat Styles */
+        .chat-bubble { max-width: 80%; padding: 12px 16px; border-radius: 18px; margin-bottom: 8px; font-size: 14px; line-height: 1.4; animation: pop 0.2s ease-out; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .chat-octo { background-color: white; color: #374151; border-bottom-left-radius: 4px; border: 1px solid #e5e7eb; align-self: flex-start; }
+        .chat-user { background-color: #3b82f6; color: white; border-bottom-right-radius: 4px; align-self: flex-end; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -131,17 +115,22 @@
             return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
         };
 
-        // --- 2. OCTO BRAIN (EXTREM SAFE & SMART) ---
-        // Proaktives Gehirn für den Chat-Tab
+        // --- 2. OCTO BRAIN & CHAT (SAFE MODE) ---
         
         const OCTO_BRAIN = {
+            greet: function(name) {
+                const h = new Date().getHours();
+                const timeGreeting = h < 12 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend";
+                const shortName = name ? name.split(' ')[0] : "Gärtner";
+                return "Blub! " + timeGreeting + ", " + shortName + "! 🐙 Ich bin dein Assistent.";
+            },
+            
             analyzeState: function(ctx) {
                 if (!ctx || !ctx.roomData) return "Blub! Ich lade noch Daten...";
                 
                 const idx = ctx.activeGardenIdx || 0;
                 const garden = (ctx.roomData.gardens && ctx.roomData.gardens[idx]) ? ctx.roomData.gardens[idx] : {};
                 const coins = ctx.roomData.coins || 0;
-                const tasks = ctx.tasks || [];
                 const now = Date.now();
                 
                 let thirsty = 0;
@@ -159,23 +148,22 @@
                     }
                 });
 
-                // Prioritäten-Logik
                 if (plantCount === 0) return "Dein Garten ist leer! 🏜️ Geh in den Shop und kauf dir ein paar Samen.";
                 if (thirsty > 0) return "Alarm! 🚨 " + thirsty + " Pflanzen brauchen dringend Wasser! Geh schnell zurück in den Garten.";
                 if (ready > 0) return "Glückwunsch! 🌾 " + ready + " Pflanzen sind erntereif. Hol dir die Gems!";
                 if (coins < 20) return "Du bist etwas knapp bei Kasse (" + coins + " Münzen). 💸 Erledige eine Aufgabe!";
                 
-                return "Alles ruhig im Garten. 🌊 Kann ich dir etwas erklären?";
+                return "Alles ruhig im Garten. 🌊 Kann ich dir etwas erklären? Frag mich nach 'Geld' oder 'Aufgaben'.";
             },
 
             think: function(input, ctx) {
                 const text = input.toLowerCase();
                 
-                if (text.match(/(hallo|hi|hey|moin)/)) return "Blub blub! 👋 Wie kann ich helfen?";
+                if (text.match(/(hallo|hi|hey|moin)/)) return "Blub blub! 👋";
                 
                 if (text.match(/(geld|münze|reich|arm|leisten|konto)/)) {
-                    const c = ctx.roomData.coins || 0;
-                    return "Du hast " + c + " Münzen 💰.";
+                    const c = (ctx && ctx.roomData) ? (ctx.roomData.coins || 0) : 0;
+                    return "Dein Kontostand: " + c + " Münzen 💰.";
                 }
                 
                 if (text.match(/(status|garten|pflanze|wie geht|bericht)/)) {
@@ -183,12 +171,13 @@
                 }
 
                 if (text.match(/(tun|machen|aufgabe|quest)/)) {
+                    if(!ctx || !ctx.tasks) return "Keine Aufgaben.";
                     const openTasks = ctx.tasks.filter(function(t) { return !t.done; });
                     if(openTasks.length > 0) return "Mach die Aufgabe: '" + openTasks[0].title + "'! 📋";
                     return "Alles erledigt! Entspann dich. 🌱";
                 }
 
-                if (text.match(/(pflanz|säen|samen)/)) return "Klicke im Garten unten auf das Werkzeug-Symbol eines Samens und dann auf die Erde. 🌱";
+                if (text.match(/(pflanz|säen|samen)/)) return "Klicke im Garten unten auf einen Samen und dann auf die Erde. 🌱";
                 if (text.match(/(ernt|sammel)/)) return "Voller blauer Balken? Drauftippen! Gibt Gems 💎.";
                 if (text.match(/(streak|flamme)/)) return "Täglich eine Aufgabe = Streak hoch 🔥.";
                 if (text.match(/(löschen|weg|entfern)/)) return "Deko antippen = Einpacken. Pflanzen mit Boden überbauen = Löschen.";
@@ -198,8 +187,6 @@
             }
         };
 
-        // --- 3. OCTO CHAT COMPONENT (DER NEUE TAB) ---
-
         const OctoChatInterface = ({ context }) => {
             const [messages, setMessages] = React.useState([
                 { sender: 'octo', text: 'Lade Gehirn...' }
@@ -207,7 +194,6 @@
             const [input, setInput] = React.useState("");
             const messagesEndRef = React.useRef(null);
 
-            // Initiale Analyse beim Öffnen des Tabs
             React.useEffect(() => {
                 if(context && context.roomData) {
                     const initialMsg = OCTO_BRAIN.analyzeState(context);
@@ -237,7 +223,6 @@
 
             return (
                 <div className="flex flex-col h-full bg-[#f0f9ff] relative">
-                    {/* Header */}
                     <div className="bg-white p-4 shadow-sm border-b flex items-center gap-3 sticky top-0 z-10">
                         <div className="relative">
                             <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" className="w-12 h-12 drop-shadow-md" />
@@ -249,7 +234,6 @@
                         </div>
                     </div>
 
-                    {/* Chat Area */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
                         {messages.map((msg, i) => (
                             <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -261,7 +245,6 @@
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Input Area */}
                     <div className="p-4 bg-white border-t flex gap-2 items-center absolute bottom-0 w-full">
                         <input 
                             value={input}
@@ -278,7 +261,7 @@
             );
         };
 
-        // --- 4. GRID CELL ---
+        // --- 3. GRID CELL ---
 
         const GridCell = ({ x, y, cell, handleGridClick, now }) => {
             const floorItem = cell.floor ? ITEMS[cell.floor] : null;
@@ -323,7 +306,7 @@
             );
         };
 
-        // --- 5. ERROR BOUNDARY & MODALS ---
+        // --- 4. ERROR BOUNDARY & MODALS ---
 
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -376,7 +359,7 @@
             );
         };
 
-        // --- 6. SCREENS ---
+        // --- 5. SCREENS ---
 
         const CommunityList = ({ onVisit, onBack }) => {
             const [list, setList] = React.useState([]);
@@ -676,13 +659,7 @@
                     <nav className="fixed bottom-0 left-0 w-full bg-white border-t z-40 flex justify-around p-2 pb-safe md:relative md:w-64 md:flex-col md:justify-start md:border-t-0 md:border-r md:p-6 md:gap-4">
                         <div className="hidden md:block mb-8"><h1 className="text-2xl font-bold text-green-600 flex items-center gap-2"><Icon name="sprout"/> DuoBloom</h1>{isSpectator && <div className="bg-purple-100 text-purple-600 text-xs px-2 py-1 rounded mt-2 font-bold uppercase text-center">Zuschauer</div>}</div>
                         <button onClick={() => setTab('garden')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'garden' ? 'bg-green-50 text-green-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="flower-2"/> <span className="text-[10px] md:text-sm">Garten</span></button>
-                        {!isSpectator && (
-                            <>
-                                <button onClick={() => setTab('tasks')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'tasks' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="check-square"/> <span className="text-[10px] md:text-sm">Aufgaben</span></button>
-                                <button onClick={() => setTab('shop')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'shop' ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="shopping-cart"/> <span className="text-[10px] md:text-sm">Shop</span></button>
-                                <button onClick={() => setTab('octo')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'octo' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="message-circle"/> <span className="text-[10px] md:text-sm">Hilfe</span></button>
-                            </>
-                        )}
+                        {!isSpectator && <><button onClick={() => setTab('tasks')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'tasks' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="check-square"/> <span className="text-[10px] md:text-sm">Aufgaben</span></button><button onClick={() => setTab('shop')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'shop' ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="shopping-cart"/> <span className="text-[10px] md:text-sm">Shop</span></button><button onClick={() => setTab('octo')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'octo' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="message-circle"/> <span className="text-[10px] md:text-sm">Hilfe</span></button></>}
                     </nav>
                     <main className="flex-1 overflow-y-auto bg-[#eefcf3] relative pb-28 md:pb-0">
                         <header className={`sticky top-0 backdrop-blur-md p-4 shadow-sm z-30 flex justify-between items-center px-6 ${isSpectator ? 'bg-purple-50/90' : 'bg-white/90'}`}>
@@ -748,6 +725,114 @@
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                 </div>
+            );
+        };
+
+        // --- 6. LOGIN & APP CONTROLLER (HIER SIND SIE!) ---
+
+        const LoginScreen = ({ onLogin }) => (
+            <div className="h-full flex flex-col items-center justify-center bg-[#f0fdf4] p-6 text-center relative overflow-hidden">
+                <div className="absolute inset-0 z-0 opacity-10" style={{backgroundImage: `url(${GARDEN_BG})`, backgroundSize: '200px'}}></div>
+                <div className="z-10 bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-2xl border-2 border-white max-w-sm w-full animate-pop">
+                    <div className="mb-6 bg-green-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-inner">
+                        <Icon name="sprout" size={48} />
+                    </div>
+                    <h1 className="text-3xl font-black text-gray-800 mb-2">DuoBloom</h1>
+                    <p className="text-gray-500 mb-8 font-medium">Baue gemeinsam Gärten, erledige Aufgaben und sammle Belohnungen.</p>
+                    <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
+                        <Icon name="log-in" /> Mit Google starten
+                    </button>
+                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 22.0 • Octo-Tab</p>
+                </div>
+            </div>
+        );
+
+        const App = () => {
+            const [user, setUser] = React.useState(null);
+            const [loading, setLoading] = React.useState(true);
+            const [view, setView] = React.useState('login'); // login, menu, game, community
+            const [currentRoom, setCurrentRoom] = React.useState(localStorage.getItem('lastRoom') || null);
+            const [isSpectator, setIsSpectator] = React.useState(false);
+
+            React.useEffect(() => {
+                const unsub = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    setLoading(false);
+                    if (u) setView('menu');
+                    else setView('login');
+                });
+                return () => unsub();
+            }, []);
+
+            const handleLogin = async () => {
+                try {
+                    await signInWithPopup(auth, new GoogleAuthProvider());
+                } catch (e) {
+                    alert("Login fehlgeschlagen: " + e.message);
+                }
+            };
+
+            const handleMenuAction = async (action, payload, payload2) => {
+                if (action === 'community') {
+                    setView('community');
+                } else if (action === 'create') {
+                    const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+                    const gardenName = payload2 || "Mein Garten";
+                    
+                    await setDoc(doc(db, 'rooms', newCode), {
+                        roomName: gardenName,
+                        owner: user.uid,
+                        ownerName: user.displayName,
+                        createdAt: new Date().toISOString(),
+                        users: [user.uid],
+                        tasks: [],
+                        inventory: { carrot_seed: 2 }, 
+                        coins: 50,
+                        gems: 0,
+                        gardens: { 0: {} },
+                        unlockedGardens: [0],
+                        likes: 0
+                    });
+                    enterRoom(newCode, false);
+                } else if (action === 'join' || action === 'resume') {
+                    const code = payload;
+                    const snap = await getDoc(doc(db, 'rooms', code));
+                    if (snap.exists()) {
+                        enterRoom(code, false);
+                    } else {
+                        alert("Garten nicht gefunden!");
+                    }
+                }
+            };
+
+            const enterRoom = (code, spectator) => {
+                if (!spectator) {
+                    localStorage.setItem('lastRoom', code);
+                }
+                setCurrentRoom(code);
+                setIsSpectator(spectator);
+                setView('game');
+            };
+
+            const handleBackToMenu = () => {
+                if (isSpectator) {
+                    const myLastRoom = localStorage.getItem('lastRoom');
+                    setCurrentRoom(myLastRoom);
+                    setIsSpectator(false);
+                }
+                setView('menu');
+            };
+
+            if (loading) return <div className="h-full flex items-center justify-center bg-slate-50 text-green-600 animate-pulse"><Icon name="loader-2" className="animate-spin mr-2"/> Lade DuoBloom...</div>;
+
+            if (!user) return <LoginScreen onLogin={handleLogin} />;
+
+            return (
+                <ErrorBoundary roomCode={currentRoom}>
+                    {view === 'menu' && <MainMenu user={user} currentRoom={currentRoom} onAction={handleMenuAction} />}
+                    {view === 'community' && <CommunityList onVisit={(id) => enterRoom(id, true)} onBack={() => setView('menu')} />}
+                    {view === 'game' && <GameApp user={user} roomCode={currentRoom} isSpectator={isSpectator} onBackToMenu={handleBackToMenu} />}
+                </ErrorBoundary>
             );
         };
 
