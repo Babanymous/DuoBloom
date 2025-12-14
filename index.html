@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 24.0 (Clean Octo)</title>
+    <title>DuoBloom 24.1 (Smart Octo)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -224,128 +224,6 @@
             );
         };
 
-        // --- 4. FLOATING OCTO CHAT (IMPROVED) ---
-
-        const OctoChat = ({ user }) => {
-            const [isOpen, setIsOpen] = React.useState(false);
-            const [messages, setMessages] = React.useState([
-                { role: 'assistant', content: 'Blub Blub! 🐙 Ich bin Octo. Ich kenne jeden Grashalm hier. Frag mich was zum Spiel!' }
-            ]);
-            const [input, setInput] = React.useState("");
-            const [isTyping, setIsTyping] = React.useState(false);
-            const messagesEndRef = React.useRef(null);
-
-            const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
-            React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
-
-            // --- DAS GEHIRN VON OCTO ---
-            const getOctoResponse = (text) => {
-                const t = text.toLowerCase();
-                
-                // 1. BEGRÜSSUNG & SMALLTALK
-                if (t.match(/(hallo|hi|hey|moin|guten tag)/)) return "Halli Hallo! Bereit zum Gärtnern? 🌿";
-                if (t.match(/(wie geht|alles klar|was machst du)/)) return "Mir geht's blendend! Ich genieße die Feuchtigkeit hier im Garten. Und dir? 💧";
-                if (t.match(/(wer bist du|dein name)/)) return "Ich bin Octo! Der schlaue Garten-Oktopus. Ich passe auf, dass hier alles wächst. 🐙";
-                if (t.match(/(danke|cool|super)/)) return "Gerne doch! Immer fleißig bleiben! ✨";
-                if (t.match(/(witz|lachen)/)) {
-                    const jokes = [
-                        "Was ist grün und klopft an die Tür? Ein Klopfsalat!",
-                        "Warum können Gärtner nicht reich werden? Weil sie immer alles vergraben.",
-                        "Was macht eine Pflanze im Matheunterricht? Wurzeln ziehen!"
-                    ];
-                    return jokes[Math.floor(Math.random() * jokes.length)];
-                }
-
-                // 2. PFLANZEN WISSEN
-                if (t.includes("karotte")) return "Karotten 🥕 kosten 20 Münzen. Sie brauchen 3 Stufen zum Wachsen. Perfekt für Anfänger!";
-                if (t.includes("sonnenblume")) return "Sonnenblumen 🌻 bringen 20 Gems Belohnung! Aber sie brauchen etwas länger (4 Stufen).";
-                if (t.includes("vergiss")) return "Das Vergissmeinnicht 🪻 ist unsere Premium-Blume. Teuer im Einkauf, aber es lohnt sich!";
-                
-                // 3. GAMEPLAY MECHANIKEN
-                if (t.match(/(wasser|gießen|gießt|trocken)/)) return "Pflanzen muss man alle 6 Stunden gießen! 💧 Wenn sie blau leuchten oder hüpfen, haben sie Durst.";
-                if (t.match(/(münzen|geld|verdienen|coin)/)) return "Münzen bekommst du durch Aufgaben! Schau mal im Tab 'Aufgaben' vorbei. 💰";
-                if (t.match(/(gem|diamant|kristall)/)) return "Gems 💎 bekommst du, wenn du fertige Pflanzen erntest. Damit kannst du neue Gartenbereiche kaufen!";
-                if (t.match(/(ernten|pflücken)/)) return "Klicke auf eine fertig gewachsene Pflanze, um sie zu ernten und Gems zu kassieren! 🧺";
-                if (t.match(/(weg|löschen|entfernen)/)) return "Willst du was löschen? Klicke auf ein leeres Feld oder eine Pflanze. Octo fragt dich dann zur Sicherheit nochmal.";
-                if (t.match(/(speichern|save)/)) return "Keine Sorge, DuoBloom speichert alles automatisch in der Cloud! ☁️";
-                if (t.match(/(freunde|besuchen|code)/)) return "Du kannst Freunde besuchen! Gib ihren Code im Hauptmenü ein. Deinen Code siehst du oben rechts.";
-                if (t.match(/(level|aufsteigen)/)) return "Dein Level hängt davon ab, wie viele Gärten du freigeschaltet hast. Kauf mehr Land im Shop!";
-
-                // 4. SONSTIGES
-                if (t.includes("liebe")) return "Ich liebe diesen Garten auch! ❤️";
-                if (t.includes("octo")) return "Jaaa? Das bin ich! 🐙";
-
-                // 5. FALLBACK (Wenn er nichts versteht)
-                const fallbacks = [
-                    "Das ist eine tiefe Frage... für einen Oktopus zu tief. Frag mich lieber was zu Pflanzen! 🌿",
-                    "Blub? Das habe ich nicht verstanden. Geht es um Karotten? 🥕",
-                    "Interessant! Aber hast du schon deine Blumen gegossen? 💧",
-                    "Dazu steht nichts in meinem Gartenbuch. 🤔"
-                ];
-                return fallbacks[Math.floor(Math.random() * fallbacks.length)];
-            };
-
-            const handleSend = () => {
-                if (!input.trim()) return;
-                const userText = input;
-                setMessages(prev => [...prev, { role: 'user', content: userText }]);
-                setInput("");
-                setIsTyping(true);
-
-                // Simuliere Denkzeit
-                setTimeout(() => {
-                    const answer = getOctoResponse(userText);
-                    setMessages(prev => [...prev, { role: 'assistant', content: answer }]);
-                    setIsTyping(false);
-                }, 800);
-            };
-
-            return (
-                <>
-                    <button 
-                        onClick={() => setIsOpen(true)} 
-                        className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 bg-white hover:bg-gray-50 p-2 md:p-3 rounded-full shadow-xl border-4 border-purple-200 transition-transform hover:scale-110 flex items-center justify-center animate-bounce"
-                    >
-                        <img src={OCTO_IMG} className="w-10 h-10 md:w-12 md:h-12" alt="Octo" />
-                    </button>
-
-                    {isOpen && (
-                        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
-                            <div className="bg-white w-full md:w-[380px] h-[70vh] md:h-[550px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto overflow-hidden animate-pop border border-gray-200 m-0 md:m-4">
-                                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white flex justify-between items-center shadow-md">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-white/20 p-1.5 rounded-full backdrop-blur-sm">
-                                            <img src={OCTO_IMG} className="w-8 h-8" alt="Octo" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-bold text-lg">Octo</h3>
-                                            <p className="text-[10px] text-purple-200 font-mono uppercase">Dein Garten-Guide</p>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => setIsOpen(false)}><Icon name="x" className="text-white/80 hover:text-white" /></button>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto p-4 bg-[#f8fafc] space-y-4">
-                                    {messages.map((m, i) => (
-                                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start items-end gap-2'}`}>
-                                            {m.role === 'assistant' && <img src={OCTO_IMG} className="w-6 h-6 mb-1" />}
-                                            <div className={`max-w-[85%] p-3 px-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                                                m.role === 'user' 
-                                                ? 'bg-purple-600 text-white rounded-br-none' 
-                                                : 'bg-white border border-gray-100 text-gray-700 rounded-bl-none'
-                                            }`}>
-                                                {m.content}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {isTyping && (
-                                        <div className="flex justify-start items-end gap-2">
-                                            <img src={OCTO_IMG} className="w-6 h-6 mb-1" />
-                                            <div className="bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1">
-                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0s'}}></div>
-                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0.1s'}}></div>
-                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0.2s'}}></div>
-                                            </div>
         // --- 4. FLOATING OCTO CHAT (SMART EDITION) ---
 
         const OctoChat = ({ user, roomData }) => {
@@ -401,8 +279,7 @@
                 }
 
                 // 2. SPECIFIC ITEM CHECK (SMART LOOKUP)
-                // Sucht, ob der User nach einem Item fragt, das es im Spiel gibt
-                const foundItemKey = Object.keys(ITEMS).find(key => t.includes(ITEMS[key].name.toLowerCase()) || t.includes(ITEMS[key].name.toLowerCase().replace('e', 'en'))); // Simple plural check
+                const foundItemKey = Object.keys(ITEMS).find(key => t.includes(ITEMS[key].name.toLowerCase()) || t.includes(ITEMS[key].name.toLowerCase().replace('e', 'en'))); 
                 if (foundItemKey) {
                     const item = ITEMS[foundItemKey];
                     const owned = roomData.inventory?.[foundItemKey] || 0;
@@ -418,12 +295,12 @@
                 if (t.match(/(kaufen|shop|laden)/)) return "Geh unten auf den Tab 'Shop', um Samen oder Deko zu kaufen.";
                 if (t.match(/(code|einladen|freunde)/)) return `Dein Raum-Code ist: ${roomData.id || 'oben links'}. Gib ihn deinen Freunden!`;
                 
-                // 4. SMALLTALK (BLEIBT GLEICH)
+                // 4. SMALLTALK
                 if (t.match(/(hallo|hi|hey|moin)/)) return `Halli Hallo ${user.displayName}! 👋`;
                 if (t.match(/(danke|cool|super)/)) return "Gerne doch! Viel Spaß beim Gärtnern! 🌻";
                 if (t.match(/(witz)/)) return "Was ist orange und wandert den Berg hoch? Eine Wanderine! 🍊";
                 
-                // 5. FALLBACK MIT KONTEXT
+                // 5. FALLBACK
                 const fallbacks = [
                     "Das weiß ich nicht genau. Aber hast du schon deine Pflanzen gecheckt? 🌱",
                     `Ich bin mir unsicher. Aber mit ${roomData.coins} Münzen kannst du dir bestimmt was Schönes kaufen.`,
@@ -440,7 +317,6 @@
                 setIsTyping(true);
 
                 setTimeout(() => {
-                    // Wir übergeben roomData jetzt sicherheitshalber, falls wir es im Scope brauchen
                     const answer = getOctoResponse(userText);
                     setMessages(prev => [...prev, { role: 'assistant', content: answer }]);
                     setIsTyping(false);
@@ -503,7 +379,7 @@
                                         value={input}
                                         onChange={e => setInput(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && handleSend()}
-                                        placeholder="Frage z.B. nach Münzen oder Aufgaben..."
+                                        placeholder="Frage z.B. nach Münzen..."
                                         className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none focus:bg-white focus:ring-2 ring-purple-500 transition-all text-sm font-medium"
                                         autoFocus
                                     />
@@ -517,7 +393,6 @@
                 </>
             );
         };
-
 
         // --- 5. SCREENS ---
 
@@ -870,7 +745,6 @@
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
                     <OctoChat user={user} roomData={roomData} />
-
                 </div>
             );
         };
