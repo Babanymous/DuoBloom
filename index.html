@@ -130,183 +130,249 @@
         // --- 2. OCTO BRAIN (SAFE MODE) ---
         // Dies ist die Datenbank für den Oktopus. Keine modernen JS-Features verwenden!
         
+                // --- 2. OCTO BRAIN 2.0 (Smart & Lively) ---
+        
         const OCTO_BRAIN = {
+            // Hilfsfunktion für Zufallsantworten
+            pick: function(arr) { return arr[Math.floor(Math.random() * arr.length)]; },
+
             greet: function(name) {
                 const h = new Date().getHours();
-                const timeGreeting = h < 12 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend";
-                const shortName = name ? name.split(' ')[0] : "Gärtner";
-                return "Blub! " + timeGreeting + ", " + shortName + "! 🐙 Was liegt an?";
+                const greeting = h < 12 ? "Morgen!" : h < 18 ? "Hi!" : "N'abend!";
+                const shortName = name ? name.split(' ')[0] : "Chef";
+                
+                return {
+                    text: `${this.pick(["Blub!", "Huhu!", "Ahoi!"])} ${greeting} ${shortName}. 🐙`,
+                    mood: 'happy'
+                };
             },
             
             analyzeGarden: function(ctx) {
-                if (!ctx || !ctx.roomData || !ctx.roomData.gardens) return "Ich kann den Garten gerade nicht sehen. 👀";
+                if (!ctx || !ctx.roomData || !ctx.roomData.gardens) return { text: "Ich brauche meine Brille... 👓 (Lade...)", mood: 'confused' };
                 
-                // Sicherer Zugriff auf activeGardenIdx
                 const idx = ctx.activeGardenIdx || 0;
                 const garden = ctx.roomData.gardens[idx] || {};
-                
                 const now = Date.now();
-                let thirstyCount = 0;
-                let readyCount = 0;
-                let plantCount = 0;
+                
+                let thirsty = 0, ready = 0, plants = 0, dead = 0;
+                let plantTypes = {};
 
-                Object.values(garden).forEach(function(cell) {
+                Object.values(garden).forEach(cell => {
                     if (cell.item && ITEMS[cell.item] && ITEMS[cell.item].type === 'seed') {
-                        plantCount++;
-                        if (cell.grown) {
-                            readyCount++;
-                        } else {
+                        plants++;
+                        plantTypes[ITEMS[cell.item].name] = true;
+                        if (cell.grown) ready++;
+                        else {
                             const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
-                            if (now - lastWatered > WATER_COOLDOWN) thirstyCount++;
+                            if (now - lastWatered > WATER_COOLDOWN) thirsty++;
                         }
                     }
                 });
 
-                if (plantCount === 0) return "Hier wächst ja gar nichts! 🏜️ Kauf dir ein paar Samen im Shop.";
-                if (readyCount > 0) return "Erntezeit! 🌾 " + readyCount + " Pflanzen sind fertig. Hol dir die Gems!";
-                if (thirstyCount > 0) return "Alarm! 💧 " + thirstyCount + " Pflanzen sind durstig. Schnell gießen!";
-                return "Alles im grünen Bereich. Deine Pflanzen wachsen glücklich vor sich hin. 🌱";
+                // Hier wird Octo "schlau": Er priorisiert Probleme
+                if (plants === 0) return { 
+                    text: this.pick(["Hier ist es so leer... 🏜️", "Pflanz was an!", "Der Boden ist einsam."]), 
+                    mood: 'sad' 
+                };
+                
+                if (thirsty > 0) {
+                    const urgency = thirsty > 3 ? "PANIK! 🔥" : "Achtung!";
+                    return { 
+                        text: `${urgency} ${thirsty} Pflanzen verdursten! 💦 Schnell, Wasser marsch!`, 
+                        mood: 'panic' 
+                    };
+                }
+                
+                if (ready > 0) return { 
+                    text: this.pick([
+                        `Erntezeit! 🌾 ${ready} Pflanzen sind reif!`, 
+                        "Schnapp dir die Gems! 💎 Alles reif!", 
+                        "Sieht lecker aus. Ernte sie schnell!"
+                    ]), 
+                    mood: 'excited' 
+                };
+
+                const types = Object.keys(plantTypes).join(", ");
+                return { 
+                    text: `Alles entspannt. Deine ${types} wachsen prächtig. 🌱`, 
+                    mood: 'happy' 
+                };
             },
 
             analyzeFinances: function(ctx) {
-                if (!ctx || !ctx.roomData) return "Ich sehe deine Geldbörse nicht.";
                 const coins = ctx.roomData.coins || 0;
                 const gems = ctx.roomData.gems || 0;
                 
-                if (coins < 20) return "Oje, du hast nur " + coins + " Münzen. 💸 Mach schnell ein paar Aufgaben!";
-                if (coins < 100) return "Du hast " + coins + " Münzen. Das reicht für ein paar Karotten 🥕.";
-                if (coins > 1000) return "Wow! " + coins + " Münzen! 🤑 Du bist der reichste Gärtner hier.";
+                if (coins < 20) return { text: "Wir sind pleite... 💸 Mach Aufgaben!", mood: 'sad' };
+                if (coins > 500 && gems < 200) return { text: "Viele Münzen, wenig Gems. Kauf Samen! 🥕", mood: 'neutral' };
+                if (coins > 1000) return { text: "Wir sind reich! 🤑 Gönn dir Deko!", mood: 'excited' };
                 
-                return "Finanz-Check: " + coins + " Münzen 💰 und " + gems + " Gems 💎. Solide!";
+                return { text: `${coins} Münzen 💰 & ${gems} Gems 💎. Solide Bilanz.`, mood: 'smart' };
             },
 
             recommendTask: function(ctx) {
-                if (!ctx || !ctx.tasks) return "Keine Aufgaben in Sicht.";
-                const tasks = ctx.tasks.filter(function(t) { return !t.done; });
-                if (tasks.length === 0) return "Du bist fleißig! Alle Aufgaben erledigt. 🎉 Ruh dich aus.";
+                if (!ctx || !ctx.tasks) return { text: "Nichts zu tun? Unmöglich.", mood: 'confused' };
+                const tasks = ctx.tasks.filter(t => !t.done);
                 
-                const bestTask = tasks.sort(function(a,b) { return b.reward - a.reward; })[0];
-                return "Tipp: Mach die Aufgabe '" + bestTask.title + "'. Die bringt " + bestTask.reward + " Münzen! 📈";
+                if (tasks.length === 0) return { text: "Alles erledigt! Du bist eine Maschine! 🤖", mood: 'excited' };
+                
+                const randomTask = this.pick(tasks);
+                return { 
+                    text: `Konzentrier dich auf: "${randomTask.title}". Das bringt ${randomTask.reward} Münzen! 🎯`, 
+                    mood: 'smart' 
+                };
+            },
+
+            // Die "Idle"-Funktion für spontane Kommentare
+            getIdleThought: function(ctx) {
+                const r = Math.random();
+                if (r < 0.3) return this.analyzeGarden(ctx);
+                if (r < 0.4) return { text: "Ein Oktopus im Garten... eigentlich verrückt, oder? 🐙", mood: 'confused' };
+                if (r < 0.5) return { text: "Hast du schon die neuen Samen gesehen? 👀", mood: 'neutral' };
+                if (r < 0.6) return { text: "Ich liebe das Geräusch von wachsenden Karotten. 🥕", mood: 'happy' };
+                return null; // Manchmal sagt er nichts
             },
 
             think: function(input, ctx) {
                 const text = input.toLowerCase();
                 
-                // 1. Kontext-Checks (Safe Logic)
-                if (text.match(/(hallo|hi|hey|moin|servus)/)) {
-                    let name = "Gast";
-                    if(ctx && ctx.user && ctx.user.displayName) name = ctx.user.displayName;
-                    return this.greet(name);
-                }
+                // Greeting
+                if (text.match(/(hallo|hi|hey|moin|servus)/)) return this.greet(ctx?.user?.displayName);
                 
+                // Status Check
                 if (text.match(/(status|garten|pflanze|wie geht|alles ok)/)) return this.analyzeGarden(ctx);
                 
+                // Money
                 if (text.match(/(geld|münze|reich|arm|leisten|konto|finanz)/)) return this.analyzeFinances(ctx);
                 
+                // Tasks
                 if (text.match(/(tun|machen|aufgabe|quest|langweil)/)) return this.recommendTask(ctx);
 
+                // Specific Needs
                 if (text.match(/(durst|wasser|gieß)/)) {
-                    if (!ctx || !ctx.roomData) return "Ich brauche erst meine Brille... (Lade Daten)";
-                    const idx = ctx.activeGardenIdx || 0;
-                    const garden = (ctx.roomData.gardens && ctx.roomData.gardens[idx]) ? ctx.roomData.gardens[idx] : {};
-                    const now = Date.now();
-                    let thirsty = 0;
-                    Object.values(garden).forEach(function(c) {
-                        if(c.item && ITEMS[c.item] && ITEMS[c.item].type === 'seed' && !c.grown) {
-                            const lw = c.lastWatered ? new Date(c.lastWatered).getTime() : 0;
-                            if (now - lw > WATER_COOLDOWN) thirsty++;
-                        }
-                    });
-                    return thirsty > 0 ? "Ja! " + thirsty + " Pflanzen schreien nach Wasser! 💦" : "Nein, alle sind gut versorgt. 💧";
+                    // Quick check garden logic reuse
+                    const res = this.analyzeGarden(ctx);
+                    if (res.mood === 'panic') return res;
+                    return { text: "Niemand hat Durst. Spar das Wasser! 💧", mood: 'smart' };
                 }
 
-                // 2. Statisches Wissen
-                if (text.match(/(pflanz|säen|samen)/)) return "Wähle unten einen Samen (z.B. Karotte) und tippe auf ein leeres Feld. Kostet Münzen!";
-                if (text.match(/(ernt|sammel)/)) return "Tippe auf Pflanzen mit vollem blauen Balken. Das bringt Gems 💎!";
-                if (text.match(/(gem|edelstein)/)) return "Gems 💎 kriegst du nur durch Ernten. Damit kaufst du neue Gärten.";
-                if (text.match(/(streak|flamme)/)) {
-                    let streak = 0;
-                    if(ctx && ctx.roomData) streak = ctx.roomData.currentStreak || 0;
-                    return "Dein Streak ist aktuell bei " + streak + " Tagen 🔥. Bleib dran!";
-                }
-                if (text.match(/(shop|kauf)/)) return "Oben im Shop gibt's Gärten (Gems), unten Samen & Deko (Münzen).";
-                if (text.match(/(löschen|weg)/)) return "Tippe auf Deko zum Einpacken. Pflanzen verschwinden, wenn du Boden drüber baust.";
-                if (text.match(/(witz)/)) return "Warum gießen Gärtner so ungern? Weil sie Angst vor dem Wasserhahn haben! ... Okay, der war flach. 🐙";
-                if (text.match(/(wer bist|name)/)) return "Ich bin Octo, dein Assistent mit Kontext-Bewusstsein! 🧠";
+                // Knowledge Base
+                if (text.match(/(witz)/)) return { text: this.pick(["Was ist orange und wandert den Berg hoch? Eine Wanderine! 🍊", "Treffen sich zwei Pflanzen. Sagt die eine: 'Lass uns abhauen', sagt die andere: 'Geht nicht, ich bin verwurzelt!'"]), mood: 'happy' };
+                
+                if (text.match(/(liebe|lieb|magst)/)) return { text: "Ich liebe diesen Garten! Und Wasser. 💙", mood: 'excited' };
 
-                return "Blub? Dazu fällt mir nichts ein. Frag mich nach deinem Garten, Geld oder Aufgaben! 🐙";
+                return { text: "Blub? Das verstehe ich nicht. Frag nach Garten, Geld oder Aufgaben! 🐙", mood: 'confused' };
             }
         };
 
-        const OctoBot = ({ context }) => {
+
+                const OctoBot = ({ context }) => {
             const [showBubble, setShowBubble] = React.useState(false);
-            const [message, setMessage] = React.useState("");
+            const [brainState, setBrainState] = React.useState({ text: "", mood: "neutral" });
             const [isInputOpen, setIsInputOpen] = React.useState(false);
             const [input, setInput] = React.useState("");
+
+            // Hilfsfunktion zum Sprechen
+            const speak = (response) => {
+                if(!response) return;
+                setBrainState(response);
+                setShowBubble(true);
+                // Automatisch ausblenden
+                setTimeout(() => setShowBubble(false), 8000);
+            };
 
             const handleAsk = () => {
                 const q = input.trim();
                 if(!q) return;
-
-                // Error Catching im Gehirn
-                let reply = "Blub... mein Gehirn hat einen Knoten.";
                 try {
-                    reply = OCTO_BRAIN.think(q, context);
-                } catch(e) {
-                    console.error("Octo Error", e);
-                }
-
-                setMessage(reply);
-                setShowBubble(true);
+                    const reply = OCTO_BRAIN.think(q, context);
+                    speak(reply);
+                } catch(e) { console.error("Octo Error", e); }
                 setIsInputOpen(false);
                 setInput("");
-                
-                setTimeout(() => setShowBubble(false), 15000);
             };
 
-            // Initiale Begrüßung beim Laden
+            // 1. Initiale Begrüßung
             React.useEffect(() => {
-                if (Math.random() > 0.7) {
-                    setMessage("Blub! 👋");
-                    setShowBubble(true);
-                    setTimeout(() => setShowBubble(false), 5000);
-                }
+                setTimeout(() => {
+                    speak(OCTO_BRAIN.greet(context?.user?.displayName));
+                }, 2000);
             }, []);
+
+            // 2. Automatischer "Idle" Check (Octo wird lebendig)
+            React.useEffect(() => {
+                const interval = setInterval(() => {
+                    // Nur sprechen, wenn Blase gerade nicht sichtbar ist und Input zu ist
+                    if (!showBubble && !isInputOpen && Math.random() > 0.6) {
+                        const idleThought = OCTO_BRAIN.getIdleThought(context);
+                        if (idleThought) speak(idleThought);
+                    }
+                }, 30000); // Check alle 30 Sekunden
+                return () => clearInterval(interval);
+            }, [showBubble, isInputOpen, context]);
+
+            // Styles basierend auf Stimmung
+            const getMoodStyles = () => {
+                switch(brainState.mood) {
+                    case 'panic': return { bubble: 'bg-red-100 border-red-300 text-red-800', anim: 'animate-ping' }; // Starker Alarm
+                    case 'excited': return { bubble: 'bg-yellow-100 border-yellow-300 text-yellow-800', anim: 'animate-bounce' };
+                    case 'sad': return { bubble: 'bg-gray-100 border-gray-300 text-gray-600', anim: 'grayscale' };
+                    case 'smart': return { bubble: 'bg-blue-100 border-blue-300 text-blue-800', anim: '' };
+                    default: return { bubble: 'bg-white border-blue-100 text-gray-700', anim: 'animate-pulse' };
+                }
+            };
+
+            const styles = getMoodStyles();
 
             return (
                 <div className="absolute -bottom-6 -right-6 md:-right-16 md:bottom-0 z-50 flex flex-col items-end pointer-events-none">
                     <div className="pointer-events-auto flex flex-col items-end">
-                        {showBubble && (
-                            <div className="bg-white text-gray-700 p-4 rounded-2xl shadow-xl mb-3 max-w-[240px] text-sm animate-pop border-2 border-blue-100 relative bubble-tail font-medium leading-relaxed">
-                                {message}
+                        {/* Sprechblase */}
+                        <div className={`transition-all duration-300 transform origin-bottom-right ${showBubble ? 'scale-100 opacity-100' : 'scale-0 opacity-0'} mb-3`}>
+                            <div className={`${styles.bubble} p-4 rounded-2xl shadow-xl max-w-[200px] text-sm border-2 relative bubble-tail font-medium leading-relaxed`}>
+                                {brainState.text}
                             </div>
-                        )}
+                        </div>
                         
+                        {/* Input Feld */}
                         {isInputOpen && (
-                            <div className="bg-white p-2 rounded-xl shadow-xl mb-2 flex gap-2 animate-pop border border-blue-100 items-center">
+                            <div className="bg-white p-2 rounded-xl shadow-xl mb-2 flex gap-2 animate-pop border border-blue-100 items-center origin-bottom-right">
                                 <input 
-                                    className="border border-gray-200 rounded-lg px-2 py-1 text-sm w-48 outline-none focus:border-blue-400 focus:ring-1 ring-blue-100" 
-                                    placeholder="Frag Octo..." 
+                                    className="border border-gray-200 rounded-lg px-2 py-1 text-sm w-40 outline-none focus:border-blue-400" 
+                                    placeholder="Frag mich..." 
                                     value={input} 
                                     onChange={e => setInput(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleAsk()}
                                     autoFocus
                                 />
-                                <button onClick={handleAsk} className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-1.5 transition-colors"><Icon name="send" size={16}/></button>
+                                <button onClick={handleAsk} className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-1.5"><Icon name="send" size={16}/></button>
                             </div>
                         )}
 
+                        {/* Der Oktopus selbst */}
                         <button 
-                            onClick={() => { setIsInputOpen(!isInputOpen); setShowBubble(false); }} 
-                            className="hover:scale-110 hover:-rotate-6 transition-all active:scale-95 cursor-pointer group"
+                            onClick={() => { 
+                                if (showBubble && !isInputOpen) { setIsInputOpen(true); } 
+                                else if (!showBubble) { speak({text: "Ja? Was gibt's? 🐙", mood: 'neutral'}); setIsInputOpen(true); }
+                                else { setIsInputOpen(!isInputOpen); }
+                            }} 
+                            className={`hover:scale-110 hover:-rotate-12 transition-all active:scale-95 cursor-pointer group relative`}
                             title="Frag den Oktopus!"
                         >
-                            <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" className="w-20 h-20 drop-shadow-2xl group-hover:animate-bounce" alt="Octo-Help" />
+                             {/* Emoji Image */}
+                            <img 
+                                src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" 
+                                className={`w-20 h-20 drop-shadow-2xl ${brainState.mood === 'excited' ? 'animate-bounce' : ''} ${brainState.mood === 'panic' ? 'animate-pulse' : ''}`} 
+                                alt="Octo" 
+                            />
+                            {/* Kleiner Indikator wenn er etwas zu sagen hat oder Warnung */}
+                            {brainState.mood === 'panic' && <div className="absolute -top-2 -left-2 text-2xl animate-bounce">⚠️</div>}
                         </button>
                     </div>
                 </div>
             );
         };
+
 
         // --- 3. GRID CELL ---
 
