@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 22.0 (Octo Chat)</title>
+    <title>DuoBloom 23.0 (Octo Avatar)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -15,6 +15,22 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
+    <!-- Global Error Handler -->
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            const root = document.getElementById('root');
+            if (root) {
+                root.innerHTML = '<div style="padding:20px; color:#b91c1c; font-family:sans-serif; text-align:center; height:100vh; display:flex; flex-direction:column; justify-content:center; background:#fef2f2;">' +
+                    '<h2 style="font-size:20px; font-weight:bold; margin-bottom:10px;">Start-Fehler!</h2>' +
+                    '<p style="background:white; padding:15px; border-radius:8px; border:1px solid #fca5a5; font-family:monospace;">' + msg + '</p>' +
+                    '<p style="font-size:12px; color:gray; margin-top:10px;">Zeile: ' + line + '</p>' +
+                    '<button onclick="location.reload()" style="margin-top:20px; padding:12px 24px; background:#ef4444; color:white; border:none; border-radius:8px; font-weight:bold;">Neu laden</button>' +
+                    '</div>';
+            }
+            return false;
+        };
+    </script>
+
     <style>
         body { height: 100dvh; width: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow: hidden; background-color: #f8fafc; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -24,10 +40,10 @@
         .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         
-        /* Chat Styles */
-        .chat-bubble { max-width: 80%; padding: 12px 16px; border-radius: 18px; margin-bottom: 8px; font-size: 14px; line-height: 1.4; animation: pop 0.2s ease-out; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .chat-octo { background-color: white; color: #374151; border-bottom-left-radius: 4px; border: 1px solid #e5e7eb; align-self: flex-start; }
-        .chat-user { background-color: #3b82f6; color: white; border-bottom-right-radius: 4px; align-self: flex-end; }
+        /* CHAT STYLES */
+        .chat-bubble { max-width: 80%; padding: 12px 16px; border-radius: 18px; margin-bottom: 2px; font-size: 14px; line-height: 1.4; animation: pop 0.2s ease-out; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .chat-octo { background-color: white; color: #374151; border-bottom-left-radius: 4px; border: 1px solid #e5e7eb; }
+        .chat-user { background-color: #3b82f6; color: white; border-bottom-right-radius: 4px; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -122,7 +138,7 @@
                 const h = new Date().getHours();
                 const timeGreeting = h < 12 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend";
                 const shortName = name ? name.split(' ')[0] : "Gärtner";
-                return "Blub! " + timeGreeting + ", " + shortName + "! 🐙 Ich bin dein Assistent.";
+                return "Blub! " + timeGreeting + ", " + shortName + "! 🐙";
             },
             
             analyzeState: function(ctx) {
@@ -131,6 +147,7 @@
                 const idx = ctx.activeGardenIdx || 0;
                 const garden = (ctx.roomData.gardens && ctx.roomData.gardens[idx]) ? ctx.roomData.gardens[idx] : {};
                 const coins = ctx.roomData.coins || 0;
+                const tasks = ctx.tasks || [];
                 const now = Date.now();
                 
                 let thirsty = 0;
@@ -149,7 +166,7 @@
                 });
 
                 if (plantCount === 0) return "Dein Garten ist leer! 🏜️ Geh in den Shop und kauf dir ein paar Samen.";
-                if (thirsty > 0) return "Alarm! 🚨 " + thirsty + " Pflanzen brauchen dringend Wasser! Geh schnell zurück in den Garten.";
+                if (thirsty > 0) return "Alarm! 🚨 " + thirsty + " Pflanzen brauchen dringend Wasser!";
                 if (ready > 0) return "Glückwunsch! 🌾 " + ready + " Pflanzen sind erntereif. Hol dir die Gems!";
                 if (coins < 20) return "Du bist etwas knapp bei Kasse (" + coins + " Münzen). 💸 Erledige eine Aufgabe!";
                 
@@ -236,7 +253,13 @@
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-20">
                         {messages.map((msg, i) => (
-                            <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div key={i} className={`flex items-end gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                {msg.sender === 'octo' && (
+                                    <img 
+                                        src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" 
+                                        className="w-8 h-8 mb-1 drop-shadow-sm animate-pop" 
+                                    />
+                                )}
                                 <div className={`chat-bubble ${msg.sender === 'user' ? 'chat-user' : 'chat-octo'}`}>
                                     {msg.text}
                                 </div>
@@ -728,8 +751,6 @@
             );
         };
 
-        // --- 6. LOGIN & APP CONTROLLER (HIER SIND SIE!) ---
-
         const LoginScreen = ({ onLogin }) => (
             <div className="h-full flex flex-col items-center justify-center bg-[#f0fdf4] p-6 text-center relative overflow-hidden">
                 <div className="absolute inset-0 z-0 opacity-10" style={{backgroundImage: `url(${GARDEN_BG})`, backgroundSize: '200px'}}></div>
@@ -742,7 +763,7 @@
                     <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
                         <Icon name="log-in" /> Mit Google starten
                     </button>
-                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 22.0 • Octo-Tab</p>
+                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 23.0 • Octo-Avatar</p>
                 </div>
             </div>
         );
@@ -776,6 +797,7 @@
                 if (action === 'community') {
                     setView('community');
                 } else if (action === 'create') {
+                    // Payload2 ist hier der Name des Gartens
                     const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
                     const gardenName = payload2 || "Mein Garten";
                     
@@ -786,7 +808,7 @@
                         createdAt: new Date().toISOString(),
                         users: [user.uid],
                         tasks: [],
-                        inventory: { carrot_seed: 2 }, 
+                        inventory: { carrot_seed: 2 }, // Start-Items
                         coins: 50,
                         gems: 0,
                         gardens: { 0: {} },
