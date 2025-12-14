@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 16.0 (Octo-Bot)</title>
+    <title>DuoBloom 16.1 (Smart Octo)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -135,11 +135,11 @@
             return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
         };
 
-        // --- 2. OCTO BOT COMPONENT (NEU!) ---
+        // --- 2. SMART OCTO BOT COMPONENT (VERBESSERT!) ---
 
         const OctoBot = () => {
             const [showBubble, setShowBubble] = React.useState(false);
-            const [message, setMessage] = React.useState("Blub! Brauchst du Hilfe?");
+            const [message, setMessage] = React.useState("Blub! Ich erkläre dir alles!");
             const [isInputOpen, setIsInputOpen] = React.useState(false);
             const [input, setInput] = React.useState("");
 
@@ -147,50 +147,75 @@
                 const q = input.toLowerCase().trim();
                 if(!q) return;
 
-                let reply = "Tut mir leid, ich bin nur ein einfacher Garten-Oktopus. Ich kann dir nur Fragen zu DuoBloom beantworten.";
+                let reply = "Entschuldigung, das habe ich nicht verstanden. Ich weiß alles über Gärten, Pflanzen, Aufgaben und Streaks! 🐙";
 
-                // Logik für Antworten
-                if (q.includes("hallo") || q.includes("hi") || q.includes("hey")) reply = "Hallo! 🐙 Frag mich etwas über den Garten!";
-                else if (q.includes("pflanz") || q.includes("samen") || q.includes("säen")) reply = "Um zu pflanzen, klicke unten auf ein Item im Werkzeugkasten und dann auf ein leeres Feld im Garten.";
-                else if (q.includes("gieß") || q.includes("wasser")) reply = "Pflanzen brauchen Wasser! Klicke auf eine Pflanze, um sie zu gießen. Das geht alle 6 Stunden.";
-                else if (q.includes("ernt") || q.includes("sammeln")) reply = "Wenn der blaue Balken voll ist, ist die Pflanze ausgewachsen. Klicke darauf, um Edelsteine (Gems) zu ernten!";
-                else if (q.includes("münze") || q.includes("geld")) reply = "Münzen bekommst du, wenn du Aufgaben erledigst. Damit kannst du Samen und Deko kaufen.";
-                else if (q.includes("gem") || q.includes("edelstein")) reply = "Gems bekommst du durch Ernten. Damit kannst du neue Gärten freischalten!";
-                else if (q.includes("aufgabe")) reply = "Im Aufgaben-Tab findest du tägliche Missionen. Erledige sie für Münzen!";
-                else if (q.includes("streak") || q.includes("flamme")) reply = "Dein Streak steigt, wenn du jeden Tag mindestens eine Aufgabe erledigst. Bleib dran!";
-                else if (q.includes("shop") || q.includes("kaufen")) reply = "Im Shop gibt es neue Gärten (für Gems) und Items (für Münzen).";
-                else if (q.includes("löschen") || q.includes("weg") || q.includes("entfernen")) reply = "Wenn du etwas entfernen willst, klicke es an. Oder setze einfach einen Bodenbelag darüber.";
-                else if (q.includes("freund") || q.includes("besuchen")) reply = "Teile deinen Code im Hauptmenü, damit Freunde dich besuchen können!";
+                // Verbesserte Logik mit RegEx für bessere Erkennung
+                if (q.match(/(hallo|hi|hey|moin|guten tag)/)) {
+                    reply = "Blub! Hallo Gärtner! 🌊 Frag mich ruhig, wie man pflanzt, gießt oder wie der Streak funktioniert.";
+                }
+                else if (q.match(/(pflanz|samen|säen|karotte|sonnenblume|blume)/)) {
+                    reply = "Ganz einfach: Wähle unten im Menü einen Samen aus (kostet Münzen 💰) und tippe auf ein leeres Feld. Vergiss nicht, danach zu gießen, damit sie wachsen!";
+                }
+                else if (q.match(/(gieß|wasser|trocken|zeit|wann|uhr)/)) {
+                    reply = "Pflanzen werden durstig! Alle 6 Stunden musst du gießen. Achte auf das hüpfende 'Gießen!'-Schild. Ohne Wasser wachsen sie nicht weiter.";
+                }
+                else if (q.match(/(ernt|sammeln|fertig|ausgewachsen|blau|balken)/)) {
+                    reply = "Wenn der blaue Balken voll ist, ist Erntezeit! Tippe die Pflanze an, um Edelsteine (Gems 💎) zu bekommen. Die brauchst du für neue Gärten.";
+                }
+                else if (q.match(/(geld|münze|coin|verdien|reich|kaufen)/)) {
+                    reply = "Münzen 💰 verdienst du durch das Erledigen von Aufgaben im 'Aufgaben'-Tab. Mit Münzen kaufst du Samen, Zäune und Deko.";
+                }
+                else if (q.match(/(gem|edelstein|diamant|kristall)/)) {
+                    reply = "Edelsteine 💎 sind selten! Du bekommst sie NUR durch das Ernten von fertigen Pflanzen. Spare sie, um teure Gärten wie die Waldlichtung freizuschalten.";
+                }
+                else if (q.match(/(aufgabe|mission|quest|täg|erledig)/)) {
+                    reply = "Schau unten in den Tab 'Aufgaben'. Tägliche Aufgaben (blau) kommen jeden Tag wieder. Einmalige Aufgaben geben oft viele Münzen, haben aber manchmal eine Frist!";
+                }
+                else if (q.match(/(streak|flamme|feuer|tagen|reihe|konstant)/)) {
+                    reply = "Der Streak 🔥 zeigt, wie viele Tage du in Folge aktiv warst. Erledige jeden Tag mindestens EINE Aufgabe, um ihn zu erhöhen. Ab Tag 3 wird er orange!";
+                }
+                else if (q.match(/(shop|laden|markt|angebot)/)) {
+                    reply = "Im Shop gibt es zwei Bereiche: Oben kaufst du neue Gärten für Edelsteine 💎, unten kaufst du Samen und Deko für Münzen 💰.";
+                }
+                else if (q.match(/(löschen|weg|entfernen|abbauen|kaputt|falsch)/)) {
+                    reply = "Deko kannst du antippen, um sie ins Inventar zu packen. Pflanzen kannst du nicht verschieben, aber wenn du einen Bodenbelag darüber legst, verschwinden sie.";
+                }
+                else if (q.match(/(freund|besuch|multiplayer|zusammen|code)/)) {
+                    reply = "Du kannst deinen Garten-Code (oben im Menü) teilen! Freunde können ihn eingeben und dich besuchen. Sie können zuschauen, aber nichts kaputt machen. 👀";
+                }
+                else if (q.match(/(wetter|essen|leben|sinn|mathe|rezept)/)) {
+                    reply = "Oh, da bin ich überfragt. Ich bin nur ein kleiner Oktopus im Handy. Ich kenne mich nur mit DuoBloom aus! 🌸";
+                }
 
                 setMessage(reply);
                 setShowBubble(true);
                 setIsInputOpen(false);
                 setInput("");
                 
-                // Sprechblase nach 10 Sekunden ausblenden
-                setTimeout(() => setShowBubble(false), 12000);
+                // Längere Anzeigezeit für längere Texte (15 Sekunden)
+                setTimeout(() => setShowBubble(false), 15000);
             };
 
             return (
                 <div className="absolute -bottom-6 -right-6 md:-right-16 md:bottom-0 z-50 flex flex-col items-end pointer-events-none">
                     <div className="pointer-events-auto flex flex-col items-end">
                         {showBubble && (
-                            <div className="bg-white text-gray-700 p-4 rounded-2xl shadow-xl mb-3 max-w-[220px] text-sm animate-pop border-2 border-blue-100 relative bubble-tail font-medium">
+                            <div className="bg-white text-gray-700 p-4 rounded-2xl shadow-xl mb-3 max-w-[240px] text-sm animate-pop border-2 border-blue-100 relative bubble-tail font-medium leading-relaxed">
                                 {message}
                             </div>
                         )}
                         
                         {isInputOpen && (
-                            <div className="bg-white p-2 rounded-xl shadow-xl mb-2 flex gap-2 animate-pop border border-blue-100">
+                            <div className="bg-white p-2 rounded-xl shadow-xl mb-2 flex gap-2 animate-pop border border-blue-100 items-center">
                                 <input 
-                                    className="border border-gray-200 rounded-lg px-2 py-1 text-sm w-40 outline-none focus:border-blue-400" 
-                                    placeholder="Frage stellen..." 
+                                    className="border border-gray-200 rounded-lg px-2 py-1 text-sm w-48 outline-none focus:border-blue-400 focus:ring-1 ring-blue-100" 
+                                    placeholder="Stell eine Frage..." 
                                     value={input} 
                                     onChange={e => setInput(e.target.value)}
                                     onKeyDown={e => e.key === 'Enter' && handleAsk()}
                                     autoFocus
                                 />
-                                <button onClick={handleAsk} className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg px-2 py-1"><Icon name="send" size={16}/></button>
+                                <button onClick={handleAsk} className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-1.5 transition-colors"><Icon name="send" size={16}/></button>
                             </div>
                         )}
 
@@ -674,7 +699,7 @@
                     <button onClick={onLogin} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg transform transition hover:scale-105 hover:shadow-green-500/30 flex items-center justify-center gap-3">
                         <Icon name="log-in" /> Mit Google starten
                     </button>
-                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 16.0 • Octo-Bot</p>
+                    <p className="mt-6 text-[10px] text-gray-400 uppercase tracking-widest">Version 16.1 • Smart Octo</p>
                 </div>
             </div>
         );
