@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DuoBloom 19.0 (Safe & Smart)</title>
+    <title>DuoBloom 20.0 (Octo Chat)</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#4ade80">
@@ -38,8 +38,15 @@
         .texture-stone { background-color: #d1d5db; background-image: radial-gradient(circle, #9ca3af 20%, transparent 20%), radial-gradient(circle, #9ca3af 20%, transparent 20%); background-size: 10px 10px; background-position: 0 0, 5px 5px; border: 1px solid #9ca3af; }
         .texture-wood { background-color: #78350f; background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.1) 5px, rgba(255,255,255,0.1) 10px); border: 1px solid #451a03; box-shadow: inset 0 0 10px rgba(0,0,0,0.2); }
         .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        .bubble-tail::after { content: ''; position: absolute; bottom: -8px; right: 20px; border-width: 8px 8px 0; border-style: solid; border-color: white transparent transparent transparent; }
+        @keyframes pop { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        /* Chat Bubble Styles */
+        .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 18px; margin-bottom: 8px; font-size: 14px; line-height: 1.4; animation: pop 0.2s ease-out; position: relative; }
+        .chat-octo { background-color: white; color: #374151; border-bottom-left-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e5e7eb; align-self: flex-start; }
+        .chat-user { background-color: #3b82f6; color: white; border-bottom-right-radius: 4px; align-self: flex-end; box-shadow: 0 2px 5px rgba(59, 130, 246, 0.3); }
+        .typing-dot { display: inline-block; width: 6px; height: 6px; background-color: #9ca3af; border-radius: 50%; margin: 0 2px; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -63,6 +70,7 @@
             measurementId: "G-Z0W0LK6D88"
         };
 
+        // Init Firebase safely
         let firebaseApp, auth, db;
         try {
             firebaseApp = initializeApp(firebaseConfig);
@@ -127,188 +135,159 @@
             return "from-yellow-400 to-yellow-600 border-2 border-yellow-200"; 
         };
 
-        // --- 2. OCTO BRAIN (SAFE MODE) ---
-        // Dies ist die Datenbank für den Oktopus. Keine modernen JS-Features verwenden!
+        // --- 2. OCTO BRAIN (SAFE & SMART) ---
+        // Dies ist die Wissensdatenbank.
         
         const OCTO_BRAIN = {
-            greet: function(name) {
-                const h = new Date().getHours();
-                const timeGreeting = h < 12 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend";
-                const shortName = name ? name.split(' ')[0] : "Gärtner";
-                return "Blub! " + timeGreeting + ", " + shortName + "! 🐙 Was liegt an?";
-            },
-            
-            analyzeGarden: function(ctx) {
-                if (!ctx || !ctx.roomData || !ctx.roomData.gardens) return "Ich kann den Garten gerade nicht sehen. 👀";
+            // Proaktive Analyse (wird aufgerufen, wenn man den Tab öffnet)
+            analyzeState: function(ctx) {
+                if (!ctx || !ctx.roomData) return "Blub! Ich lade noch Daten...";
                 
-                // Sicherer Zugriff auf activeGardenIdx
-                const idx = ctx.activeGardenIdx || 0;
-                const garden = ctx.roomData.gardens[idx] || {};
-                
+                const garden = (ctx.roomData.gardens && ctx.roomData.gardens[ctx.activeGardenIdx]) || {};
+                const coins = ctx.roomData.coins || 0;
+                const tasks = ctx.tasks || [];
                 const now = Date.now();
-                let thirstyCount = 0;
-                let readyCount = 0;
-                let plantCount = 0;
-
-                Object.values(garden).forEach(function(cell) {
-                    if (cell.item && ITEMS[cell.item] && ITEMS[cell.item].type === 'seed') {
-                        plantCount++;
-                        if (cell.grown) {
-                            readyCount++;
-                        } else {
-                            const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
-                            if (now - lastWatered > WATER_COOLDOWN) thirstyCount++;
+                
+                let thirsty = 0;
+                let ready = 0;
+                Object.values(garden).forEach(function(c) {
+                    if(c.item && ITEMS[c.item] && ITEMS[c.item].type === 'seed') {
+                        if(c.grown) ready++;
+                        else {
+                            const lw = c.lastWatered ? new Date(c.lastWatered).getTime() : 0;
+                            if (now - lw > WATER_COOLDOWN) thirsty++;
                         }
                     }
                 });
 
-                if (plantCount === 0) return "Hier wächst ja gar nichts! 🏜️ Kauf dir ein paar Samen im Shop.";
-                if (readyCount > 0) return "Erntezeit! 🌾 " + readyCount + " Pflanzen sind fertig. Hol dir die Gems!";
-                if (thirstyCount > 0) return "Alarm! 💧 " + thirstyCount + " Pflanzen sind durstig. Schnell gießen!";
-                return "Alles im grünen Bereich. Deine Pflanzen wachsen glücklich vor sich hin. 🌱";
+                // Prioritäten-Logik
+                if (thirsty > 0) return "Alarm! 🚨 " + thirsty + " Pflanzen brauchen dringend Wasser! Geh schnell in den Garten!";
+                if (ready > 0) return "Glückwunsch! 🌾 " + ready + " Pflanzen sind erntereif. Hol dir die Gems!";
+                if (coins < 20 && tasks.some(function(t) { return !t.done; })) return "Du bist etwas knapp bei Kasse. 💸 Erledige eine Aufgabe für Münzen!";
+                if (coins > 100) return "Wow, " + coins + " Münzen! 💰 Du könntest im Shop shoppen gehen.";
+                
+                const h = new Date().getHours();
+                const greeting = h < 12 ? "Guten Morgen" : h < 18 ? "Hallo" : "Guten Abend";
+                return "Blub! " + greeting + ", " + (ctx.user ? ctx.user.displayName.split(' ')[0] : "Gärtner") + "! Alles ruhig im Ozean... äh, Garten. 🌊";
             },
 
-            analyzeFinances: function(ctx) {
-                if (!ctx || !ctx.roomData) return "Ich sehe deine Geldbörse nicht.";
-                const coins = ctx.roomData.coins || 0;
-                const gems = ctx.roomData.gems || 0;
-                
-                if (coins < 20) return "Oje, du hast nur " + coins + " Münzen. 💸 Mach schnell ein paar Aufgaben!";
-                if (coins < 100) return "Du hast " + coins + " Münzen. Das reicht für ein paar Karotten 🥕.";
-                if (coins > 1000) return "Wow! " + coins + " Münzen! 🤑 Du bist der reichste Gärtner hier.";
-                
-                return "Finanz-Check: " + coins + " Münzen 💰 und " + gems + " Gems 💎. Solide!";
-            },
-
-            recommendTask: function(ctx) {
-                if (!ctx || !ctx.tasks) return "Keine Aufgaben in Sicht.";
-                const tasks = ctx.tasks.filter(function(t) { return !t.done; });
-                if (tasks.length === 0) return "Du bist fleißig! Alle Aufgaben erledigt. 🎉 Ruh dich aus.";
-                
-                const bestTask = tasks.sort(function(a,b) { return b.reward - a.reward; })[0];
-                return "Tipp: Mach die Aufgabe '" + bestTask.title + "'. Die bringt " + bestTask.reward + " Münzen! 📈";
-            },
-
+            // Reaktion auf Fragen
             think: function(input, ctx) {
                 const text = input.toLowerCase();
                 
-                // 1. Kontext-Checks (Safe Logic)
-                if (text.match(/(hallo|hi|hey|moin|servus)/)) {
-                    let name = "Gast";
-                    if(ctx && ctx.user && ctx.user.displayName) name = ctx.user.displayName;
-                    return this.greet(name);
+                if (text.match(/(hallo|hi|hey|moin|servus)/)) return "Blub blub! 👋 Ich bin ganz Ohr (wenn ich welche hätte).";
+                
+                if (text.match(/(geld|münze|reich|arm|leisten|konto|finanz)/)) {
+                    const c = ctx.roomData.coins || 0;
+                    return "Dein Kontostand: " + c + " Münzen 💰. " + (c < 50 ? "Sparsam sein!" : "Gönn dir was!");
                 }
                 
-                if (text.match(/(status|garten|pflanze|wie geht|alles ok)/)) return this.analyzeGarden(ctx);
-                
-                if (text.match(/(geld|münze|reich|arm|leisten|konto|finanz)/)) return this.analyzeFinances(ctx);
-                
-                if (text.match(/(tun|machen|aufgabe|quest|langweil)/)) return this.recommendTask(ctx);
-
-                if (text.match(/(durst|wasser|gieß)/)) {
-                    if (!ctx || !ctx.roomData) return "Ich brauche erst meine Brille... (Lade Daten)";
-                    const idx = ctx.activeGardenIdx || 0;
-                    const garden = (ctx.roomData.gardens && ctx.roomData.gardens[idx]) ? ctx.roomData.gardens[idx] : {};
-                    const now = Date.now();
-                    let thirsty = 0;
-                    Object.values(garden).forEach(function(c) {
-                        if(c.item && ITEMS[c.item] && ITEMS[c.item].type === 'seed' && !c.grown) {
-                            const lw = c.lastWatered ? new Date(c.lastWatered).getTime() : 0;
-                            if (now - lw > WATER_COOLDOWN) thirsty++;
-                        }
-                    });
-                    return thirsty > 0 ? "Ja! " + thirsty + " Pflanzen schreien nach Wasser! 💦" : "Nein, alle sind gut versorgt. 💧";
+                if (text.match(/(status|garten|pflanze|wie geht|alles ok|bericht)/)) {
+                    return this.analyzeState(ctx); // Nutze die Analyse-Funktion
                 }
 
-                // 2. Statisches Wissen
-                if (text.match(/(pflanz|säen|samen)/)) return "Wähle unten einen Samen (z.B. Karotte) und tippe auf ein leeres Feld. Kostet Münzen!";
-                if (text.match(/(ernt|sammel)/)) return "Tippe auf Pflanzen mit vollem blauen Balken. Das bringt Gems 💎!";
-                if (text.match(/(gem|edelstein)/)) return "Gems 💎 kriegst du nur durch Ernten. Damit kaufst du neue Gärten.";
-                if (text.match(/(streak|flamme)/)) {
-                    let streak = 0;
-                    if(ctx && ctx.roomData) streak = ctx.roomData.currentStreak || 0;
-                    return "Dein Streak ist aktuell bei " + streak + " Tagen 🔥. Bleib dran!";
+                if (text.match(/(tun|machen|aufgabe|quest|langweil)/)) {
+                    const openTasks = ctx.tasks.filter(function(t) { return !t.done; });
+                    if(openTasks.length > 0) return "Arbeit ruft! 📋 Mach: '" + openTasks[0].title + "'.";
+                    return "Alles erledigt! Entspann dich oder pflanz was Neues. 🌱";
                 }
-                if (text.match(/(shop|kauf)/)) return "Oben im Shop gibt's Gärten (Gems), unten Samen & Deko (Münzen).";
-                if (text.match(/(löschen|weg)/)) return "Tippe auf Deko zum Einpacken. Pflanzen verschwinden, wenn du Boden drüber baust.";
-                if (text.match(/(witz)/)) return "Warum gießen Gärtner so ungern? Weil sie Angst vor dem Wasserhahn haben! ... Okay, der war flach. 🐙";
-                if (text.match(/(wer bist|name)/)) return "Ich bin Octo, dein Assistent mit Kontext-Bewusstsein! 🧠";
 
-                return "Blub? Dazu fällt mir nichts ein. Frag mich nach deinem Garten, Geld oder Aufgaben! 🐙";
+                // Standard Wissen
+                if (text.match(/(pflanz|säen|samen)/)) return "1. Klicke unten auf 'Shop' für Samen. 2. Im Garten auswählen. 3. Auf Erde tippen. Easy! 🌱";
+                if (text.match(/(ernt|sammel)/)) return "Blaue Balken voll? Drauftippen! Gibt Gems 💎.";
+                if (text.match(/(gem|edelstein)/)) return "Gems 💎 sind selten. Du kriegst sie nur durch Ernten.";
+                if (text.match(/(streak|flamme)/)) return "Täglich eine Aufgabe = Streak hoch 🔥. Verpass keinen Tag!";
+                if (text.match(/(löschen|weg)/)) return "Deko antippen zum Einpacken. Pflanzen überbauen (mit Boden) zum Löschen.";
+                if (text.match(/(witz)/)) return "Was ist orange und wandert den Berg hoch? Eine Wanderine! 🍊 ... Blub.";
+                if (text.match(/(danke|gut|super|cool)/)) return "Gerne! 🐙 Dafür bin ich da.";
+
+                return "Das verstehe ich nicht ganz. Frag mich nach 'Geld', 'Aufgaben' oder 'Garten'! 🐙";
             }
         };
 
-        const OctoBot = ({ context }) => {
-            const [showBubble, setShowBubble] = React.useState(false);
-            const [message, setMessage] = React.useState("");
-            const [isInputOpen, setIsInputOpen] = React.useState(false);
+        // --- 3. OCTO CHAT COMPONENT (NEW TAB) ---
+
+        const OctoChatInterface = ({ context }) => {
+            // Initialer State mit Begrüßung
+            const [messages, setMessages] = React.useState([
+                { sender: 'octo', text: 'Lade Gehirn...' }
+            ]);
             const [input, setInput] = React.useState("");
+            const messagesEndRef = React.useRef(null);
 
-            const handleAsk = () => {
-                const q = input.trim();
-                if(!q) return;
+            // Beim Start: Analyse durchführen
+            React.useEffect(() => {
+                const initialMsg = OCTO_BRAIN.analyzeState(context);
+                setMessages([{ sender: 'octo', text: initialMsg }]);
+            }, []); // Nur einmal beim Mounten
 
-                // Error Catching im Gehirn
-                let reply = "Blub... mein Gehirn hat einen Knoten.";
-                try {
-                    reply = OCTO_BRAIN.think(q, context);
-                } catch(e) {
-                    console.error("Octo Error", e);
-                }
+            // Auto-Scroll
+            React.useEffect(() => {
+                if(messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+            }, [messages]);
 
-                setMessage(reply);
-                setShowBubble(true);
-                setIsInputOpen(false);
-                setInput("");
+            const handleSend = () => {
+                if(!input.trim()) return;
+                const userMsg = { sender: 'user', text: input };
+                setMessages(prev => [...prev, userMsg]);
                 
-                setTimeout(() => setShowBubble(false), 15000);
+                // Octo denkt nach...
+                setTimeout(() => {
+                    let reply = "Blub...";
+                    try {
+                        reply = OCTO_BRAIN.think(input, context);
+                    } catch(e) { console.error(e); }
+                    
+                    setMessages(prev => [...prev, { sender: 'octo', text: reply }]);
+                }, 600); // Kleine Verzögerung für "Realismus"
+
+                setInput("");
             };
 
-            // Initiale Begrüßung beim Laden
-            React.useEffect(() => {
-                if (Math.random() > 0.7) {
-                    setMessage("Blub! 👋");
-                    setShowBubble(true);
-                    setTimeout(() => setShowBubble(false), 5000);
-                }
-            }, []);
-
             return (
-                <div className="absolute -bottom-6 -right-6 md:-right-16 md:bottom-0 z-50 flex flex-col items-end pointer-events-none">
-                    <div className="pointer-events-auto flex flex-col items-end">
-                        {showBubble && (
-                            <div className="bg-white text-gray-700 p-4 rounded-2xl shadow-xl mb-3 max-w-[240px] text-sm animate-pop border-2 border-blue-100 relative bubble-tail font-medium leading-relaxed">
-                                {message}
-                            </div>
-                        )}
-                        
-                        {isInputOpen && (
-                            <div className="bg-white p-2 rounded-xl shadow-xl mb-2 flex gap-2 animate-pop border border-blue-100 items-center">
-                                <input 
-                                    className="border border-gray-200 rounded-lg px-2 py-1 text-sm w-48 outline-none focus:border-blue-400 focus:ring-1 ring-blue-100" 
-                                    placeholder="Frag Octo..." 
-                                    value={input} 
-                                    onChange={e => setInput(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleAsk()}
-                                    autoFocus
-                                />
-                                <button onClick={handleAsk} className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-1.5 transition-colors"><Icon name="send" size={16}/></button>
-                            </div>
-                        )}
+                <div className="flex flex-col h-full bg-[#f0f9ff]">
+                    {/* Header */}
+                    <div className="bg-white p-4 shadow-sm border-b flex items-center gap-3 sticky top-0 z-10">
+                        <div className="relative">
+                            <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" className="w-10 h-10 drop-shadow-md" />
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-gray-800">Octo-Bot</h2>
+                            <p className="text-xs text-blue-500 font-medium">Online • Hilft dir gerne</p>
+                        </div>
+                    </div>
 
-                        <button 
-                            onClick={() => { setIsInputOpen(!isInputOpen); setShowBubble(false); }} 
-                            className="hover:scale-110 hover:-rotate-6 transition-all active:scale-95 cursor-pointer group"
-                            title="Frag den Oktopus!"
-                        >
-                            <img src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png" className="w-20 h-20 drop-shadow-2xl group-hover:animate-bounce" alt="Octo-Help" />
+                    {/* Chat Area */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {messages.map((msg, i) => (
+                            <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`chat-bubble ${msg.sender === 'user' ? 'chat-user' : 'chat-octo'}`}>
+                                    {msg.text}
+                                </div>
+                            </div>
+                        ))}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Input Area */}
+                    <div className="p-3 bg-white border-t flex gap-2 items-center">
+                        <input 
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSend()}
+                            placeholder="Schreib eine Nachricht..."
+                            className="flex-1 bg-gray-100 border-0 rounded-full px-4 py-3 text-sm focus:ring-2 focus:ring-blue-400 outline-none"
+                        />
+                        <button onClick={handleSend} className="bg-blue-500 text-white p-3 rounded-full hover:bg-blue-600 transition-transform active:scale-95 shadow-md">
+                            <Icon name="send" size={18} />
                         </button>
                     </div>
                 </div>
             );
         };
 
-        // --- 3. GRID CELL ---
+        // --- 4. GRID CELL ---
 
         const GridCell = ({ x, y, cell, handleGridClick, now }) => {
             const floorItem = cell.floor ? ITEMS[cell.floor] : null;
@@ -353,7 +332,7 @@
             );
         };
 
-        // --- 4. ERROR BOUNDARY & MODALS ---
+        // --- 5. ERROR BOUNDARY & MODALS ---
 
         class ErrorBoundary extends React.Component {
             constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -406,7 +385,7 @@
             );
         };
 
-        // --- 5. SCREENS ---
+        // --- 6. SCREENS ---
 
         const CommunityList = ({ onVisit, onBack }) => {
             const [list, setList] = React.useState([]);
@@ -705,19 +684,27 @@
                 <div className={`flex h-full bg-slate-100 overflow-hidden md:max-w-7xl md:mx-auto md:my-8 md:rounded-3xl md:shadow-2xl md:border ${isSpectator ? 'border-purple-300 ring-4 ring-purple-100' : 'border-slate-200'}`}>
                     <nav className="fixed bottom-0 left-0 w-full bg-white border-t z-40 flex justify-around p-2 pb-safe md:relative md:w-64 md:flex-col md:justify-start md:border-t-0 md:border-r md:p-6 md:gap-4">
                         <div className="hidden md:block mb-8"><h1 className="text-2xl font-bold text-green-600 flex items-center gap-2"><Icon name="sprout"/> DuoBloom</h1>{isSpectator && <div className="bg-purple-100 text-purple-600 text-xs px-2 py-1 rounded mt-2 font-bold uppercase text-center">Zuschauer</div>}</div>
+                        
                         <button onClick={() => setTab('garden')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'garden' ? 'bg-green-50 text-green-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="flower-2"/> <span className="text-[10px] md:text-sm">Garten</span></button>
-                        {!isSpectator && <><button onClick={() => setTab('tasks')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'tasks' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="check-square"/> <span className="text-[10px] md:text-sm">Aufgaben</span></button><button onClick={() => setTab('shop')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'shop' ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="shopping-cart"/> <span className="text-[10px] md:text-sm">Shop</span></button></>}
+                        
+                        {!isSpectator && (
+                            <>
+                                <button onClick={() => setTab('tasks')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'tasks' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="check-square"/> <span className="text-[10px] md:text-sm">Aufgaben</span></button>
+                                <button onClick={() => setTab('shop')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'shop' ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="shopping-cart"/> <span className="text-[10px] md:text-sm">Shop</span></button>
+                                <button onClick={() => setTab('octo')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'octo' ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="message-circle"/> <span className="text-[10px] md:text-sm">Hilfe</span></button>
+                            </>
+                        )}
                     </nav>
                     <main className="flex-1 overflow-y-auto bg-[#eefcf3] relative pb-28 md:pb-0">
                         <header className={`sticky top-0 backdrop-blur-md p-4 shadow-sm z-30 flex justify-between items-center px-6 ${isSpectator ? 'bg-purple-50/90' : 'bg-white/90'}`}>
                             <div className="flex items-center gap-4"><button onClick={onBackToMenu} className="bg-white border p-2 rounded-xl hover:bg-gray-100 shadow-sm" title="Zurück"><Icon name="home" className="text-gray-600"/></button><div className="flex flex-col"><span className="font-bold text-gray-700 truncate max-w-[150px] md:max-w-none text-lg">{roomData.roomName}</span><span className="text-[10px] text-gray-400 font-mono">{isSpectator ? `Besuche: ${roomCode}` : `Code: ${roomCode}`}</span></div></div>
                             <div className="flex gap-4 ml-auto items-center">{isSpectator ? <button onClick={handleLike} className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold transition-all ${hasLiked ? 'bg-red-100 text-red-500' : 'bg-white border hover:bg-red-50 text-gray-500'}`}><Icon name="heart" className={hasLiked ? "fill-red-500" : ""}/> {roomData.likes || 0}</button> : <div className="flex flex-col items-end"><span className="font-bold text-yellow-600 text-lg flex items-center gap-1">💰 {roomData.coins}</span><span className="font-bold text-purple-600 text-lg flex items-center gap-1">💎 {roomData.gems}</span></div>}</div>
                         </header>
+                        
                         {tab === 'garden' && (
                             <div className="p-4 md:p-8 flex flex-col items-center relative">
                                 <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">{GARDEN_UPGRADES.map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); if(!owned) return null; return <button key={g.id} onClick={() => setActiveGardenIdx(g.id)} className={`px-4 py-1 rounded-full text-sm font-bold border ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200'}`}>{g.name}</button> })}</div>
                                 
-                                {/* GARDEN CONTAINER MIT BILD UND OCTO-BOT */}
                                 <div className="relative inline-block">
                                     <div className="p-4 rounded-xl shadow-2xl relative bg-cover bg-center" style={{ backgroundImage: `url(${GARDEN_BG})`, backgroundColor: '#5c4033' }}>
                                         <div className="grid grid-cols-5 gap-0 border-2 border-black/10 shadow-inner">
@@ -726,13 +713,12 @@
                                             ))}
                                         </div>
                                     </div>
-                                    {/* Octo-Bot mit dem neuen Kontext-Gehirn! */}
-                                    <OctoBot context={octoContext} />
                                 </div>
 
                                 {!isSpectator && <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100"><h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3><div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">{Object.entries(getInventory()).map(([id, count]) => { if (count <= 0) return null; return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><ItemDisplay item={ITEMS[id]} className="w-8 h-8" /><span className="text-xs font-bold text-gray-600">{count}x</span></button> })}</div></div>}
                             </div>
                         )}
+                        
                         {tab === 'tasks' && !isSpectator && (
                             <div className="p-6 md:max-w-3xl md:mx-auto">
                                 <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-700">Aufgaben</h2><button onClick={() => setTaskModalOpen(true)} className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><Icon name="plus" /> Neu</button></div>
@@ -754,12 +740,19 @@
                                 </div>
                             </div>
                         )}
+                        
                         {tab === 'shop' && !isSpectator && (
                             <div className="p-6 md:max-w-4xl md:mx-auto pb-32">
                                 <h3 className="font-bold text-xl text-purple-700 mb-4 flex items-center gap-2"><Icon name="castle"/> Immobilien (Gems)</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">{GARDEN_UPGRADES.filter(g => g.id > 0).map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); return <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}><div className="text-3xl mb-2">🏞️</div><div className="font-bold">{g.name}</div><button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>{owned ? 'Gekauft' : `${g.price} 💎`}</button></div> })}</div>
                                 <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><Icon name="store"/> Markt (Münzen)</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{item.icon && !item.img && item.icon}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
+                            </div>
+                        )}
+
+                        {tab === 'octo' && !isSpectator && (
+                            <div className="h-full bg-[#f0f9ff] flex flex-col">
+                                <OctoChatInterface context={octoContext} />
                             </div>
                         )}
                     </main>
@@ -770,104 +763,9 @@
             );
         };
 
-                // --- 6. MAIN APP COMPONENT (DAS FEHLTE) ---
-
-        const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [view, setView] = React.useState("loading"); // loading, login, menu, game, community
-            const [currentRoom, setCurrentRoom] = React.useState(null);
-            const [isSpectator, setIsSpectator] = React.useState(false);
-
-            React.useEffect(() => {
-                const unsub = onAuthStateChanged(auth, (u) => {
-                    if (u) {
-                        setUser(u);
-                        setView("menu");
-                        const lastRoom = localStorage.getItem("lastRoom");
-                        if(lastRoom) setCurrentRoom(lastRoom);
-                    } else {
-                        setUser(null);
-                        setView("login");
-                    }
-                });
-                return () => unsub();
-            }, []);
-
-            const handleAction = async (type, payload, extra) => {
-                if (type === 'create') {
-                    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    const newRoom = {
-                        roomName: extra || "Neuer Garten",
-                        owner: user.uid,
-                        createdAt: new Date().toISOString(),
-                        coins: 50,
-                        gems: 0,
-                        gardens: { 0: {} },
-                        unlockedGardens: [0],
-                        tasks: [],
-                        inventory: { carrot_seed: 2 },
-                        likes: 0,
-                        currentStreak: 0,
-                        lastStreakDate: null
-                    };
-                    await setDoc(doc(db, 'rooms', code), newRoom);
-                    setCurrentRoom(code);
-                    localStorage.setItem("lastRoom", code);
-                    setIsSpectator(false);
-                    setView("game");
-                } else if (type === 'join' || type === 'resume') {
-                    const code = payload.toUpperCase();
-                    const ref = doc(db, 'rooms', code);
-                    const snap = await getDoc(ref);
-                    if (snap.exists()) {
-                        setCurrentRoom(code);
-                        localStorage.setItem("lastRoom", code);
-                        setIsSpectator(false);
-                        setView("game");
-                    } else {
-                        alert("Garten nicht gefunden!");
-                    }
-                } else if (type === 'community') {
-                    setView("community");
-                }
-            };
-
-            const handleVisit = (id) => {
-                setCurrentRoom(id);
-                setIsSpectator(true);
-                setView("game");
-            };
-
-            // Login Screen
-            if (view === "login") {
-                 return (
-                    <div className="h-full flex flex-col items-center justify-center p-6 bg-slate-50 space-y-6 animate-pop">
-                        <div className="bg-green-100 p-6 rounded-full text-green-600 mb-4 shadow-lg border-4 border-white">
-                            <Icon name="sprout" size={64}/>
-                        </div>
-                        <h1 className="text-4xl font-black text-slate-800 tracking-tight">DuoBloom</h1>
-                        <p className="text-gray-500 text-center max-w-xs leading-relaxed font-medium">Dein gemeinsamer Garten wartet. Züchte Pflanzen, erledige Aufgaben und entspanne dich.</p>
-                        <button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white border-2 border-slate-200 px-8 py-4 rounded-2xl font-bold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-blue-400 hover:text-blue-500 transition-all flex items-center gap-3 active:scale-95">
-                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6"/>
-                             <span>Mit Google anmelden</span>
-                        </button>
-                    </div>
-                 );
-            }
-
-            if (view === "loading") return <div className="h-full w-full flex flex-col items-center justify-center bg-slate-50"><div className="animate-spin text-green-500 mb-4"><Icon name="loader-2" size={40}/></div><div className="text-green-700 font-bold animate-pulse">Lade Garten...</div></div>;
-
-            return (
-                <ErrorBoundary roomCode={currentRoom}>
-                    {view === 'menu' && <MainMenu user={user} currentRoom={currentRoom} onAction={handleAction} />}
-                    {view === 'community' && <CommunityList onVisit={handleVisit} onBack={() => setView('menu')} />}
-                    {view === 'game' && <GameApp user={user} roomCode={currentRoom} isSpectator={isSpectator} onBackToMenu={() => setView('menu')} />}
-                </ErrorBoundary>
-            );
-        };
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
 </html>
+
