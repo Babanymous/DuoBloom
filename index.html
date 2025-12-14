@@ -346,6 +346,153 @@
                                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0.1s'}}></div>
                                                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0.2s'}}></div>
                                             </div>
+        // --- 4. FLOATING OCTO CHAT (SMART EDITION) ---
+
+        const OctoChat = ({ user, roomData }) => {
+            const [isOpen, setIsOpen] = React.useState(false);
+            const [messages, setMessages] = React.useState([
+                { role: 'assistant', content: `Blub Blub! 🐙 Hallo ${user.displayName.split(' ')[0]}! Ich habe die Finanzen und den Garten im Blick. Frag mich was!` }
+            ]);
+            const [input, setInput] = React.useState("");
+            const [isTyping, setIsTyping] = React.useState(false);
+            const messagesEndRef = React.useRef(null);
+
+            const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
+            React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
+
+            // --- DAS NEUE GEHIRN VON OCTO ---
+            const getOctoResponse = (text) => {
+                const t = text.toLowerCase();
+                
+                // HILFSFUNKTIONEN
+                const getInventoryString = () => {
+                    if (!roomData.inventory) return "Dein Rucksack ist leer.";
+                    const items = Object.entries(roomData.inventory).filter(([k,v]) => v > 0).map(([k,v]) => `${v}x ${ITEMS[k]?.name || k}`);
+                    return items.length > 0 ? "Du hast: " + items.join(", ") : "Dein Inventar ist leer.";
+                };
+
+                const getTaskAdvice = () => {
+                    const tasks = roomData.tasks || [];
+                    const active = tasks.filter(task => {
+                        const today = new Date().toISOString().split('T')[0];
+                        return task.type === 'daily' ? task.lastDone !== today : !task.done;
+                    });
+                    if (active.length === 0) return "Alles erledigt! Entspann dich oder erstell neue Aufgaben. 🌴";
+                    return `Du hast noch ${active.length} offene Aufgaben! Fang am besten mit "${active[0].title}" an.`;
+                };
+
+                // 1. FINANZEN & STATUS (DYNAMISCH)
+                if (t.match(/(geld|münzen|coins|arm|reich|stand)/)) {
+                    if (roomData.coins < 20) return `Du hast aktuell ${roomData.coins} 💰. Das ist etwas knapp! Erledige Aufgaben, um mehr zu verdienen.`;
+                    if (roomData.coins > 500) return `Wow! ${roomData.coins} 💰! Du bist ja reich! Gönn dir doch einen Gartenzwerg im Shop.`;
+                    return `Dein Kontostand: ${roomData.coins} Münzen 💰.`;
+                }
+
+                if (t.match(/(gems|diamanten|edelsteine|kristalle)/)) {
+                    return `Du besitzt ${roomData.gems} Gems 💎. Spare sie für neue Gartenerweiterungen!`;
+                }
+
+                if (t.match(/(inventar|rucksack|tasche|habe ich)/)) {
+                    return getInventoryString();
+                }
+
+                if (t.match(/(aufgabe|zu tun|job|quest)/)) {
+                    return getTaskAdvice();
+                }
+
+                // 2. SPECIFIC ITEM CHECK (SMART LOOKUP)
+                // Sucht, ob der User nach einem Item fragt, das es im Spiel gibt
+                const foundItemKey = Object.keys(ITEMS).find(key => t.includes(ITEMS[key].name.toLowerCase()) || t.includes(ITEMS[key].name.toLowerCase().replace('e', 'en'))); // Simple plural check
+                if (foundItemKey) {
+                    const item = ITEMS[foundItemKey];
+                    const owned = roomData.inventory?.[foundItemKey] || 0;
+                    let info = `${item.name} (${item.icon}): Kostet ${item.price} ${item.price > 1000 ? '💎' : '💰'}. `;
+                    if (item.type === 'seed') info += `Wächst in ${item.stages} Stufen.`;
+                    if (owned > 0) info += ` Du hast noch ${owned} davon im Inventar!`;
+                    else info += ` Du besitzt aktuell keine.`;
+                    return info;
+                }
+
+                // 3. GAMEPLAY & HILFE
+                if (t.match(/(wasser|gießen|trocken)/)) return "Pflanzen brauchen Wasser, wenn der Balken nicht voll ist oder sie hüpfen. Klicke sie einfach an! 💧";
+                if (t.match(/(kaufen|shop|laden)/)) return "Geh unten auf den Tab 'Shop', um Samen oder Deko zu kaufen.";
+                if (t.match(/(code|einladen|freunde)/)) return `Dein Raum-Code ist: ${roomData.id || 'oben links'}. Gib ihn deinen Freunden!`;
+                
+                // 4. SMALLTALK (BLEIBT GLEICH)
+                if (t.match(/(hallo|hi|hey|moin)/)) return `Halli Hallo ${user.displayName}! 👋`;
+                if (t.match(/(danke|cool|super)/)) return "Gerne doch! Viel Spaß beim Gärtnern! 🌻";
+                if (t.match(/(witz)/)) return "Was ist orange und wandert den Berg hoch? Eine Wanderine! 🍊";
+                
+                // 5. FALLBACK MIT KONTEXT
+                const fallbacks = [
+                    "Das weiß ich nicht genau. Aber hast du schon deine Pflanzen gecheckt? 🌱",
+                    `Ich bin mir unsicher. Aber mit ${roomData.coins} Münzen kannst du dir bestimmt was Schönes kaufen.`,
+                    "Frag mich lieber was über deinen Garten oder dein Inventar! 🐙"
+                ];
+                return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+            };
+
+            const handleSend = () => {
+                if (!input.trim()) return;
+                const userText = input;
+                setMessages(prev => [...prev, { role: 'user', content: userText }]);
+                setInput("");
+                setIsTyping(true);
+
+                setTimeout(() => {
+                    // Wir übergeben roomData jetzt sicherheitshalber, falls wir es im Scope brauchen
+                    const answer = getOctoResponse(userText);
+                    setMessages(prev => [...prev, { role: 'assistant', content: answer }]);
+                    setIsTyping(false);
+                }, 600);
+            };
+
+            return (
+                <>
+                    <button 
+                        onClick={() => setIsOpen(true)} 
+                        className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 bg-white hover:bg-gray-50 p-2 md:p-3 rounded-full shadow-xl border-4 border-purple-200 transition-transform hover:scale-110 flex items-center justify-center animate-bounce"
+                    >
+                        <img src={OCTO_IMG} className="w-10 h-10 md:w-12 md:h-12" alt="Octo" />
+                    </button>
+
+                    {isOpen && (
+                        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
+                            <div className="bg-white w-full md:w-[380px] h-[70vh] md:h-[550px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto overflow-hidden animate-pop border border-gray-200 m-0 md:m-4">
+                                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white flex justify-between items-center shadow-md">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-white/20 p-1.5 rounded-full backdrop-blur-sm">
+                                            <img src={OCTO_IMG} className="w-8 h-8" alt="Octo" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg">Octo</h3>
+                                            <p className="text-[10px] text-purple-200 font-mono uppercase">Smart Assistant</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setIsOpen(false)}><Icon name="x" className="text-white/80 hover:text-white" /></button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-4 bg-[#f8fafc] space-y-4">
+                                    {messages.map((m, i) => (
+                                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start items-end gap-2'}`}>
+                                            {m.role === 'assistant' && <img src={OCTO_IMG} className="w-6 h-6 mb-1" />}
+                                            <div className={`max-w-[85%] p-3 px-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                                                m.role === 'user' 
+                                                ? 'bg-purple-600 text-white rounded-br-none' 
+                                                : 'bg-white border border-gray-100 text-gray-700 rounded-bl-none'
+                                            }`}>
+                                                {m.content}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {isTyping && (
+                                        <div className="flex justify-start items-end gap-2">
+                                            <img src={OCTO_IMG} className="w-6 h-6 mb-1" />
+                                            <div className="bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1">
+                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0s'}}></div>
+                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0.1s'}}></div>
+                                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0.2s'}}></div>
+                                            </div>
                                         </div>
                                     )}
                                     <div ref={messagesEndRef} />
@@ -356,7 +503,7 @@
                                         value={input}
                                         onChange={e => setInput(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && handleSend()}
-                                        placeholder="Frage stellen..."
+                                        placeholder="Frage z.B. nach Münzen oder Aufgaben..."
                                         className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none focus:bg-white focus:ring-2 ring-purple-500 transition-all text-sm font-medium"
                                         autoFocus
                                     />
@@ -370,6 +517,7 @@
                 </>
             );
         };
+
 
         // --- 5. SCREENS ---
 
@@ -721,7 +869,8 @@
                     {isTaskModalOpen && (
                         <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(e.target.value)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
                     )}
-                    <OctoChat user={user} />
+                    <OctoChat user={user} roomData={roomData} />
+
                 </div>
             );
         };
