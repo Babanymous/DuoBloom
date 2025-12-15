@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -64,9 +65,9 @@
         const PART_A = "hf_"; 
         
         // WICHTIG: Stelle sicher, dass hier KEINE Leerzeichen am Ende sind!
-        const PART_B = "BdIIxczYCeSaPggyDsNWfZNClRijRAYjex"; 
+        const PART_B = "JyJfHArSizpTEurSiZDTXVMMvpAoJvSclN"; 
         
-        const HF_TOKEN = PART_A+PART_B; 
+        const HF_TOKEN = PART_A + PART_B; 
         
         // Wir nutzen Zephyr, da es am stabilsten für Web-Apps ist:
         const HF_MODEL = "HuggingFaceH4/zephyr-7b-beta"; 
@@ -228,64 +229,112 @@
         };
 
         // --- OCTO CHAT (PWA-SAFE) ---
-        const OCTO_BRAIN = {
-                systemPrompt: `Du bist Octo, ein freundlicher Oktopus im Spiel DuoBloom. Antworte kurz, lustig und hilfreich auf Deutsch. Max 30 Wörter.`,
+
+        const OctoChat = ({ user, roomData }) => {
+            const [isOpen, setIsOpen] = React.useState(false);
+            const [messages, setMessages] = React.useState([
+                { role: 'assistant', content: `Blub Blub! 🐙 Hallo ${user.displayName.split(' ')[0]}! Ich bin dein Garten-Assistent. Frag mich etwas!` }
+            ]);
+            const [input, setInput] = React.useState("");
+            const [isTyping, setIsTyping] = React.useState(false);
+            const messagesEndRef = React.useRef(null);
+
+            const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
+            React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
+
+            const OCTO_BRAIN = {
+                systemPrompt: `Du bist Octo, ein Oktopus im Spiel DuoBloom. Antworte kurz (max 2 Sätze) auf Deutsch.`,
             
                 think: async function(inputText, ctx) {
-                    // Token prüfen
-                    if (!HF_TOKEN || HF_TOKEN.includes("ВСТАВЬ")) return "Fehler: Token fehlt im Code.";
-                    if (HF_TOKEN.includes(" ")) return "Fehler: Leerzeichen im Token entdeckt! Bitte PART_B prüfen.";
+                    // Check ob Token da ist
+                    if (!HF_TOKEN || HF_TOKEN.length < 20) return "Fehler: Kein gültiger Token im Code gefunden.";
 
                     const contextData = `Spieler: ${ctx.user.displayName}, Münzen: ${ctx.roomData?.coins||0}`;
-                    const fullPrompt = `<|system|>\n${this.systemPrompt}\nContext: ${contextData}</s>\n<|user|>\n${inputText}</s>\n<|assistant|>\n`;
+                    const fullPrompt = `<|system|>\n${this.systemPrompt}\n${contextData}</s>\n<|user|>\n${inputText}</s>\n<|assistant|>\n`;
             
                     try {
-                        console.log("Sende Anfrage an HuggingFace..."); // Für Debugging (F12)
-                        
+                        // Standard Fetch ohne spezielle CORS-Settings (oft am besten für Zephyr)
                         const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
                             method: "POST",
-                            mode: "cors", // WICHTIG: Erzwingt CORS
                             headers: {
                                 "Authorization": `Bearer ${HF_TOKEN}`,
                                 "Content-Type": "application/json"
                             },
                             body: JSON.stringify({
                                 inputs: fullPrompt,
-                                parameters: { 
-                                    max_new_tokens: 100,
-                                    return_full_text: false 
-                                }
+                                parameters: { max_new_tokens: 100, return_full_text: false }
                             })
                         });
             
                         if (!response.ok) {
-                            // Versuche den genauen Fehlertext vom Server zu lesen
-                            const errText = await response.text();
-                            console.error("HF API Error:", response.status, errText);
-                            
-                            if (response.status === 503) return "Ich lade noch (Modell lädt)... Versuch es in 20 Sekunden nochmal! ⏱️";
-                            if (response.status === 401) return "Token abgelehnt (401). Prüfe, ob 'hf_' doppelt ist oder fehlt.";
-                            if (response.status === 403) return "Keine Rechte (403). Prüfe 'Inference' Haken im Token.";
-                            return `Server Fehler ${response.status}: ${errText.slice(0, 50)}...`;
+                            if (response.status === 503) return "Ich wache gerade auf (Modell lädt)... Warte kurz! 💤";
+                            if (response.status === 401) return "Mein Token wurde abgelehnt (401). Er ist wohl gesperrt.";
+                            return `Server Fehler: ${response.status}`;
                         }
             
                         const result = await response.json();
-                        let reply = Array.isArray(result) ? result[0].generated_text : result.generated_text;
-                        return reply ? reply.trim() : "Octo ist sprachlos (Leere Antwort).";
+                        let reply = "";
+                        if (Array.isArray(result) && result.length > 0) reply = result[0].generated_text;
+                        else if (result.generated_text) reply = result.generated_text;
+                        else reply = "???";
+                        return reply.trim();
             
                     } catch (e) {
-                        console.error("Netzwerkfehler Details:", e);
-                        // Prüfen ob es ein Fetch-Fehler ist
-                        if (e.message.includes("Failed to fetch")) {
-                            return "Verbindungsfehler (CORS). Bist du auf GitHub Pages (https://...)? Lokal funktioniert das oft nicht.";
-                        }
-                        return `Fehler: ${e.message}`;
+                        console.error(e);
+                        return `Verbindungsfehler: ${e.message}. (Token prüfen!)`;
                     }
                 }
             };
 
+            const handleSend = async () => {
+                if(!input.trim()) return;
+                const userText = input;
+                setMessages(prev => [...prev, { role: 'user', content: userText }]);
+                setInput("");
+                setIsTyping(true);
+                
+                try {
+                    const ctx = { user, roomData };
+                    const reply = await OCTO_BRAIN.think(userText, ctx);
+                    setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+                } catch(e) {
+                    setMessages(prev => [...prev, { role: 'assistant', content: "Ups, Fehler." }]);
+                } finally {
+                    setIsTyping(false);
+                }
+            };
 
-    
+            return (
+                <>
+                    <button onClick={() => setIsOpen(true)} className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 bg-white p-2 rounded-full shadow-xl border-4 border-purple-200 animate-bounce">
+                        <img src={OCTO_IMG} className="w-10 h-10" alt="Octo" />
+                    </button>
+                    {isOpen && (
+                        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
+                            <div className="bg-white w-full md:w-[380px] h-[70vh] md:h-[550px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4">
+                                <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
+                                    <h3 className="font-bold">Octo AI</h3>
+                                    <button onClick={() => setIsOpen(false)}><Icon name="x" /></button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
+                                    {messages.map((m, i) => (
+                                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`p-3 rounded-2xl text-sm max-w-[85%] ${m.role === 'user' ? 'bg-purple-600 text-white' : 'bg-white border'}`}>{m.content}</div>
+                                        </div>
+                                    ))}
+                                    {isTyping && <div className="text-xs text-gray-400 ml-4">Octo tippt...</div>}
+                                    <div ref={messagesEndRef} />
+                                </div>
+                                <div className="p-3 bg-white border-t flex gap-2">
+                                    <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Frag Octo..." className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none" />
+                                    <button onClick={handleSend} className="bg-purple-600 text-white p-3 rounded-xl"><Icon name="send" /></button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            );
+        };
 
         // --- SCREENS ---
         const CommunityList = ({ onVisit, onBack }) => {
