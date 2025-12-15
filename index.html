@@ -240,66 +240,51 @@
 
             const OCTO_BRAIN = {
                 think: async function(inputText, currentHistory, ctx) {
-                    // API KEY CHECK
-                    if (!GEMINI_API_KEY) return "Fehler: Kein API Key gefunden.";
+                    if (!GEMINI_API_KEY) return "Fehler: Kein API Key.";
 
                     try {
-                        // 1. Sicherer Import direkt für Browser
                         const { GoogleGenerativeAI } = await import("https://esm.run/@google/generative-ai");
-                        
                         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
                         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-                        // 2. Historie bereinigen (WICHTIG!)
-                        // Gemini stürzt ab, wenn leere Nachrichten gesendet werden oder die Rollen nicht stimmen.
-                        // Wir bauen die History hier ganz strikt neu auf.
-                        const cleanHistory = currentHistory
-                            .filter(m => m.text && m.text.trim().length > 0) // Leere löschen
+                        // --- SCHRITT 1: History formatieren ---
+                        let apiHistory = currentHistory
+                            .filter(m => m.text && m.text.trim().length > 0)
                             .map(m => ({
                                 role: (m.role === 'model' || m.role === 'assistant') ? 'model' : 'user',
                                 parts: [{ text: m.text }]
                             }));
 
-                        // Die allerletzte User-Nachricht (inputText) darf NICHT in der History sein, 
-                        // die wird separat gesendet. Also entfernen wir sie, falls sie schon drin ist.
-                        // Da wir sie unten erst hinzufügen, nehmen wir hier einfach die cleanHistory.
+                        // --- SCHRITT 2 (DER FIX): Begrüßung entfernen ---
+                        // Wenn die erste Nachricht vom 'model' ist, löschen wir sie aus der API-Anfrage.
+                        // Google erlaubt keinen Start mit 'model'.
+                        if (apiHistory.length > 0 && apiHistory[0].role === 'model') {
+                            apiHistory.shift(); 
+                        }
 
-                        // System Prompt bauen
+                        // --- SCHRITT 3: System Prompt ---
                         const systemPrompt = `Du bist Octo, ein Oktopus im Spiel DuoBloom. 
-                        User: ${ctx.user.displayName}. Coins: ${ctx.roomData?.coins}.
-                        Sei lustig, nutze Emojis (🐙, 🌊). Antworte kurz.`;
+                        Spieler: ${ctx.user.displayName}. 
+                        Antworte kurz, lustig und mit Emojis (🐙, 🌱).`;
 
+                        // Chat starten
                         const chat = model.startChat({
-                            history: cleanHistory, // Alte Nachrichten
+                            history: apiHistory,
                             generationConfig: { maxOutputTokens: 150 }
                         });
 
-                        // 3. Nachricht senden (System Prompt + User Frage kombiniert für Stabilität)
-                        const fullMessage = `${systemPrompt}\n\nUser fragt: ${inputText}`;
-                        
-                        const result = await chat.sendMessage(fullMessage);
+                        // Nachricht senden (System Prompt voranstellen, um Kontext zu sichern)
+                        const result = await chat.sendMessage(systemPrompt + "\n\nUser: " + inputText);
                         const response = await result.response;
                         return response.text();
 
                     } catch (e) {
-                        console.error("GEMINI FATAL ERROR:", e);
-                        
-                        // Hier entpacken wir das mysteriöse "h {}" Objekt
-                        let errorMsg = "Unbekannter Fehler";
-                        if (e.message) errorMsg = e.message;
-                        if (e.toString().includes("403")) errorMsg = "Zugriff verweigert (API Key Domain prüfen!)";
-                        if (e.toString().includes("400")) errorMsg = "Ungültige Anfrage (History Fehler)";
-                        
-                        // Versuche, das Fehlerobjekt zu lesen
-                        try {
-                            const jsonError = JSON.stringify(e, null, 2);
-                            console.log("Error Detail:", jsonError);
-                        } catch(jsonErr) {}
-
-                        return `Octo ist verwirrt: ${errorMsg}`;
+                        console.error("Gemini Error:", e);
+                        return `Octo ist verwirrt: ${e.message}`;
                     }
                 }
             };
+
 
             const handleSend = async () => {
                 if(!input.trim()) return;
