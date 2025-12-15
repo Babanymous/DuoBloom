@@ -49,7 +49,7 @@
         import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, arrayUnion, arrayRemove, increment, deleteField, query, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // --- CONFIG & SETUP ---
+        // CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
             authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -60,12 +60,16 @@
             measurementId: "G-Z0W0LK6D88"
         };
 
-        // --- KI EINSTELLUNGEN (Hier deinen NEUEN Token rein!) ---
+        // --- KI KONFIGURATION (Nur EINMAL definiert!) ---
         const PART_A = "hf_"; 
-        const PART_B = "JyJfHArSizpTEurSiZDTXVMMvpAoJvSclN"; // <--- ÄNDERN!
+        
+        // WICHTIG: Stelle sicher, dass hier KEINE Leerzeichen am Ende sind!
+        const PART_B = "JyJfHArSizpTEurSiZDTXVMMvpAoJvSclN"; 
         
         const HF_TOKEN = PART_A + PART_B; 
-        const HF_MODEL = "HuggingFaceH4/zephyr-7b-beta"; // Das zuverlässigste Modell
+        
+        // Wir nutzen Zephyr, da es am stabilsten für Web-Apps ist:
+        const HF_MODEL = "HuggingFaceH4/zephyr-7b-beta"; 
 
         let firebaseApp, auth, db;
         try {
