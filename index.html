@@ -217,12 +217,12 @@
             );
         };
 
-        // --- OCTO CHAT (MIT AVATAR & KEYWORDS) ---
+        // --- OCTO CHAT (SMART MULTI-KEYWORD VERSION) ---
         
         const OctoChat = ({ user, roomData }) => {
             const [isOpen, setIsOpen] = React.useState(false);
             const [messages, setMessages] = React.useState([
-                { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName.split(' ')[0]}! Ich bin Octo. Frag mich was zum Spiel!` }
+                { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName.split(' ')[0]}! Ich bin Octo. Frag mich was, mir ist langweilig! 🫧` }
             ]);
             const [input, setInput] = React.useState("");
             const [isTyping, setIsTyping] = React.useState(false);
@@ -231,42 +231,166 @@
             const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
             React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
 
-            // --- DAS GEHIRN VON OCTO (WISSENSDATENBANK) ---
+            // --- DAS GROSSE GEHIRN VON OCTO 🧠 ---
             const OCTO_KNOWLEDGE = [
-                { keys: ["hallo", "hi ", "hey", "moin", "guten tag", "servus"], answer: "Blub Blub! 👋 Schön dich zu sehen! Wie kann ich dir helfen? 🐙" },
-                { keys: ["wer bist du", "was bist du", "dein name"], answer: "Ich bin Octo, dein persönlicher Garten-Oktopus! 🐙 Ich helfe dir, dich hier zurechtzufinden." },
-                { keys: ["danke", "cool", "super", "nett"], answer: "Gerne doch! Immer fleißig weiter gärtnern! 🌱✨" },
-                { keys: ["gießen", "wasser", "trocken", "gießkanne"], answer: "Pflanzen haben Durst! 💧 Wenn über einer Pflanze ein blaues 'Gießen!' Schild steht, klicke darauf, damit sie weiter wächst." },
-                { keys: ["pflanzen", "samen", "säen", "anbauen"], answer: "Klicke im Menü unten auf 'Shop' (Einkaufswagen), kaufe Samen 🥕 und klicke dann auf ein leeres Feld im Garten, um sie zu pflanzen." },
-                { keys: ["ernten", "fertig", "groß"], answer: "Wenn eine Pflanze ausgewachsen ist (großes Bild), klicke sie an! Du bekommst Gems (Edelsteine) als Belohnung. 💎" },
-                { keys: ["entfernen", "löschen", "wegmachen", "abreißen"], answer: "Willst du etwas entfernen? Klicke einfach auf das Objekt. Wenn es Deko ist, kommt es ins Inventar. Pflanzen werden verkauft/gelöscht." },
-                { keys: ["boden", "stein", "holz", "weg"], answer: "Böden (Stein/Holz) kannst du im Shop kaufen. Wähle sie im Werkzeugkasten aus und klicke auf leere Felder, um Wege zu bauen. 🧱" },
-                { keys: ["zeit", "dauer", "wie lange"], answer: "Jede Pflanze braucht unterschiedlich lange. Wenn du sie gießt, musst du warten, bis sie wieder trocken ist (6 Stunden Cooldown). ⏳" },
-                { keys: ["münzen", "coins", "geld", "verdienen", "gold"], answer: "Münzen 💰 bekommst du durch das Erledigen von Aufgaben! Schau im Tab 'Aufgaben' nach." },
-                { keys: ["gems", "edelsteine", "diamanten", "kristalle"], answer: "Gems 💎 sind selten! Du bekommst sie, wenn du fertig gewachsene Pflanzen erntest. Damit kannst du neue Gartenteile kaufen." },
-                { keys: ["shop", "kaufen", "markt"], answer: "Im Shop 🛒 gibt es zwei Bereiche: Oben kaufst du Landerweiterungen mit Gems 💎, unten Samen und Deko mit Münzen 💰." },
-                { keys: ["aufgabe", "quest", "mission", "ziel"], answer: "Klicke unten auf 'Aufgaben' (Checkbox). Du kannst eigene Aufgaben erstellen (z.B. 'Zimmer aufräumen') und dich selbst belohnen! ✅" },
-                { keys: ["täglich", "wiederholen", "daily"], answer: "Tägliche Aufgaben setzen sich jeden Tag um Mitternacht zurück. Perfekt für Routinen wie Zähneputzen oder Hausaufgaben! 📅" },
-                { keys: ["level", "aufsteigen", "erfahrung"], answer: "Dein Level entspricht der Anzahl deiner freigeschalteten Gärten. Kaufe 'Hinterhof' oder 'Waldlichtung' mit Gems, um aufzusteigen! 🆙" },
-                { keys: ["freund", "besuchen", "teilen", "code"], answer: "Dein Raum-Code steht oben (z.B. X7Z9A). Gib ihn deinen Freunden, damit sie deinen Garten besuchen und liken können! ❤️" },
-                { keys: ["community", "andere", "fremd"], answer: "Gehe ins Hauptmenü und klicke auf 'Community', um die Gärten anderer Spieler zu sehen und Inspiration zu sammeln. 🌍" },
-                { keys: ["liken", "herz", "gefällt mir"], answer: "Wenn du als Besucher (Zuschauer) in einem Garten bist, kannst du oben rechts ein Herz ❤️ da lassen." },
-                { keys: ["speichern", "save", "verloren"], answer: "Das Spiel speichert automatisch in der Cloud! ☁️ Solange du eingeloggt bist, ist alles sicher." },
-                { keys: ["app", "installieren", "handy"], answer: "Auf dem Handy kannst du 'Zum Home-Bildschirm' wählen, dann sieht DuoBloom aus wie eine echte App! 📱" },
-                { keys: ["streak", "feuer", "flamme"], answer: "Komm jeden Tag vorbei, um deinen Streak 🔥 zu erhöhen! Wenn du einen Tag verpasst, fängt er wieder bei 0 an." }
+                // --- KATEGORIE: SMALLTALK & BEGRÜSSUNG ---
+                { 
+                    keys: ["hallo", "hi ", "hey", "moin", "guten tag", "servus", "jo"], 
+                    answer: "Blub Blub! 👋 Schön dich zu sehen! Wie laufen die Geschäfte im Garten? 🐙" 
+                },
+                { 
+                    keys: ["wie gehts", "wie geht's", "alles fit", "was geht", "alles klar"], 
+                    answer: "Mir geht's super! 🌊 Im Wasser ist es schön frisch. Und dir? Hoffentlich hast du keinen Sonnenbrand vom Gärtnern! ☀️" 
+                },
+                { 
+                    keys: ["mir geht es gut", "mir gehts gut", "alles super", "bestens"], 
+                    answer: "Das freut mich riesig! 🎉 Dann hast du ja genug Energie zum Pflanzen!" 
+                },
+                { 
+                    keys: ["mir geht es schlecht", "nicht gut", "traurig", "müde", "krank"], 
+                    answer: "Oh nein... 🥺 Fühl dich von meinen 8 Armen gedrückt! 🤗 Ruh dich etwas aus, dein Garten läuft nicht weg." 
+                },
+                { 
+                    keys: ["wer bist du", "was bist du", "dein name", "vorstellen"], 
+                    answer: "Ich bin Octo! 🐙 Ich lebe hier im Teich nebenan und helfe dir, der beste Gärtner der Welt zu werden." 
+                },
+                { 
+                    keys: ["danke", "thx", "vielen dank", "ehrenmann"], 
+                    answer: "Kein Problem! Dafür habe ich ja so viele Arme – um überall zu helfen! 💪✨" 
+                },
+                { 
+                    keys: ["tschüss", "bye", "ciao", "bis bald", "weg"], 
+                    answer: "Schwimm nicht zu weit raus! Bis später! 👋🌊" 
+                },
+                { 
+                    keys: ["witz", "lachen", "lustig", "joke"], 
+                    answer: "Was ist orange und wandert den Berg hoch? Eine Wander-Mandarine! 🍊 ... Okay, ich arbeite noch an meinem Humor. 😅" 
+                },
+                { 
+                    keys: ["langweilig", "nichts zu tun", "was machen"], 
+                    answer: "Langeweile? 😲 Pflanz doch ein paar Vergissmeinnicht oder besuche einen Community-Garten für Inspiration! 🌱" 
+                },
+                { 
+                    keys: ["liebe", "lieb", "mag dich", "süß"], 
+                    answer: "Oh, da werde ich ja ganz rot wie ein gekochter Hummer! 😳❤️ Danke!" 
+                },
+
+                // --- KATEGORIE: GARTENARBEIT ---
+                { 
+                    keys: ["gießen", "wasser", "trocken", "gießkanne", "nass"], 
+                    answer: "Wasser marsch! 💧 Pflanzen brauchen alle 6 Stunden Wasser. Achte auf das blaue 'Gießen!' Schild über ihnen." 
+                },
+                { 
+                    keys: ["pflanzen", "samen", "säen", "anbauen", "karotte", "sonnenblume"], 
+                    answer: "Ab in die Erde damit! 🌱 Kaufe Samen im Shop (unten rechts) und klicke auf ein leeres Feld. Karotten 🥕 gehen schnell, Blumen dauern länger." 
+                },
+                { 
+                    keys: ["ernten", "fertig", "groß", "ausgewachsen"], 
+                    answer: "Erntezeit ist die beste Zeit! 🌾 Wenn das Bild groß ist, klick drauf! Das gibt Gems (Edelsteine). 💎" 
+                },
+                { 
+                    keys: ["entfernen", "löschen", "wegmachen", "abreißen", "falsch gebaut"], 
+                    answer: "Ups, vergebaut? 🏗️ Klicke auf das Objekt. Deko wandert zurück in die Tasche, Pflanzen werden kompostiert (gelöscht)." 
+                },
+                { 
+                    keys: ["boden", "stein", "holz", "weg", "plaster"], 
+                    answer: "Schicke Wege werten den Garten auf! 🧱 Kaufe Böden im Shop und lege sie über das Werkzeug-Menü an." 
+                },
+                { 
+                    keys: ["zeit", "dauer", "wie lange", "wann fertig"], 
+                    answer: "Gut Ding will Weile haben! ⏳ Jede Pflanze hat mehrere Wachstumsstufen. Nach jedem Gießen wächst sie ein Stück weiter." 
+                },
+
+                // --- KATEGORIE: WIRTSCHAFT & SHOP ---
+                { 
+                    keys: ["münzen", "coins", "geld", "verdienen", "gold", "reich"], 
+                    answer: "Münzen regieren die Welt! 💰 Erledige Aufgaben im Tab 'Aufgaben', um reich zu werden." 
+                },
+                { 
+                    keys: ["gems", "edelsteine", "diamanten", "kristalle", "blau"], 
+                    answer: "Gems sind super selten! 💎 Du bekommst sie nur durch das Ernten von fertigen Pflanzen. Spare sie für Landerweiterungen!" 
+                },
+                { 
+                    keys: ["shop", "kaufen", "markt", "laden"], 
+                    answer: "Shopping-Tour? 🛒 Im Shop gibt es zwei Abteilungen: Oben Immobilien (für Gems), unten Samen & Deko (für Münzen)." 
+                },
+                { 
+                    keys: ["inventar", "tasche", "rucksack", "besitze"], 
+                    answer: "Deine Schätze findest du im Werkzeugkasten unter dem Garten. Klicke ein Item an, um es auszuwählen. 🎒" 
+                },
+
+                // --- KATEGORIE: AUFGABEN ---
+                { 
+                    keys: ["aufgabe", "quest", "mission", "ziel", "todo"], 
+                    answer: "Produktivität ist wichtig! ✅ Im Tab 'Aufgaben' kannst du eigene Ziele setzen (z.B. 'Zimmer aufräumen') und dich im Spiel belohnen." 
+                },
+                { 
+                    keys: ["täglich", "wiederholen", "daily", "routine"], 
+                    answer: "Tägliche Aufgaben resetten sich um 0 Uhr. Perfekt für Dinge, die du jeden Tag machen willst! 📅" 
+                },
+                
+                // --- KATEGORIE: SOZIALES & FORTSCHRITT ---
+                { 
+                    keys: ["level", "aufsteigen", "erfahrung", "xp"], 
+                    answer: "Level Up! 🆙 Dein Level ist die Anzahl deiner freigeschalteten Garten-Bereiche. Kaufe mehr Land im Shop!" 
+                },
+                { 
+                    keys: ["freund", "besuchen", "teilen", "code", "multiplayer"], 
+                    answer: "Gärtnern macht gemeinsam mehr Spaß! 👯 Gib deinen Code (oben im Menü) an Freunde weiter, damit sie dich besuchen können." 
+                },
+                { 
+                    keys: ["community", "andere", "fremd", "welt"], 
+                    answer: "Schau mal über den Zaun! 🌍 Im Hauptmenü unter 'Community' siehst du die Gärten anderer Spieler." 
+                },
+                { 
+                    keys: ["liken", "herz", "gefällt mir", "likes"], 
+                    answer: "Verteile Liebe! ❤️ Als Besucher kannst du oben rechts ein Herz dalassen. Sammle selbst Likes für deinen Garten!" 
+                },
+                { 
+                    keys: ["streak", "feuer", "flamme", "tage"], 
+                    answer: "Bleib dran! 🔥 Dein Streak zeigt, wie viele Tage du in Folge da warst. Ein Tag Pause und er ist futsch! 😱" 
+                },
+
+                // --- KATEGORIE: TECHNIK ---
+                { 
+                    keys: ["speichern", "save", "verloren", "sicher"], 
+                    answer: "Keine Panik! ☁️ Das Spiel speichert alles automatisch in der Cloud. Dein Fortschritt ist sicher." 
+                },
+                { 
+                    keys: ["app", "installieren", "handy", "ios", "android"], 
+                    answer: "Mach mich zur App! 📱 Tippe im Browser auf 'Teilen' (iOS) oder das Menü (Android) und wähle 'Zum Home-Bildschirm' beziehungsweise als 'Web App' installieren." 
+                },
+                { 
+                    keys: ["musik", "sound", "ton"], 
+                    answer: "Aktuell hören wir nur das Rauschen des Windes... 🍃 (Musik kommt vielleicht in einem späteren Update!)" 
+                }
             ];
 
             const OCTO_BRAIN = {
                 think: async function(inputText) {
                     const text = inputText.toLowerCase();
+                    let foundAnswers = [];
+
+                    // 1. Suche nach ALLEN passenden Themen
                     for (const entry of OCTO_KNOWLEDGE) {
                         if (entry.keys.some(key => text.includes(key))) {
-                            await new Promise(r => setTimeout(r, 600));
-                            return entry.answer;
+                            foundAnswers.push(entry.answer);
                         }
                     }
+
+                    // Denkpause simulieren
                     await new Promise(r => setTimeout(r, 600));
-                    return "Blub? 🫧 Das habe ich nicht ganz verstanden. Frag mich nach 'Gießen', 'Münzen', 'Aufgaben' oder 'Freunden'! 🐙";
+
+                    // 2. Antworten verarbeiten
+                    if (foundAnswers.length > 0) {
+                        // Wenn mehrere Antworten gefunden wurden, verbinden wir sie
+                        // Wir entfernen Duplikate (falls vorhanden) und joinen sie
+                        const uniqueAnswers = [...new Set(foundAnswers)];
+                        return uniqueAnswers.join(" "); 
+                    } else {
+                        // Fallback
+                        return "Blub? 🫧 Das habe ich nicht ganz verstanden. Frag mich nach 'Gießen', 'Münzen', 'Aufgaben', 'Freunden' oder sag einfach 'Hallo'! 🐙";
+                    }
                 }
             };
 
@@ -365,6 +489,7 @@
                 </>
             );
         };
+
         
         // --- SCREENS ---
         const CommunityList = ({ onVisit, onBack }) => {
