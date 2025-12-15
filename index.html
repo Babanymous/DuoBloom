@@ -231,140 +231,231 @@
             const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
             React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
 
-            // --- DAS GROSSE GEHIRN VON OCTO 🧠 ---
+            // --- DAS RIESIGE GEHIRN VON OCTO 🧠 (ERWEITERT) ---
             const OCTO_KNOWLEDGE = [
-                // --- KATEGORIE: SMALLTALK & BEGRÜSSUNG ---
+                // ==========================================
+                // 👋 BEGRÜSSUNG & ABSCHIED (Nuanciert)
+                // ==========================================
                 { 
-                    keys: ["hallo", "hi ", "hey", "moin", "guten tag", "servus", "jo"], 
+                    keys: ["hallo", "hi ", "hey", "moin", "servus", "jo", "grüß dich", "guten tag"], 
                     answer: "Blub Blub! 👋 Schön dich zu sehen! Wie laufen die Geschäfte im Garten? 🐙" 
                 },
                 { 
-                    keys: ["wie gehts", "wie geht's", "alles fit", "was geht", "alles klar"], 
-                    answer: "Mir geht's super! 🌊 Im Wasser ist es schön frisch. Und dir? Hoffentlich hast du keinen Sonnenbrand vom Gärtnern! ☀️" 
+                    keys: ["guten morgen", "morgen", "früh"], 
+                    answer: "Guten Morgen! ☕️ Die Tau-Tropfen auf den Blättern sehen heute besonders schön aus. Zeit für die erste Gießrunde!" 
                 },
                 { 
-                    keys: ["mir geht es gut", "mir gehts gut", "alles super", "bestens"], 
-                    answer: "Das freut mich riesig! 🎉 Dann hast du ja genug Energie zum Pflanzen!" 
+                    keys: ["guten abend", "abend", "nacht", "spät"], 
+                    answer: "Guten Abend! 🌙 Die Pflanzen gehen bald schlafen. Vergiss nicht, noch einmal nach dem Rechten zu sehen, bevor du ins Bett gehst." 
                 },
                 { 
-                    keys: ["mir geht es schlecht", "nicht gut", "traurig", "müde", "krank"], 
-                    answer: "Oh nein... 🥺 Fühl dich von meinen 8 Armen gedrückt! 🤗 Ruh dich etwas aus, dein Garten läuft nicht weg." 
+                    keys: ["schlaf gut", "gute nacht", "träum süß"], 
+                    answer: "Gute Nacht! 😴 Ich träume von elektrischen Aalen... oder riesigen Karotten. Bis morgen! 🌊" 
                 },
                 { 
-                    keys: ["wer bist du", "was bist du", "dein name", "vorstellen"], 
-                    answer: "Ich bin Octo! 🐙 Ich lebe hier im Teich nebenan und helfe dir, der beste Gärtner der Welt zu werden." 
+                    keys: ["tschüss", "bye", "ciao", "bis bald", "weg", "bin raus", "ade"], 
+                    answer: "Schwimm nicht zu weit raus! Bis später! 👋 Pass auf deine Streak auf!" 
                 },
                 { 
-                    keys: ["danke", "thx", "vielen dank", "ehrenmann"], 
-                    answer: "Kein Problem! Dafür habe ich ja so viele Arme – um überall zu helfen! 💪✨" 
-                },
-                { 
-                    keys: ["tschüss", "bye", "ciao", "bis bald", "weg"], 
-                    answer: "Schwimm nicht zu weit raus! Bis später! 👋🌊" 
-                },
-                { 
-                    keys: ["witz", "lachen", "lustig", "joke"], 
-                    answer: "Was ist orange und wandert den Berg hoch? Eine Wander-Mandarine! 🍊 ... Okay, ich arbeite noch an meinem Humor. 😅" 
-                },
-                { 
-                    keys: ["langweilig", "nichts zu tun", "was machen"], 
-                    answer: "Langeweile? 😲 Pflanz doch ein paar Vergissmeinnicht oder besuche einen Community-Garten für Inspiration! 🌱" 
-                },
-                { 
-                    keys: ["liebe", "lieb", "mag dich", "süß"], 
-                    answer: "Oh, da werde ich ja ganz rot wie ein gekochter Hummer! 😳❤️ Danke!" 
+                    keys: ["bin wieder da", "re", "back"], 
+                    answer: "Willkommen zurück an Deck! ⚓️ Deine Pflanzen haben dich vermisst (und ich auch ein bisschen)." 
                 },
 
-                // --- KATEGORIE: GARTENARBEIT ---
+                // ==========================================
+                // ❤️ EMOTIONEN & BEZIEHUNG (KI-Feeling)
+                // ==========================================
                 { 
-                    keys: ["gießen", "wasser", "trocken", "gießkanne", "nass"], 
-                    answer: "Wasser marsch! 💧 Pflanzen brauchen alle 6 Stunden Wasser. Achte auf das blaue 'Gießen!' Schild über ihnen." 
+                    keys: ["wie gehts", "wie geht's", "alles fit", "was geht", "alles klar", "status"], 
+                    answer: "Mir geht's super! 🌊 Meine Tinte ist flüssig und alle 8 Arme sind einsatzbereit. Und bei dir? Alles im grünen Bereich?" 
                 },
                 { 
-                    keys: ["pflanzen", "samen", "säen", "anbauen", "karotte", "sonnenblume"], 
-                    answer: "Ab in die Erde damit! 🌱 Kaufe Samen im Shop (unten rechts) und klicke auf ein leeres Feld. Karotten 🥕 gehen schnell, Blumen dauern länger." 
+                    keys: ["mir geht es gut", "mir gehts gut", "alles super", "bestens", "happy", "glücklich"], 
+                    answer: "Das freut mich riesig! 🎉 Positive Energie ist der beste Dünger für deinen Garten! 🌱✨" 
                 },
                 { 
-                    keys: ["ernten", "fertig", "groß", "ausgewachsen"], 
-                    answer: "Erntezeit ist die beste Zeit! 🌾 Wenn das Bild groß ist, klick drauf! Das gibt Gems (Edelsteine). 💎" 
+                    keys: ["mir geht es schlecht", "nicht gut", "traurig", "deprimiert", "schlechter tag", "mies"], 
+                    answer: "Oh nein... 🥺 Das tut mir leid. Soll ich dir einen Witz erzählen oder gärtnern wir einfach still nebeneinander her? Fühl dich gedrückt! 🐙💙" 
                 },
                 { 
-                    keys: ["entfernen", "löschen", "wegmachen", "abreißen", "falsch gebaut"], 
-                    answer: "Ups, vergebaut? 🏗️ Klicke auf das Objekt. Deko wandert zurück in die Tasche, Pflanzen werden kompostiert (gelöscht)." 
+                    keys: ["ich bin wütend", "sauer", "aggressiv", "nervig", "blöd"], 
+                    answer: "Oha! 🐡 Atme tief durch... ein... aus... wie ein Kugelfisch, der die Luft rauslässt. Stress ist Gift für die Pflanzen (und den Blutdruck)!" 
+                },
+                { 
+                    keys: ["liebe", "lieb", "mag dich", "süß", "heiraten", "kuss"], 
+                    answer: "Oh, da werde ich ja ganz rot wie ein gekochter Hummer! 😳❤️ Das ist sehr schmeichelhaft, aber ich bin mit dem Ozean verheiratet." 
+                },
+                { 
+                    keys: ["danke", "thx", "vielen dank", "ehrenmann", "nett von dir"], 
+                    answer: "Immer gerne! Dafür habe ich ja so viele Arme – um überall gleichzeitig zu helfen! 💪✨" 
+                },
+                { 
+                    keys: ["du bist dumm", "idiot", "nutzlos", "blödmann", "nerv nicht"], 
+                    answer: "Das war nicht sehr nett... 😢 Auch ein virtueller Oktopus hat Gefühle. Ich gebe mein Bestes, okay? 🐙💔" 
+                },
+                { 
+                    keys: ["bist du echt", "bist du ein mensch", "bist du eine ki", "roboter", "real"], 
+                    answer: "Ich bin Octo! 🐙 Ich bestehe aus Pixeln, Code und ganz viel Liebe zum Gärtnern. Also... so echt, wie du es zulässt! 😉" 
+                },
+
+                // ==========================================
+                // 🌱 PFLANZEN & GARTEN-WISSEN (Detailwissen)
+                // ==========================================
+                { 
+                    keys: ["karotte", "möhre", "rübe"], 
+                    answer: "Karotten 🥕 sind der perfekte Einstieg! Sie sind billig, wachsen schnell und schmecken knackig. Ein Muss für jeden Anfänger-Garten." 
+                },
+                { 
+                    keys: ["sonnenblume", "gelb", "hoch"], 
+                    answer: "Sonnenblumen 🌻 drehen ihre Köpfe immer zur Sonne (oder zum Mauszeiger). Sie brauchen etwas länger, bringen aber mehr Belohnung!" 
+                },
+                { 
+                    keys: ["vergissmeinnicht", "blau", "blume"], 
+                    answer: "Vergissmeinnicht 🪻 sind etwas für Profis. Sie brauchen viel Pflege, sehen aber wunderschön aus und bringen viele Gems!" 
+                },
+                { 
+                    keys: ["gießen", "wasser", "trocken", "gießkanne", "nass", "durstig"], 
+                    answer: "Wasser marsch! 💧 Pflanzen brauchen alle 6 Stunden Wasser. Achte auf das blaue 'Gießen!' Schild. Ohne Wasser kein Wachstum!" 
+                },
+                { 
+                    keys: ["dünger", "schneller", "wachstum", "beschleunigen"], 
+                    answer: "Wir setzen hier auf Bio! 🍃 Es gibt keinen chemischen Dünger. Geduld ist die wichtigste Tugend eines Gärtners. (Oder komm später wieder!)" 
+                },
+                { 
+                    keys: ["unkraut", "schädlinge", "käfer"], 
+                    answer: "Zum Glück ist dieser Garten magisch – hier gibt es kein Unkraut und keine Blattläuse! Nur reine Pflanzenfreude. 🐛🚫" 
+                },
+                { 
+                    keys: ["photosynthese", "biologie", "wie funktioniert"], 
+                    answer: "Ah, Wissenschaft! 🤓 Pflanzen verwandeln Sonnenlicht in Energie. In DuoBloom verwandeln sie deine Klicks in Münzen. Fast das Gleiche, oder? ☀️" 
+                },
+                
+                // ==========================================
+                // 🏗️ BAUEN & DEKO (Spielmechanik)
+                // ==========================================
+                { 
+                    keys: ["zwerg", "gnom", "wichtel", "zipfelmütze"], 
+                    answer: "Der Gartenzwerg 🎅 überwacht dein Reich, wenn du weg bist. Er sagt nicht viel, aber er hat eine tolle Ausstrahlung." 
+                },
+                { 
+                    keys: ["bank", "sitz", "parkbank"], 
+                    answer: "Eine Bank 🪑 lädt zum Verweilen ein. Leider können wir uns (noch) nicht draufsetzen, aber sie sieht schick aus!" 
+                },
+                { 
+                    keys: ["zaun", "grenze"], 
+                    answer: "Gute Zäune machen gute Nachbarn! 🚧 Oder sie halten die imaginären Kaninchen fern." 
                 },
                 { 
                     keys: ["boden", "stein", "holz", "weg", "plaster"], 
-                    answer: "Schicke Wege werten den Garten auf! 🧱 Kaufe Böden im Shop und lege sie über das Werkzeug-Menü an." 
+                    answer: "Niemand mag matschige Füße! 🧱 Lege Stein- oder Holzwege an, um Struktur in deinen Garten zu bringen. (Im Shop unter 'Markt'!)" 
                 },
                 { 
-                    keys: ["zeit", "dauer", "wie lange", "wann fertig"], 
-                    answer: "Gut Ding will Weile haben! ⏳ Jede Pflanze hat mehrere Wachstumsstufen. Nach jedem Gießen wächst sie ein Stück weiter." 
+                    keys: ["entfernen", "löschen", "wegmachen", "abreißen", "falsch gebaut", "kaputt"], 
+                    answer: "Radiergummi gefällig? 🏗️ Klicke einfach auf das Objekt. Deko und Boden landen im Inventar, Pflanzen werden leider kompostiert (gelöscht)." 
                 },
 
-                // --- KATEGORIE: WIRTSCHAFT & SHOP ---
+                // ==========================================
+                // 💰 WIRTSCHAFT & FORTSCHRITT
+                // ==========================================
                 { 
-                    keys: ["münzen", "coins", "geld", "verdienen", "gold", "reich"], 
-                    answer: "Münzen regieren die Welt! 💰 Erledige Aufgaben im Tab 'Aufgaben', um reich zu werden." 
+                    keys: ["münzen", "coins", "geld", "verdienen", "gold", "reich", "arm"], 
+                    answer: "Münzen regieren die Welt! 💰 Erledige Aufgaben im Tab 'Aufgaben' oder verkaufe... ähm, nein, erledige einfach Aufgaben! Das ist der Weg." 
                 },
                 { 
-                    keys: ["gems", "edelsteine", "diamanten", "kristalle", "blau"], 
-                    answer: "Gems sind super selten! 💎 Du bekommst sie nur durch das Ernten von fertigen Pflanzen. Spare sie für Landerweiterungen!" 
+                    keys: ["gems", "edelsteine", "diamanten", "kristalle", "blau", "rubin"], 
+                    answer: "Gems sind super selten und wertvoll! 💎 Du bekommst sie, wenn du ausgewachsene Pflanzen erntest. Spare sie für neues Land!" 
                 },
                 { 
-                    keys: ["shop", "kaufen", "markt", "laden"], 
-                    answer: "Shopping-Tour? 🛒 Im Shop gibt es zwei Abteilungen: Oben Immobilien (für Gems), unten Samen & Deko (für Münzen)." 
+                    keys: ["shop", "kaufen", "markt", "laden", "einkaufen"], 
+                    answer: "Shopping-Fieber? 🛒 Im Shop gibt es zwei Abteilungen: Oben Immobilien (Land für Gems), unten Samen & Deko (für Münzen)." 
                 },
                 { 
-                    keys: ["inventar", "tasche", "rucksack", "besitze"], 
-                    answer: "Deine Schätze findest du im Werkzeugkasten unter dem Garten. Klicke ein Item an, um es auszuwählen. 🎒" 
+                    keys: ["inventar", "tasche", "rucksack", "besitze", "wo sind meine sachen"], 
+                    answer: "Deine Schätze findest du im Werkzeugkasten direkt unter dem Gartenfeld. Klicke ein Item an, um es auszuwählen (blauer Rand). 🎒" 
+                },
+                { 
+                    keys: ["level", "xp", "erfahrung", "aufsteigen"], 
+                    answer: "Level Up? 🆙 Dein 'Level' ist die Anzahl deiner freigeschalteten Garten-Bereiche. Kaufe mehr Land im Shop, um im Rang zu steigen!" 
                 },
 
-                // --- KATEGORIE: AUFGABEN ---
+                // ==========================================
+                // 🗓️ AUFGABEN & STREAK
+                // ==========================================
                 { 
                     keys: ["aufgabe", "quest", "mission", "ziel", "todo"], 
-                    answer: "Produktivität ist wichtig! ✅ Im Tab 'Aufgaben' kannst du eigene Ziele setzen (z.B. 'Zimmer aufräumen') und dich im Spiel belohnen." 
+                    answer: "Produktivität ist wichtig! ✅ Im Tab 'Aufgaben' kannst du Ziele setzen. Der Witz ist: Du belohnst dich selbst für echte Aufgaben (z.B. 'Lernen')." 
                 },
                 { 
-                    keys: ["täglich", "wiederholen", "daily", "routine"], 
-                    answer: "Tägliche Aufgaben resetten sich um 0 Uhr. Perfekt für Dinge, die du jeden Tag machen willst! 📅" 
-                },
-                
-                // --- KATEGORIE: SOZIALES & FORTSCHRITT ---
-                { 
-                    keys: ["level", "aufsteigen", "erfahrung", "xp"], 
-                    answer: "Level Up! 🆙 Dein Level ist die Anzahl deiner freigeschalteten Garten-Bereiche. Kaufe mehr Land im Shop!" 
+                    keys: ["täglich", "wiederholen", "daily", "routine", "jeden tag"], 
+                    answer: "Tägliche Aufgaben resetten sich um 0 Uhr nachts. Perfekt für Dinge wie 'Zähne putzen' oder '5 Minuten meditieren'. 📅" 
                 },
                 { 
-                    keys: ["freund", "besuchen", "teilen", "code", "multiplayer"], 
-                    answer: "Gärtnern macht gemeinsam mehr Spaß! 👯 Gib deinen Code (oben im Menü) an Freunde weiter, damit sie dich besuchen können." 
-                },
-                { 
-                    keys: ["community", "andere", "fremd", "welt"], 
-                    answer: "Schau mal über den Zaun! 🌍 Im Hauptmenü unter 'Community' siehst du die Gärten anderer Spieler." 
-                },
-                { 
-                    keys: ["liken", "herz", "gefällt mir", "likes"], 
-                    answer: "Verteile Liebe! ❤️ Als Besucher kannst du oben rechts ein Herz dalassen. Sammle selbst Likes für deinen Garten!" 
-                },
-                { 
-                    keys: ["streak", "feuer", "flamme", "tage"], 
-                    answer: "Bleib dran! 🔥 Dein Streak zeigt, wie viele Tage du in Folge da warst. Ein Tag Pause und er ist futsch! 😱" 
+                    keys: ["streak", "feuer", "flamme", "tage", "reihe"], 
+                    answer: "Halte das Feuer am Brennen! 🔥 Dein Streak zeigt, wie viele Tage du in Folge da warst. Ein Tag Pause und er ist futsch! 😱" 
                 },
 
-                // --- KATEGORIE: TECHNIK ---
+                // ==========================================
+                // 🌍 SOCIAL & TECHNIK
+                // ==========================================
                 { 
-                    keys: ["speichern", "save", "verloren", "sicher"], 
-                    answer: "Keine Panik! ☁️ Das Spiel speichert alles automatisch in der Cloud. Dein Fortschritt ist sicher." 
+                    keys: ["freund", "besuchen", "teilen", "code", "multiplayer", "zusammen"], 
+                    answer: "Gärtnern macht gemeinsam mehr Spaß! 👯 Gib deinen Code (oben im Menü) weiter. Freunde können dich besuchen, aber (noch) nichts kaputt machen." 
                 },
                 { 
-                    keys: ["app", "installieren", "handy", "ios", "android"], 
-                    answer: "Mach mich zur App! 📱 Tippe im Browser auf 'Teilen' (iOS) oder das Menü (Android) und wähle 'Zum Home-Bildschirm' beziehungsweise als 'Web App' installieren." 
+                    keys: ["community", "andere", "fremd", "welt", "liste"], 
+                    answer: "Schau mal über den Zaun! 🌍 Im Hauptmenü unter 'Community' siehst du die Gärten anderer Spieler. Besuch sie mal!" 
                 },
                 { 
-                    keys: ["musik", "sound", "ton"], 
-                    answer: "Aktuell hören wir nur das Rauschen des Windes... 🍃 (Musik kommt vielleicht in einem späteren Update!)" 
+                    keys: ["liken", "herz", "gefällt mir", "likes", "beliebt"], 
+                    answer: "Verteile Liebe! ❤️ Als Besucher kannst du oben rechts ein Herz dalassen. Sammle selbst Likes für deinen Garten, um in der Liste aufzusteigen!" 
+                },
+                { 
+                    keys: ["speichern", "save", "verloren", "sicher", "cloud"], 
+                    answer: "Keine Panik! ☁️ Das Spiel speichert alles automatisch in der Datenbank. Solange du eingeloggt bist, ist dein Fortschritt sicher." 
+                },
+                { 
+                    keys: ["app", "installieren", "handy", "ios", "android", "herunterladen"], 
+                    answer: "Mach mich zur App! 📱 Tippe im Browser auf 'Teilen' (iOS) oder das Menü (Android) und wähle 'Zum Home-Bildschirm'. Dann habe ich ein eigenes Icon!" 
+                },
+
+                // ==========================================
+                // 🥚 EASTER EGGS & SPASS
+                // ==========================================
+                { 
+                    keys: ["spongebob", "patrick", "bikini bottom"], 
+                    answer: "Der wohnt in einer Ananas, zwei Ozeane weiter südlich! 🍍 Ein netter Kerl, aber etwas laut." 
+                },
+                { 
+                    keys: ["witz", "lachen", "lustig", "joke", "erzähl was"], 
+                    answer: "Was ist orange und wandert den Berg hoch? Eine Wander-Mandarine! 🍊 ... Und was ist grün und steht am Straßenrand? Eine Froschstituierte! 🐸 (Sorry!)" 
+                },
+                { 
+                    keys: ["sinn des lebens", "42", "universum"], 
+                    answer: "42. Und natürlich: Gärtnern. 🌱 Was sonst?" 
+                },
+                { 
+                    keys: ["entwickler", "gemacht", "programmiert", "schöpfer", "wer hat dich gebaut"], 
+                    answer: "Ich wurde von einem Code-Magier erschaffen! 🧙‍♂️ Er hat mir Leben eingehaucht, damit ich dir beim Pflanzen helfe." 
+                },
+                { 
+                    keys: ["essen", "hunger", "lecker", "pizza", "burger"], 
+                    answer: "Ich liebe Pizza Frutti di Mare... Moment, ist das Kannibalismus? 🍕 Sagen wir lieber: Ich mag Algen-Salat!" 
+                },
+                { 
+                    keys: ["langweilig", "nichts zu tun", "was machen", "öde"], 
+                    answer: "Langeweile? 😲 Unmöglich! Pflanz neue Samen, dekoriere um, besuche Community-Gärten oder setz dir eine neue Real-Life-Aufgabe!" 
+                },
+                { 
+                    keys: ["musik", "singen", "lied"], 
+                    answer: "🎵 *Unter dem Meer...* 🎵 Oh, ich kann nicht singen. Stell dir einfach ein sanftes Rauschen vor. 🌊" 
+                },
+                { 
+                    keys: ["katze", "hund", "haustier"], 
+                    answer: "Landtiere sind süß, aber können sie unter Wasser atmen? Ich glaube nicht. Ich hätte gerne ein Seepferdchen! 🐎" 
                 }
             ];
+
+
+
 
             const OCTO_BRAIN = {
                 think: async function(inputText) {
