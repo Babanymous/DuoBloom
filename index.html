@@ -60,6 +60,9 @@
             appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
             measurementId: "G-Z0W0LK6D88"
         };
+        // --- KI KONFIGURATION ---
+        const HF_TOKEN = "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"; // <-- HIER TOKEN REIN!
+        const HF_MODEL = "HuggingFaceH4/zephyr-7b-beta"; // Ein sehr gutes, schnelles Chat-Modell
 
         let firebaseApp, auth, db;
         try {
@@ -237,6 +240,96 @@
 
             const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
             React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
+// --- 2. ADVANCED AI OCTO BRAIN (Hugging Face Edition) ---
+
+            const OCTO_BRAIN = {
+                systemPrompt: `Du bist Octo, ein freundlicher, witziger Oktopus-Assistent in der Garten-App "DuoBloom".
+                Antworte IMMER kurz (max 2-3 Sätze). Benutze Emojis 🐙🌿.
+                Du sprichst Deutsch. Du liebst Wasser und Gärtnern.
+                
+                Hier sind die aktuellen Daten des Spielers (nutze sie für die Antwort):
+                `,
+            
+                // Hilfsfunktion, um den Spielstand in Text umzuwandeln
+                getContextString: function(ctx) {
+                    if (!ctx || !ctx.roomData) return "Keine Daten verfügbar.";
+                    
+                    const coins = ctx.roomData.coins || 0;
+                    const gems = ctx.roomData.gems || 0;
+                    const tasks = ctx.tasks ? ctx.tasks.filter(t => !t.done).map(t => t.title).join(", ") : "Keine";
+                    
+                    // Pflanzen analysieren
+                    let plantsStatus = "Der Garten ist leer.";
+                    if (ctx.roomData.gardens && ctx.roomData.gardens[ctx.activeGardenIdx]) {
+                        const garden = ctx.roomData.gardens[ctx.activeGardenIdx];
+                        const plants = Object.values(garden).filter(c => c.item && c.item.includes('seed'));
+                        const thirsty = plants.filter(c => {
+                             const lw = c.lastWatered ? new Date(c.lastWatered).getTime() : 0;
+                             return (Date.now() - lw > 6 * 60 * 60 * 1000) && !c.grown;
+                        }).length;
+                        const ready = plants.filter(c => c.grown).length;
+                        
+                        plantsStatus = `${plants.length} Pflanzen gesät. ${thirsty} brauchen Wasser. ${ready} sind erntereif.`;
+                    }
+            
+                    return `
+                    - Spieler Name: ${ctx.user.displayName}
+                    - Münzen: ${coins}
+                    - Gems: ${gems}
+                    - Offene Aufgaben: ${tasks}
+                    - Garten Status: ${plantsStatus}
+                    `;
+                },
+            
+                analyzeState: function(ctx) {
+                    // Für den Initialen Gruß nutzen wir keine KI, um Tokens zu sparen
+                    return "Blub blub! 🐙 Ich bin online und mit meinem KI-Gehirn verbunden! Wie kann ich helfen?";
+                },
+            
+                think: async function(input, ctx) {
+                    // 1. Kontext vorbereiten
+                    const contextData = this.getContextString(ctx);
+                    const fullPrompt = `<|system|>\n${this.systemPrompt}\n${contextData}</s>\n<|user|>\n${input}</s>\n<|assistant|>\n`;
+            
+                    try {
+                        // 2. Request an Hugging Face senden
+                        const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
+                            method: "POST",
+                            headers: {
+                                "Authorization": `Bearer ${HF_TOKEN}`,
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                inputs: fullPrompt,
+                                parameters: {
+                                    max_new_tokens: 100, // Kurze Antworten
+                                    temperature: 0.7,    // Kreativität
+                                    return_full_text: false
+                                }
+                            })
+                        });
+            
+                        const result = await response.json();
+            
+                        // Fehlerbehandlung falls Modell noch lädt
+                        if (result.error && result.error.includes("loading")) {
+                            return "Mein Gehirn wärmt sich noch auf... frag mich in 20 Sekunden nochmal! 🐙 (Modell lädt)";
+                        }
+                        if (result.error) {
+                            console.error("HF Error:", result);
+                            return "Blub... ich habe Kopfschmerzen (API Fehler).";
+                        }
+            
+                        // Antwort extrahieren (bei Chat Modellen oft im Array)
+                        let reply = result[0].generated_text || "Blub?";
+                        return reply.trim();
+            
+                    } catch (e) {
+                        console.error(e);
+                        return "Meine Internet-Tentakel haben einen Knoten. Versuch es später nochmal.";
+                    }
+                }
+            };
 
             // --- DAS NEUE GEHIRN VON OCTO ---
             const getOctoResponse = (text) => {
@@ -309,18 +402,23 @@
                 return fallbacks[Math.floor(Math.random() * fallbacks.length)];
             };
 
-            const handleSend = () => {
-                if (!input.trim()) return;
-                const userText = input;
-                setMessages(prev => [...prev, { role: 'user', content: userText }]);
+            const handleSend = async () => { // <--- WICHTIG: async hinzufügen
+                if(!input.trim()) return;
+                const userMsg = { sender: 'user', text: input };
+                setMessages(prev => [...prev, userMsg]);
                 setInput("");
-                setIsTyping(true);
-
-                setTimeout(() => {
-                    const answer = getOctoResponse(userText);
-                    setMessages(prev => [...prev, { role: 'assistant', content: answer }]);
-                    setIsTyping(false);
-                }, 600);
+                setIsTyping(true); // Zeigt die Lade-Punkte an
+                
+                try {
+                    // Wir warten nun auf die echte KI Antwort
+                    const reply = await OCTO_BRAIN.think(userMsg.text, context);
+                    
+                    setMessages(prev => [...prev, { sender: 'octo', text: reply }]);
+                } catch(e) {
+                    setMessages(prev => [...prev, { sender: 'octo', text: "Fehler im Ozean..." }]);
+                } finally {
+                    setIsTyping(false); // Lade-Punkte weg
+                }
             };
 
             return (
