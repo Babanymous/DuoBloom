@@ -448,6 +448,161 @@
 
                                 <div className="flex-1 overflow-y-auto p-4 bg-[#f8fafc] space-y-4">
                                     {messages.map((m, i) => (
+        // --- 4. FLOATING OCTO CHAT (SMART EDITION - FIXED) ---
+
+        const OctoChat = ({ user, roomData }) => {
+            const [isOpen, setIsOpen] = React.useState(false);
+            const [messages, setMessages] = React.useState([
+                { role: 'assistant', content: `Blub Blub! 🐙 Hallo ${user.displayName.split(' ')[0]}! Ich habe die Finanzen und den Garten im Blick. Frag mich was!` }
+            ]);
+            const [input, setInput] = React.useState("");
+            const [isTyping, setIsTyping] = React.useState(false);
+            const messagesEndRef = React.useRef(null);
+
+            const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
+            React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
+
+            // --- 2. ADVANCED AI OCTO BRAIN (Hugging Face Edition) ---
+            const OCTO_BRAIN = {
+                systemPrompt: `Du bist Octo, ein freundlicher Oktopus-Assistent im Spiel "DuoBloom".
+                Antworte IMMER kurz (max 2 Sätze). Sei witzig und nutze Emojis 🐙🌿.
+                Du hast Zugriff auf die aktuellen Spieldaten. Nutze sie!`,
+            
+                getContextString: function(ctx) {
+                    if (!ctx || !ctx.roomData) return "Keine Daten verfügbar.";
+                    
+                    const coins = ctx.roomData.coins || 0;
+                    const gems = ctx.roomData.gems || 0;
+                    // Aufgaben sicher auslesen
+                    const tasks = (ctx.roomData.tasks || [])
+                        .filter(t => !t.done)
+                        .map(t => t.title)
+                        .join(", ");
+                    
+                    const taskStr = tasks ? tasks : "Keine offenen Aufgaben";
+            
+                    return `
+                    [AKTUELLE SPIELDATEN]
+                    Spieler: ${ctx.user.displayName}
+                    Münzen: ${coins}
+                    Gems: ${gems}
+                    Offene Aufgaben: ${taskStr}
+                    `;
+                },
+            
+                think: async function(inputText, ctx) {
+                    // 1. Kontext vorbereiten
+                    const contextData = this.getContextString(ctx);
+                    
+                    // Prompt Format für Zephyr/Mistral Modelle
+                    const fullPrompt = `<|system|>\n${this.systemPrompt}\n${contextData}</s>\n<|user|>\n${inputText}</s>\n<|assistant|>\n`;
+            
+                    try {
+                        const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
+                            method: "POST",
+                            headers: {
+                                "Authorization": `Bearer ${HF_TOKEN}`,
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                inputs: fullPrompt,
+                                parameters: {
+                                    max_new_tokens: 150,
+                                    temperature: 0.7,
+                                    top_p: 0.95,
+                                    return_full_text: false // Wichtig: Gibt nur die Antwort zurück, nicht den Prompt
+                                }
+                            })
+                        });
+            
+                        const result = await response.json();
+            
+                        // Fehlerbehandlung: Modell lädt noch
+                        if (result.error && result.error.includes("loading")) {
+                            return "Mein Gehirn wärmt sich noch auf... frag mich in 20 Sekunden nochmal! 🐙 (Modell lädt)";
+                        }
+                        
+                        // Fehlerbehandlung: Authentifizierung oder andere API Fehler
+                        if (result.error) {
+                            console.error("HF Error:", result);
+                            return `Blub... Fehler im Ozean: ${result.error}`;
+                        }
+            
+                        // Antwort extrahieren (Hugging Face gibt Array zurück)
+                        let reply = "";
+                        if (Array.isArray(result) && result.length > 0) {
+                            reply = result[0].generated_text;
+                        } else if (typeof result === 'object' && result.generated_text) {
+                            reply = result.generated_text;
+                        } else {
+                            reply = "Blub? (Keine Antwort verstanden)";
+                        }
+
+                        return reply.trim();
+            
+                    } catch (e) {
+                        console.error(e);
+                        return "Meine Internet-Tentakel haben einen Knoten. Versuch es später nochmal.";
+                    }
+                }
+            };
+
+            const handleSend = async () => {
+                if(!input.trim()) return;
+                
+                const userText = input;
+                const userMsg = { role: 'user', content: userText }; // Format angepasst an Message-History
+                
+                setMessages(prev => [...prev, userMsg]);
+                setInput("");
+                setIsTyping(true);
+                
+                try {
+                    // HIER WAR DER FEHLER: Wir erstellen jetzt das Context-Objekt
+                    const currentContext = {
+                        user: user,
+                        roomData: roomData,
+                        activeGardenIdx: 0 // Default, da wir hier keinen Zugriff auf den State haben
+                    };
+
+                    const replyText = await OCTO_BRAIN.think(userText, currentContext);
+                    
+                    const botMsg = { role: 'assistant', content: replyText };
+                    setMessages(prev => [...prev, botMsg]);
+                } catch(e) {
+                    setMessages(prev => [...prev, { role: 'assistant', content: "Fehler beim Denken... 🤯" }]);
+                } finally {
+                    setIsTyping(false);
+                }
+            };
+
+            return (
+                <>
+                    <button 
+                        onClick={() => setIsOpen(true)} 
+                        className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 bg-white hover:bg-gray-50 p-2 md:p-3 rounded-full shadow-xl border-4 border-purple-200 transition-transform hover:scale-110 flex items-center justify-center animate-bounce"
+                    >
+                        <img src={OCTO_IMG} className="w-10 h-10 md:w-12 md:h-12" alt="Octo" />
+                    </button>
+
+                    {isOpen && (
+                        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
+                            <div className="bg-white w-full md:w-[380px] h-[70vh] md:h-[550px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto overflow-hidden animate-pop border border-gray-200 m-0 md:m-4">
+                                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white flex justify-between items-center shadow-md">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-white/20 p-1.5 rounded-full backdrop-blur-sm">
+                                            <img src={OCTO_IMG} className="w-8 h-8" alt="Octo" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg">Octo AI</h3>
+                                            <p className="text-[10px] text-purple-200 font-mono uppercase">Smart Assistant</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setIsOpen(false)}><Icon name="x" className="text-white/80 hover:text-white" /></button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-4 bg-[#f8fafc] space-y-4">
+                                    {messages.map((m, i) => (
                                         <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start items-end gap-2'}`}>
                                             {m.role === 'assistant' && <img src={OCTO_IMG} className="w-6 h-6 mb-1" />}
                                             <div className={`max-w-[85%] p-3 px-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
@@ -477,7 +632,7 @@
                                         value={input}
                                         onChange={e => setInput(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && handleSend()}
-                                        placeholder="Frage z.B. nach Münzen..."
+                                        placeholder="Frag Octo..."
                                         className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none focus:bg-white focus:ring-2 ring-purple-500 transition-all text-sm font-medium"
                                         autoFocus
                                     />
@@ -491,6 +646,7 @@
                 </>
             );
         };
+
 
         // --- 5. SCREENS ---
 
