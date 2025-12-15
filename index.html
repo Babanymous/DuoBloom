@@ -246,7 +246,7 @@
             const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
             React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
 
-            // --- 2. ADVANCED AI OCTO BRAIN (Diagnose Modus) ---
+            // --- 2. ADVANCED AI OCTO BRAIN (GitHub Pages Fix) ---
             const OCTO_BRAIN = {
                 systemPrompt: `Du bist Octo, ein Oktopus. Antworte kurz auf Deutsch.`,
             
@@ -257,16 +257,19 @@
             
                 think: async function(inputText, ctx) {
                     // 1. Token Check
-                    if (!HF_TOKEN || HF_TOKEN.length < 10) return "Fehler: HF_TOKEN Variable ist leer oder zu kurz.";
+                    if (!HF_TOKEN || HF_TOKEN.length < 10) return "Fehler: Token fehlt oder ist falsch konfiguriert.";
 
                     const contextData = this.getContextString(ctx);
                     const fullPrompt = `<|system|>\n${this.systemPrompt}\n${contextData}</s>\n<|user|>\n${inputText}</s>\n<|assistant|>\n`;
             
                     try {
-                        console.log("Sende Anfrage an HF...", HF_MODEL); // Für F12 Konsole
-                        
+                        // LOG: Damit du in der Konsole (F12) siehst, was passiert
+                        console.log("Octo denkt nach via...", HF_MODEL);
+
                         const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
                             method: "POST",
+                            mode: "cors",       // <--- WICHTIG FÜR GITHUB PAGES
+                            credentials: "omit", // <--- WICHTIG: Keine Cookies senden
                             headers: {
                                 "Authorization": `Bearer ${HF_TOKEN}`,
                                 "Content-Type": "application/json"
@@ -280,40 +283,35 @@
                             })
                         });
             
-                        // 2. HTTP Fehler abfangen (z.B. 401, 503)
                         if (!response.ok) {
-                            const errorText = await response.text();
-                            console.error("API Error Details:", errorText);
-                            
-                            if (response.status === 503) return "Mein Gehirn lädt gerade (503). Versuch es in 30 Sekunden nochmal! ⏳";
-                            if (response.status === 401) return "Der Token ist ungültig (401). Prüfe den Code!";
-                            if (response.status === 403) return "Zugriff verweigert (403). Hat dein Token 'Write' Rechte? 'Read' reicht oft nicht.";
-                            
-                            return `API Fehler ${response.status}: ${errorText.slice(0, 50)}...`;
+                            const errText = await response.text();
+                            console.error("API Fehler:", response.status, errText);
+                            if (response.status === 503) return "Ich wache gerade auf (Modell lädt)... Versuch es in 20 Sekunden nochmal! 💤";
+                            if (response.status === 401) return "Mein Token ist ungültig. (Hast du ihn richtig kopiert?)";
+                            return `Fehler ${response.status}: ${errText}`;
                         }
             
                         const result = await response.json();
                         
-                        // 3. Fehler im JSON Resultat
-                        if (result.error) {
-                            return `Modell-Fehler: ${result.error}`;
-                        }
-            
-                        // 4. Antwort extrahieren
+                        // Antwort extrahieren
                         let reply = "";
-                        if (Array.isArray(result)) reply = result[0].generated_text;
+                        if (Array.isArray(result) && result.length > 0) reply = result[0].generated_text;
                         else if (result.generated_text) reply = result.generated_text;
-                        else reply = JSON.stringify(result); // Fallback falls Struktur anders
+                        else reply = "Blub? (Ich habe nichts verstanden)";
 
-                        return reply.trim() || "Octo schweigt... (Leere Antwort)";
+                        return reply.trim();
             
                     } catch (e) {
-                        console.error("NETZWERK FEHLER:", e);
-                        // 5. Hier zeigen wir den WAHREN Grund an:
-                        return `TECHNIK-FEHLER: ${e.message}`;
+                        console.error("NETZWERK FEHLER (Details):", e);
+                        // Prüfen ob es ein "Failed to fetch" ist
+                        if (e.message.includes("Failed to fetch")) {
+                            return "Browser-Blockade! 🛑 Bitte deaktiviere deinen AdBlocker für diese Seite.";
+                        }
+                        return `Technik-Problem: ${e.message}`;
                     }
                 }
             };
+
 
 
             const handleSend = async () => {
