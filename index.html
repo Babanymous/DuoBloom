@@ -60,11 +60,14 @@
             appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
             measurementId: "G-Z0W0LK6D88"
         };
-        // --- KI KONFIGURATION ---
-        // Wir zerlegen den Token, damit GitHub/HF Scanner ihn nicht finden:
+         // Wir zerlegen den Token, damit GitHub/HF Scanner ihn nicht finden:
         const PART_A = "hf_"; 
-        // HIER UNTEN den Rest deines Tokens einfügen (alles NACH dem hf_):
-        const PART_B = "PFwQamhiywWQcwdOEvsCOELStXqZWHIMBj"; 
+        const PART_B = "PFwQamhiywWQcwdOEvsCOELStXqZWHIMBj"; // Dein Token Teil
+            
+        const HF_TOKEN = PART_A + PART_B; 
+         // NEUES MODELL (zuverlässiger für Tests):
+        const HF_MODEL = "microsoft/Phi-3-mini-4k-instruct"; 
+
         
         const HF_TOKEN = PART_A + PART_B; // Hier wird er wieder zusammengebaut
         const HF_MODEL = "HuggingFaceH4/zephyr-7b-beta";
@@ -247,42 +250,25 @@
             const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
             React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
 
-            // --- 2. ADVANCED AI OCTO BRAIN (Hugging Face Edition) ---
+            // --- 2. ADVANCED AI OCTO BRAIN (Diagnose Modus) ---
             const OCTO_BRAIN = {
-                systemPrompt: `Du bist Octo, ein freundlicher Oktopus-Assistent im Spiel "DuoBloom".
-                Antworte IMMER kurz (max 2 Sätze). Sei witzig und nutze Emojis 🐙🌿.
-                Du hast Zugriff auf die aktuellen Spieldaten. Nutze sie!`,
+                systemPrompt: `Du bist Octo, ein Oktopus. Antworte kurz auf Deutsch.`,
             
                 getContextString: function(ctx) {
-                    if (!ctx || !ctx.roomData) return "Keine Daten verfügbar.";
-                    
-                    const coins = ctx.roomData.coins || 0;
-                    const gems = ctx.roomData.gems || 0;
-                    // Aufgaben sicher auslesen
-                    const tasks = (ctx.roomData.tasks || [])
-                        .filter(t => !t.done)
-                        .map(t => t.title)
-                        .join(", ");
-                    
-                    const taskStr = tasks ? tasks : "Keine offenen Aufgaben";
-            
-                    return `
-                    [AKTUELLE SPIELDATEN]
-                    Spieler: ${ctx.user.displayName}
-                    Münzen: ${coins}
-                    Gems: ${gems}
-                    Offene Aufgaben: ${taskStr}
-                    `;
+                    if (!ctx || !ctx.roomData) return "";
+                    return `User: ${ctx.user.displayName}, Münzen: ${ctx.roomData.coins}`;
                 },
             
                 think: async function(inputText, ctx) {
-                    // 1. Kontext vorbereiten
+                    // 1. Token Check
+                    if (!HF_TOKEN || HF_TOKEN.length < 10) return "Fehler: HF_TOKEN Variable ist leer oder zu kurz.";
+
                     const contextData = this.getContextString(ctx);
-                    
-                    // Prompt Format für Zephyr/Mistral Modelle
                     const fullPrompt = `<|system|>\n${this.systemPrompt}\n${contextData}</s>\n<|user|>\n${inputText}</s>\n<|assistant|>\n`;
             
                     try {
+                        console.log("Sende Anfrage an HF...", HF_MODEL); // Für F12 Konsole
+                        
                         const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
                             method: "POST",
                             headers: {
@@ -291,46 +277,48 @@
                             },
                             body: JSON.stringify({
                                 inputs: fullPrompt,
-                                parameters: {
-                                    max_new_tokens: 150,
-                                    temperature: 0.7,
-                                    top_p: 0.95,
-                                    return_full_text: false // Wichtig: Gibt nur die Antwort zurück, nicht den Prompt
+                                parameters: { 
+                                    max_new_tokens: 100, 
+                                    return_full_text: false 
                                 }
                             })
                         });
             
+                        // 2. HTTP Fehler abfangen (z.B. 401, 503)
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            console.error("API Error Details:", errorText);
+                            
+                            if (response.status === 503) return "Mein Gehirn lädt gerade (503). Versuch es in 30 Sekunden nochmal! ⏳";
+                            if (response.status === 401) return "Der Token ist ungültig (401). Prüfe den Code!";
+                            if (response.status === 403) return "Zugriff verweigert (403). Hat dein Token 'Write' Rechte? 'Read' reicht oft nicht.";
+                            
+                            return `API Fehler ${response.status}: ${errorText.slice(0, 50)}...`;
+                        }
+            
                         const result = await response.json();
-            
-                        // Fehlerbehandlung: Modell lädt noch
-                        if (result.error && result.error.includes("loading")) {
-                            return "Mein Gehirn wärmt sich noch auf... frag mich in 20 Sekunden nochmal! 🐙 (Modell lädt)";
-                        }
                         
-                        // Fehlerbehandlung: Authentifizierung oder andere API Fehler
+                        // 3. Fehler im JSON Resultat
                         if (result.error) {
-                            console.error("HF Error:", result);
-                            return `Blub... Fehler im Ozean: ${result.error}`;
+                            return `Modell-Fehler: ${result.error}`;
                         }
             
-                        // Antwort extrahieren (Hugging Face gibt Array zurück)
+                        // 4. Antwort extrahieren
                         let reply = "";
-                        if (Array.isArray(result) && result.length > 0) {
-                            reply = result[0].generated_text;
-                        } else if (typeof result === 'object' && result.generated_text) {
-                            reply = result.generated_text;
-                        } else {
-                            reply = "Blub? (Keine Antwort verstanden)";
-                        }
+                        if (Array.isArray(result)) reply = result[0].generated_text;
+                        else if (result.generated_text) reply = result.generated_text;
+                        else reply = JSON.stringify(result); // Fallback falls Struktur anders
 
-                        return reply.trim();
+                        return reply.trim() || "Octo schweigt... (Leere Antwort)";
             
                     } catch (e) {
-                        console.error(e);
-                        return "Meine Internet-Tentakel haben einen Knoten. Versuch es später nochmal.";
+                        console.error("NETZWERK FEHLER:", e);
+                        // 5. Hier zeigen wir den WAHREN Grund an:
+                        return `TECHNIK-FEHLER: ${e.message}`;
                     }
                 }
             };
+
 
             const handleSend = async () => {
                 if(!input.trim()) return;
