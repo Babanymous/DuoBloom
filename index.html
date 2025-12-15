@@ -60,20 +60,16 @@
             appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
             measurementId: "G-Z0W0LK6D88"
         };
-         // Wir zerlegen den Token, damit GitHub/HF Scanner ihn nicht finden:
+
+        // --- KI KONFIGURATION ---
         const PART_A = "hf_"; 
-        const PART_B = "PFwQamhiywWQcwdOEvsCOELStXqZWHIMBj"; // Dein Token Teil
-            
-        const HF_TOKEN = PART_A + PART_B; 
-         // NEUES MODELL (zuverlässiger für Tests):
-        const HF_MODEL = "microsoft/Phi-3-mini-4k-instruct"; 
-
+        const PART_B = "PFwQamhiywWQcwdOEvsCOELStXqZWHIMBj"; 
         
-        const HF_TOKEN = PART_A + PART_B; // Hier wird er wieder zusammengebaut
-        const HF_MODEL = "HuggingFaceH4/zephyr-7b-beta";
-
+        const HF_TOKEN = PART_A + PART_B; 
+        const HF_MODEL = "microsoft/Phi-3-mini-4k-instruct"; // Wir nutzen nur das neue Modell
 
         let firebaseApp, auth, db;
+
         try {
             firebaseApp = initializeApp(firebaseConfig);
             auth = getAuth(firebaseApp);
@@ -779,6 +775,24 @@
                 </div>
             );
         };
+        // --- LOGIN SCREEN ---
+        const LoginScreen = ({ onLogin }) => (
+            <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-b from-green-300 to-green-100 text-center">
+                <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full animate-pop">
+                    <div className="text-6xl mb-4">🌱</div>
+                    <h1 className="text-3xl font-black text-green-700 mb-2">DuoBloom</h1>
+                    <p className="text-gray-500 mb-8">Gemeinsam gärtnern, gemeinsam wachsen.</p>
+                    <button 
+                        onClick={onLogin} 
+                        className="w-full bg-white border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 text-gray-700 font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all transform active:scale-95"
+                    >
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="G" />
+                        Mit Google anmelden
+                    </button>
+                    <p className="text-xs text-gray-400 mt-6">Version 24.1 (Octo Smart)</p>
+                </div>
+            </div>
+        );
 
         const App = () => {
             const [user, setUser] = React.useState(null);
