@@ -217,7 +217,7 @@
             );
         };
 
-        // --- OCTO CHAT (KEYWORD VERSION) ---
+        // --- OCTO CHAT (MIT AVATAR & KEYWORDS) ---
         
         const OctoChat = ({ user, roomData }) => {
             const [isOpen, setIsOpen] = React.useState(false);
@@ -233,120 +233,38 @@
 
             // --- DAS GEHIRN VON OCTO (WISSENSDATENBANK) ---
             const OCTO_KNOWLEDGE = [
-                // BEGRÜSSUNG & BASIS
-                { 
-                    keys: ["hallo", "hi ", "hey", "moin", "guten tag", "servus"], 
-                    answer: "Blub Blub! 👋 Schön dich zu sehen! Wie kann ich dir helfen? 🐙" 
-                },
-                { 
-                    keys: ["wer bist du", "was bist du", "dein name"], 
-                    answer: "Ich bin Octo, dein persönlicher Garten-Oktopus! 🐙 Ich helfe dir, dich hier zurechtzufinden." 
-                },
-                { 
-                    keys: ["danke", "cool", "super", "nett"], 
-                    answer: "Gerne doch! Immer fleißig weiter gärtnern! 🌱✨" 
-                },
-
-                // GÄRTNERN (Pflanzen, Wasser, Ernte)
-                { 
-                    keys: ["gießen", "wasser", "trocken", "gießkanne"], 
-                    answer: "Pflanzen haben Durst! 💧 Wenn über einer Pflanze ein blaues 'Gießen!' Schild steht, klicke darauf, damit sie weiter wächst." 
-                },
-                { 
-                    keys: ["pflanzen", "samen", "säen", "anbauen"], 
-                    answer: "Klicke im Menü unten auf 'Shop' (Einkaufswagen), kaufe Samen 🥕 und klicke dann auf ein leeres Feld im Garten, um sie zu pflanzen." 
-                },
-                { 
-                    keys: ["ernten", "fertig", "groß"], 
-                    answer: "Wenn eine Pflanze ausgewachsen ist (großes Bild), klicke sie an! Du bekommst Gems (Edelsteine) als Belohnung. 💎" 
-                },
-                { 
-                    keys: ["entfernen", "löschen", "wegmachen", "abreißen"], 
-                    answer: "Willst du etwas entfernen? Klicke einfach auf das Objekt. Wenn es Deko ist, kommt es ins Inventar. Pflanzen werden verkauft/gelöscht." 
-                },
-                { 
-                    keys: ["boden", "stein", "holz", "weg"], 
-                    answer: "Böden (Stein/Holz) kannst du im Shop kaufen. Wähle sie im Werkzeugkasten aus und klicke auf leere Felder, um Wege zu bauen. 🧱" 
-                },
-                { 
-                    keys: ["zeit", "dauer", "wie lange"], 
-                    answer: "Jede Pflanze braucht unterschiedlich lange. Wenn du sie gießt, musst du warten, bis sie wieder trocken ist (6 Stunden Cooldown). ⏳" 
-                },
-
-                // WÄHRUNGEN (Münzen, Gems)
-                { 
-                    keys: ["münzen", "coins", "geld", "verdienen", "gold"], 
-                    answer: "Münzen 💰 bekommst du durch das Erledigen von Aufgaben! Schau im Tab 'Aufgaben' nach." 
-                },
-                { 
-                    keys: ["gems", "edelsteine", "diamanten", "kristalle"], 
-                    answer: "Gems 💎 sind selten! Du bekommst sie, wenn du fertig gewachsene Pflanzen erntest. Damit kannst du neue Gartenteile kaufen." 
-                },
-                { 
-                    keys: ["shop", "kaufen", "markt"], 
-                    answer: "Im Shop 🛒 gibt es zwei Bereiche: Oben kaufst du Landerweiterungen mit Gems 💎, unten Samen und Deko mit Münzen 💰." 
-                },
-
-                // AUFGABEN
-                { 
-                    keys: ["aufgabe", "quest", "mission", "ziel"], 
-                    answer: "Klicke unten auf 'Aufgaben' (Checkbox). Du kannst eigene Aufgaben erstellen (z.B. 'Zimmer aufräumen') und dich selbst belohnen! ✅" 
-                },
-                { 
-                    keys: ["täglich", "wiederholen", "daily"], 
-                    answer: "Tägliche Aufgaben setzen sich jeden Tag um Mitternacht zurück. Perfekt für Routinen wie Zähneputzen oder Hausaufgaben! 📅" 
-                },
-
-                // COMMUNITY & LEVEL
-                { 
-                    keys: ["level", "aufsteigen", "erfahrung"], 
-                    answer: "Dein Level entspricht der Anzahl deiner freigeschalteten Gärten. Kaufe 'Hinterhof' oder 'Waldlichtung' mit Gems, um aufzusteigen! 🆙" 
-                },
-                { 
-                    keys: ["freund", "besuchen", "teilen", "code"], 
-                    answer: "Dein Raum-Code steht oben (z.B. X7Z9A). Gib ihn deinen Freunden, damit sie deinen Garten besuchen und liken können! ❤️" 
-                },
-                { 
-                    keys: ["community", "andere", "fremd"], 
-                    answer: "Gehe ins Hauptmenü und klicke auf 'Community', um die Gärten anderer Spieler zu sehen und Inspiration zu sammeln. 🌍" 
-                },
-                { 
-                    keys: ["liken", "herz", "gefällt mir"], 
-                    answer: "Wenn du als Besucher (Zuschauer) in einem Garten bist, kannst du oben rechts ein Herz ❤️ da lassen." 
-                },
-
-                // TECHNIK
-                { 
-                    keys: ["speichern", "save", "verloren"], 
-                    answer: "Das Spiel speichert automatisch in der Cloud! ☁️ Solange du eingeloggt bist, ist alles sicher." 
-                },
-                { 
-                    keys: ["app", "installieren", "handy"], 
-                    answer: "Auf dem Handy kannst du 'Zum Home-Bildschirm' wählen, dann sieht DuoBloom aus wie eine echte App! 📱" 
-                },
-                { 
-                    keys: ["streak", "feuer", "flamme"], 
-                    answer: "Komm jeden Tag vorbei, um deinen Streak 🔥 zu erhöhen! Wenn du einen Tag verpasst, fängt er wieder bei 0 an." 
-                }
+                { keys: ["hallo", "hi ", "hey", "moin", "guten tag", "servus"], answer: "Blub Blub! 👋 Schön dich zu sehen! Wie kann ich dir helfen? 🐙" },
+                { keys: ["wer bist du", "was bist du", "dein name"], answer: "Ich bin Octo, dein persönlicher Garten-Oktopus! 🐙 Ich helfe dir, dich hier zurechtzufinden." },
+                { keys: ["danke", "cool", "super", "nett"], answer: "Gerne doch! Immer fleißig weiter gärtnern! 🌱✨" },
+                { keys: ["gießen", "wasser", "trocken", "gießkanne"], answer: "Pflanzen haben Durst! 💧 Wenn über einer Pflanze ein blaues 'Gießen!' Schild steht, klicke darauf, damit sie weiter wächst." },
+                { keys: ["pflanzen", "samen", "säen", "anbauen"], answer: "Klicke im Menü unten auf 'Shop' (Einkaufswagen), kaufe Samen 🥕 und klicke dann auf ein leeres Feld im Garten, um sie zu pflanzen." },
+                { keys: ["ernten", "fertig", "groß"], answer: "Wenn eine Pflanze ausgewachsen ist (großes Bild), klicke sie an! Du bekommst Gems (Edelsteine) als Belohnung. 💎" },
+                { keys: ["entfernen", "löschen", "wegmachen", "abreißen"], answer: "Willst du etwas entfernen? Klicke einfach auf das Objekt. Wenn es Deko ist, kommt es ins Inventar. Pflanzen werden verkauft/gelöscht." },
+                { keys: ["boden", "stein", "holz", "weg"], answer: "Böden (Stein/Holz) kannst du im Shop kaufen. Wähle sie im Werkzeugkasten aus und klicke auf leere Felder, um Wege zu bauen. 🧱" },
+                { keys: ["zeit", "dauer", "wie lange"], answer: "Jede Pflanze braucht unterschiedlich lange. Wenn du sie gießt, musst du warten, bis sie wieder trocken ist (6 Stunden Cooldown). ⏳" },
+                { keys: ["münzen", "coins", "geld", "verdienen", "gold"], answer: "Münzen 💰 bekommst du durch das Erledigen von Aufgaben! Schau im Tab 'Aufgaben' nach." },
+                { keys: ["gems", "edelsteine", "diamanten", "kristalle"], answer: "Gems 💎 sind selten! Du bekommst sie, wenn du fertig gewachsene Pflanzen erntest. Damit kannst du neue Gartenteile kaufen." },
+                { keys: ["shop", "kaufen", "markt"], answer: "Im Shop 🛒 gibt es zwei Bereiche: Oben kaufst du Landerweiterungen mit Gems 💎, unten Samen und Deko mit Münzen 💰." },
+                { keys: ["aufgabe", "quest", "mission", "ziel"], answer: "Klicke unten auf 'Aufgaben' (Checkbox). Du kannst eigene Aufgaben erstellen (z.B. 'Zimmer aufräumen') und dich selbst belohnen! ✅" },
+                { keys: ["täglich", "wiederholen", "daily"], answer: "Tägliche Aufgaben setzen sich jeden Tag um Mitternacht zurück. Perfekt für Routinen wie Zähneputzen oder Hausaufgaben! 📅" },
+                { keys: ["level", "aufsteigen", "erfahrung"], answer: "Dein Level entspricht der Anzahl deiner freigeschalteten Gärten. Kaufe 'Hinterhof' oder 'Waldlichtung' mit Gems, um aufzusteigen! 🆙" },
+                { keys: ["freund", "besuchen", "teilen", "code"], answer: "Dein Raum-Code steht oben (z.B. X7Z9A). Gib ihn deinen Freunden, damit sie deinen Garten besuchen und liken können! ❤️" },
+                { keys: ["community", "andere", "fremd"], answer: "Gehe ins Hauptmenü und klicke auf 'Community', um die Gärten anderer Spieler zu sehen und Inspiration zu sammeln. 🌍" },
+                { keys: ["liken", "herz", "gefällt mir"], answer: "Wenn du als Besucher (Zuschauer) in einem Garten bist, kannst du oben rechts ein Herz ❤️ da lassen." },
+                { keys: ["speichern", "save", "verloren"], answer: "Das Spiel speichert automatisch in der Cloud! ☁️ Solange du eingeloggt bist, ist alles sicher." },
+                { keys: ["app", "installieren", "handy"], answer: "Auf dem Handy kannst du 'Zum Home-Bildschirm' wählen, dann sieht DuoBloom aus wie eine echte App! 📱" },
+                { keys: ["streak", "feuer", "flamme"], answer: "Komm jeden Tag vorbei, um deinen Streak 🔥 zu erhöhen! Wenn du einen Tag verpasst, fängt er wieder bei 0 an." }
             ];
 
             const OCTO_BRAIN = {
                 think: async function(inputText) {
-                    // 1. Text normalisieren (kleinschreiben)
                     const text = inputText.toLowerCase();
-
-                    // 2. Durch die Wissensdatenbank suchen
                     for (const entry of OCTO_KNOWLEDGE) {
-                        // Prüfen, ob eines der Schlüsselwörter im Text vorkommt
-                        const match = entry.keys.some(key => text.includes(key));
-                        if (match) {
-                            // Zufällige Verzögerung für "natürliches" Gefühl
+                        if (entry.keys.some(key => text.includes(key))) {
                             await new Promise(r => setTimeout(r, 600));
                             return entry.answer;
                         }
                     }
-
-                    // 3. Fallback, wenn nichts gefunden wurde
                     await new Promise(r => setTimeout(r, 600));
                     return "Blub? 🫧 Das habe ich nicht ganz verstanden. Frag mich nach 'Gießen', 'Münzen', 'Aufgaben' oder 'Freunden'! 🐙";
                 }
@@ -355,13 +273,10 @@
             const handleSend = async () => {
                 if(!input.trim()) return;
                 const userText = input;
-                
-                // UI sofort updaten
                 const newUiMsg = { role: 'user', text: userText };
                 setMessages(prev => [...prev, newUiMsg]);
                 setInput("");
                 setIsTyping(true);
-                
                 try {
                     const reply = await OCTO_BRAIN.think(userText);
                     setMessages(prev => [...prev, { role: 'model', text: reply }]);
@@ -374,33 +289,75 @@
 
             return (
                 <>
-                    <button onClick={() => setIsOpen(true)} className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 bg-white p-2 rounded-full shadow-xl border-4 border-purple-200 animate-bounce hover:scale-110 transition-transform">
-                        <img src={OCTO_IMG} className="w-10 h-10" alt="Octo" />
+                    {/* Floating Button */}
+                    <button onClick={() => setIsOpen(true)} className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 bg-white p-2 rounded-full shadow-xl border-4 border-purple-200 animate-bounce hover:scale-110 transition-transform group">
+                        <img src={OCTO_IMG} className="w-10 h-10 group-hover:rotate-12 transition-transform" alt="Octo" />
+                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">!</span>
                     </button>
+
+                    {/* Chat Window */}
                     {isOpen && (
                         <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
-                            <div className="bg-white w-full md:w-[380px] h-[70vh] md:h-[550px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4">
-                                <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md rounded-t-3xl">
-                                    <div className="flex items-center gap-2">
-                                        <div className="bg-white p-1 rounded-full"><img src={OCTO_IMG} className="w-6 h-6"/></div>
-                                        <h3 className="font-bold">Octo Helfer</h3>
+                            <div className="bg-white w-full md:w-[380px] h-[70vh] md:h-[550px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4 overflow-hidden">
+                                
+                                {/* Header */}
+                                <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-white/20 p-1.5 rounded-full backdrop-blur-sm">
+                                            <img src={OCTO_IMG} className="w-8 h-8 drop-shadow-sm"/>
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-sm md:text-base">Octo Helfer</h3>
+                                            <div className="text-[10px] text-purple-200 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span> Online</div>
+                                        </div>
                                     </div>
-                                    <button onClick={() => setIsOpen(false)} className="hover:bg-purple-500 p-1 rounded"><Icon name="x" /></button>
+                                    <button onClick={() => setIsOpen(false)} className="hover:bg-purple-500 p-2 rounded-full transition-colors"><Icon name="x" size={20}/></button>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
+
+                                {/* Messages Area */}
+                                <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4 scroll-smooth">
                                     {messages.map((m, i) => (
-                                        <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`p-3 rounded-2xl text-sm max-w-[85%] ${m.role === 'user' ? 'bg-purple-600 text-white rounded-br-none' : 'bg-white border text-gray-800 shadow-sm rounded-bl-none'}`}>
+                                        <div key={i} className={`flex w-full items-end gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            
+                                            {/* OCTO AVATAR (Links) */}
+                                            {m.role !== 'user' && (
+                                                <img src={OCTO_IMG} className="w-8 h-8 rounded-full bg-white border border-gray-200 p-1 mb-1 shadow-sm flex-shrink-0" alt="Octo" />
+                                            )}
+
+                                            {/* MESSAGE BUBBLE */}
+                                            <div className={`p-3 rounded-2xl text-sm max-w-[70%] shadow-sm leading-relaxed relative group ${
+                                                m.role === 'user' 
+                                                ? 'bg-purple-600 text-white rounded-br-none' 
+                                                : 'bg-white border text-gray-800 rounded-bl-none'
+                                            }`}>
                                                 {m.text}
                                             </div>
+
+                                            {/* USER AVATAR (Rechts) */}
+                                            {m.role === 'user' && (
+                                                <img src={user.photoURL} className="w-8 h-8 rounded-full border-2 border-purple-200 mb-1 shadow-sm flex-shrink-0" alt="Du" />
+                                            )}
                                         </div>
                                     ))}
-                                    {isTyping && <div className="text-xs text-gray-400 ml-4 animate-pulse flex items-center gap-1">Octo tippt <span className="animate-bounce">.</span><span className="animate-bounce delay-75">.</span><span className="animate-bounce delay-150">.</span></div>}
+                                    
+                                    {/* Typing Indicator */}
+                                    {isTyping && (
+                                        <div className="flex items-end gap-2">
+                                            <img src={OCTO_IMG} className="w-8 h-8 rounded-full bg-white border border-gray-200 p-1 mb-1 shadow-sm opacity-50" />
+                                            <div className="bg-gray-100 p-3 rounded-2xl rounded-bl-none text-gray-400 text-xs flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+                                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></span>
+                                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></span>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div ref={messagesEndRef} />
                                 </div>
-                                <div className="p-3 bg-white border-t flex gap-2 rounded-b-3xl">
-                                    <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Frag Octo etwas..." className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 ring-purple-200" />
-                                    <button onClick={handleSend} className="bg-purple-600 text-white p-3 rounded-xl hover:bg-purple-700 transition-colors"><Icon name="send" /></button>
+
+                                {/* Input Area */}
+                                <div className="p-3 bg-white border-t flex gap-2">
+                                    <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Frag etwas..." className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none focus:ring-2 ring-purple-500 transition-all text-sm" />
+                                    <button onClick={handleSend} disabled={!input.trim()} className="bg-purple-600 disabled:bg-gray-300 text-white p-3 rounded-xl hover:bg-purple-700 transition-colors shadow-lg active:scale-95 transform"><Icon name="send" size={20}/></button>
                                 </div>
                             </div>
                         </div>
@@ -408,7 +365,6 @@
                 </>
             );
         };
-
         
         // --- SCREENS ---
         const CommunityList = ({ onVisit, onBack }) => {
