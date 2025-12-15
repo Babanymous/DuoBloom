@@ -223,12 +223,13 @@
             );
         };
 
-        // --- OCTO CHAT (GEMINI EDITION) ---
 
+        // --- OCTO CHAT (ROBUST VERSION) ---
+        
         const OctoChat = ({ user, roomData }) => {
             const [isOpen, setIsOpen] = React.useState(false);
             const [messages, setMessages] = React.useState([
-                { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName.split(' ')[0]}! Ich bin dein Garten-Assistent. Frag mich etwas!` }
+                { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName.split(' ')[0]}! Ich bin Octo. Wie geht's deinem Garten?` }
             ]);
             const [input, setInput] = React.useState("");
             const [isTyping, setIsTyping] = React.useState(false);
@@ -238,43 +239,64 @@
             React.useEffect(() => { scrollToBottom(); }, [messages, isOpen, isTyping]);
 
             const OCTO_BRAIN = {
-                think: async function(inputText, history, ctx) {
-                    if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("HIER_EINFÜGEN")) return "Bitte API Key im Code eintragen.";
+                think: async function(inputText, currentHistory, ctx) {
+                    // API KEY CHECK
+                    if (!GEMINI_API_KEY) return "Fehler: Kein API Key gefunden.";
 
                     try {
-                        // Initialisiere Gemini
+                        // 1. Sicherer Import direkt für Browser
+                        const { GoogleGenerativeAI } = await import("https://esm.run/@google/generative-ai");
+                        
                         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
                         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-                        // System-Instruktion bauen
-                        const contextInfo = `
-                            Du bist Octo, ein freundlicher Oktopus im Spiel DuoBloom.
-                            Spieler: ${ctx.user.displayName}.
-                            Münzen: ${ctx.roomData?.coins || 0}.
-                            Antworte immer kurz (maximal 2-3 Sätze).
-                            Sei lustig und benutze Emojis wie 🐙, 🌊, 🌱.
-                            Sprich Deutsch.
-                        `;
+                        // 2. Historie bereinigen (WICHTIG!)
+                        // Gemini stürzt ab, wenn leere Nachrichten gesendet werden oder die Rollen nicht stimmen.
+                        // Wir bauen die History hier ganz strikt neu auf.
+                        const cleanHistory = currentHistory
+                            .filter(m => m.text && m.text.trim().length > 0) // Leere löschen
+                            .map(m => ({
+                                role: (m.role === 'model' || m.role === 'assistant') ? 'model' : 'user',
+                                parts: [{ text: m.text }]
+                            }));
 
-                        // Chat starten mit Verlauf
+                        // Die allerletzte User-Nachricht (inputText) darf NICHT in der History sein, 
+                        // die wird separat gesendet. Also entfernen wir sie, falls sie schon drin ist.
+                        // Da wir sie unten erst hinzufügen, nehmen wir hier einfach die cleanHistory.
+
+                        // System Prompt bauen
+                        const systemPrompt = `Du bist Octo, ein Oktopus im Spiel DuoBloom. 
+                        User: ${ctx.user.displayName}. Coins: ${ctx.roomData?.coins}.
+                        Sei lustig, nutze Emojis (🐙, 🌊). Antworte kurz.`;
+
                         const chat = model.startChat({
-                            history: history.map(m => ({
-                                role: m.role === 'assistant' || m.role === 'model' ? 'model' : 'user',
-                                parts: [{ text: m.text || m.content }] 
-                            })),
-                            generationConfig: {
-                                maxOutputTokens: 100,
-                            },
+                            history: cleanHistory, // Alte Nachrichten
+                            generationConfig: { maxOutputTokens: 150 }
                         });
 
-                        // Nachricht senden (System-Prompt schicken wir als ersten Kontext mit)
-                        const result = await chat.sendMessage(contextInfo + "\n\nUser Frage: " + inputText);
-                        const response = result.response;
+                        // 3. Nachricht senden (System Prompt + User Frage kombiniert für Stabilität)
+                        const fullMessage = `${systemPrompt}\n\nUser fragt: ${inputText}`;
+                        
+                        const result = await chat.sendMessage(fullMessage);
+                        const response = await result.response;
                         return response.text();
 
                     } catch (e) {
-                        console.error("Gemini Error:", e);
-                        return "Blub... mein Gehirn hat Schluckauf (API Fehler).";
+                        console.error("GEMINI FATAL ERROR:", e);
+                        
+                        // Hier entpacken wir das mysteriöse "h {}" Objekt
+                        let errorMsg = "Unbekannter Fehler";
+                        if (e.message) errorMsg = e.message;
+                        if (e.toString().includes("403")) errorMsg = "Zugriff verweigert (API Key Domain prüfen!)";
+                        if (e.toString().includes("400")) errorMsg = "Ungültige Anfrage (History Fehler)";
+                        
+                        // Versuche, das Fehlerobjekt zu lesen
+                        try {
+                            const jsonError = JSON.stringify(e, null, 2);
+                            console.log("Error Detail:", jsonError);
+                        } catch(jsonErr) {}
+
+                        return `Octo ist verwirrt: ${errorMsg}`;
                     }
                 }
             };
@@ -283,21 +305,21 @@
                 if(!input.trim()) return;
                 const userText = input;
                 
-                // Neue Nachricht hinzufügen
-                const newHistory = [...messages, { role: 'user', text: userText }];
-                setMessages(newHistory);
+                // Wir fügen die User-Nachricht erst der UI hinzu
+                const newUiMsg = { role: 'user', text: userText };
+                setMessages(prev => [...prev, newUiMsg]);
                 setInput("");
                 setIsTyping(true);
                 
                 try {
+                    // Wir geben dem Brain nur die ALTEN Nachrichten als History, 
+                    // die neue Nachricht (userText) wird als Trigger gesendet.
                     const ctx = { user, roomData };
-                    // Wir übergeben den Verlauf OHNE die allerneueste User-Nachricht an den Kontext-Generator, 
-                    // oder wir lassen Gemini den Verlauf managen. Hier einfach:
-                    const reply = await OCTO_BRAIN.think(userText, messages, ctx);
+                    const reply = await OCTO_BRAIN.think(userText, messages, ctx); // "messages" ist hier noch der alte Stand ohne userText
                     
                     setMessages(prev => [...prev, { role: 'model', text: reply }]);
                 } catch(e) {
-                    setMessages(prev => [...prev, { role: 'model', text: "Ups, Verbindungsfehler." }]);
+                    setMessages(prev => [...prev, { role: 'model', text: "Fehler beim Denken." }]);
                 } finally {
                     setIsTyping(false);
                 }
@@ -312,22 +334,22 @@
                         <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
                             <div className="bg-white w-full md:w-[380px] h-[70vh] md:h-[550px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4">
                                 <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
-                                    <h3 className="font-bold">Octo AI (Gemini)</h3>
+                                    <h3 className="font-bold">Octo AI</h3>
                                     <button onClick={() => setIsOpen(false)}><Icon name="x" /></button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
                                     {messages.map((m, i) => (
                                         <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`p-3 rounded-2xl text-sm max-w-[85%] ${m.role === 'user' ? 'bg-purple-600 text-white' : 'bg-white border'}`}>
-                                                {m.text || m.content}
+                                            <div className={`p-3 rounded-2xl text-sm max-w-[85%] ${m.role === 'user' ? 'bg-purple-600 text-white' : 'bg-white border text-gray-800 shadow-sm'}`}>
+                                                {m.text}
                                             </div>
                                         </div>
                                     ))}
-                                    {isTyping && <div className="text-xs text-gray-400 ml-4">Octo denkt nach... 🫧</div>}
+                                    {isTyping && <div className="text-xs text-gray-400 ml-4 animate-pulse">Octo denkt nach... 🫧</div>}
                                     <div ref={messagesEndRef} />
                                 </div>
                                 <div className="p-3 bg-white border-t flex gap-2">
-                                    <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Frag Octo..." className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none" />
+                                    <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Nachricht..." className="flex-1 bg-gray-100 rounded-xl px-4 py-3 outline-none" />
                                     <button onClick={handleSend} className="bg-purple-600 text-white p-3 rounded-xl"><Icon name="send" /></button>
                                 </div>
                             </div>
@@ -336,6 +358,7 @@
                 </>
             );
         };
+
 
 
         // --- SCREENS ---
