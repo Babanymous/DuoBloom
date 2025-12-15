@@ -243,11 +243,16 @@
                     if (!GEMINI_API_KEY) return "Fehler: Kein API Key.";
 
                     try {
-                        const { GoogleGenerativeAI } = await import("https://esm.run/@google/generative-ai");
+                        // FIX 1: Wir erzwingen die neueste Version der Library mit "@latest"
+                        const { GoogleGenerativeAI } = await import("https://esm.run/@google/generative-ai@latest");
+                        
                         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-                        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                        
+                        // FIX 2: Wir nutzen "gemini-pro" statt "flash". 
+                        // Das ist das stabilste Modell und vermeidet den 404 Fehler.
+                        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-                        // --- SCHRITT 1: History formatieren ---
+                        // History bereinigen & formatieren
                         let apiHistory = currentHistory
                             .filter(m => m.text && m.text.trim().length > 0)
                             .map(m => ({
@@ -255,26 +260,23 @@
                                 parts: [{ text: m.text }]
                             }));
 
-                        // --- SCHRITT 2 (DER FIX): Begrüßung entfernen ---
-                        // Wenn die erste Nachricht vom 'model' ist, löschen wir sie aus der API-Anfrage.
-                        // Google erlaubt keinen Start mit 'model'.
+                        // Fix für "First content should be user":
+                        // Wenn die erste Nachricht von 'model' ist -> weg damit.
                         if (apiHistory.length > 0 && apiHistory[0].role === 'model') {
                             apiHistory.shift(); 
                         }
 
-                        // --- SCHRITT 3: System Prompt ---
+                        // System Prompt
                         const systemPrompt = `Du bist Octo, ein Oktopus im Spiel DuoBloom. 
                         Spieler: ${ctx.user.displayName}. 
-                        Antworte kurz, lustig und mit Emojis (🐙, 🌱).`;
+                        Antworte immer kurz (max 2 Sätze), lustig und mit Emojis (🐙, 🌱).`;
 
-                        // Chat starten
                         const chat = model.startChat({
                             history: apiHistory,
-                            generationConfig: { maxOutputTokens: 150 }
                         });
 
-                        // Nachricht senden (System Prompt voranstellen, um Kontext zu sichern)
-                        const result = await chat.sendMessage(systemPrompt + "\n\nUser: " + inputText);
+                        // Nachricht senden
+                        const result = await chat.sendMessage(systemPrompt + " User fragt: " + inputText);
                         const response = await result.response;
                         return response.text();
 
@@ -284,6 +286,7 @@
                     }
                 }
             };
+
 
 
             const handleSend = async () => {
