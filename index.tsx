@@ -769,7 +769,7 @@ const GameScreen = ({ user, roomCode, roomData, onBack }) => {
                     return (
                         <button key={id} onClick={() => setSelectedItem(id)} className={`relative w-16 h-16 rounded-xl border-2 flex-shrink-0 flex items-center justify-center overflow-hidden ${selectedItem === id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'}`}>
                             <ItemDisplay item={it} className="w-10 h-10" />
-                            <span className="absolute bottom-0 right-1 text-xs font-bold text-slate-700 bg-white/80 px-1 rounded">{count}</span>
+                            <span className="absolute bottom-0 right-1 text-xs font-bold text-slate-700 bg-white/80 px-1 rounded">{count as number}</span>
                         </button>
                     );
                 })}
