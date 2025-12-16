@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, addDoc, arrayUnion, increment, deleteField, query, limit, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, addDoc, arrayUnion, increment, deleteField, query, limit, orderBy, collectionGroup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // CONFIG
@@ -231,15 +231,31 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
     const [creatingStep, setCreatingStep] = React.useState(false);
 
     React.useEffect(() => {
-        const q = query(collection(db, 'blackMarket'), orderBy('createdAt', 'desc'), limit(50));
+        // CHANGED: Use collectionGroup to find 'blackMarket' collections in ANY room
+        // Removed 'orderBy' to avoid index requirement error on initial load
+        const q = query(collectionGroup(db, 'blackMarket'), limit(50));
+        
         const unsub = onSnapshot(q, (snap) => {
-            const l = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const l = snap.docs.map(d => {
+                const data = d.data();
+                // Manually sort client side since we removed orderBy
+                return { id: d.id, ...data, path: d.ref.path }; // Store path for buying
+            }).sort((a,b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+            
             setListings(l);
         }, (error) => {
-            console.error("BlackMarket Snapshot Error:", error);
+            console.error("BlackMarket Snapshot Error (likely index missing):", error);
+            // Fallback: If collectionGroup fails (index error), try listing just CURRENT room's items
+            // This ensures at least the user sees their own/local items
+            try {
+                 const localQ = query(collection(db, 'rooms', roomCode, 'blackMarket'), limit(20));
+                 getDocs(localQ).then(sn => {
+                     setListings(sn.docs.map(d => ({id:d.id, ...d.data(), path: d.ref.path})));
+                 });
+            } catch(e){}
         });
         return () => unsub();
-    }, []);
+    }, [roomCode]);
 
     const handleCreateListing = async () => {
         try {
@@ -254,14 +270,15 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
 
             setCreatingStep(true);
 
-            // 1. Deduct Gems
+            // 1. Deduct Gems from CURRENT room
             const roomRef = doc(db, 'rooms', roomCode);
             await updateDoc(roomRef, {
                 gems: increment(-gemCost)
             });
 
-            // 2. Create Listing
-            await addDoc(collection(db, 'blackMarket'), {
+            // 2. Create Listing in CURRENT ROOM's subcollection
+            // CHANGED: Using subcollection 'rooms/{roomCode}/blackMarket' instead of root 'blackMarket'
+            await addDoc(collection(db, 'rooms', roomCode, 'blackMarket'), {
                 creatorId: user.uid,
                 creatorName: user.displayName || 'Unbekannt',
                 creatorRoom: roomCode,
@@ -285,7 +302,6 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
             alert("Angebot erfolgreich erstellt!");
         } catch(e: any) {
             console.error("Blackmarket Error:", e);
-            // Fehleranzeige für den Nutzer
             alert("Fehler: " + (e.message || e));
         } finally {
             setCreatingStep(false);
@@ -300,7 +316,7 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
         try {
             const revenue = Math.floor(listing.price * 0.6);
 
-            // 1. Buyer pays & gets Item definition
+            // 1. Buyer pays & gets Item definition (Local Update)
             await updateDoc(doc(db, 'rooms', roomCode), {
                 coins: increment(-listing.price),
                 [`inventory.${listing.id}`]: increment(1),
@@ -315,23 +331,35 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
                 }
             });
 
-            // 2. Update Supply
-            await updateDoc(doc(db, 'blackMarket', listing.id), {
-                supply: increment(-1)
-            });
+            // 2. Update Supply (Remote Update)
+            // CHANGED: Update the specific document in the seller's room subcollection
+            // Try/Catch block added because if rules are strict, this might fail.
+            try {
+                // Construct path to seller's item: rooms/{creatorRoom}/blackMarket/{listingId}
+                const sellerItemRef = doc(db, 'rooms', listing.creatorRoom, 'blackMarket', listing.id);
+                await updateDoc(sellerItemRef, {
+                    supply: increment(-1)
+                });
+            } catch(e) {
+                console.warn("Could not update seller supply (permission issue?), but item bought locally.");
+            }
 
-            // 3. Seller gets money (Best effort)
+            // 3. Seller gets money (Remote Update)
             try {
                 if (listing.creatorRoom) {
                     await updateDoc(doc(db, 'rooms', listing.creatorRoom), {
                         coins: increment(revenue)
                     });
                 }
-            } catch(e) { console.log("Verkäufer Raum nicht gefunden/aktiv", e); }
+            } catch(e) { 
+                console.warn("Verkäufer konnte nicht bezahlt werden (Permissions).", e); 
+            }
+            
+            alert("Gekauft!");
 
         } catch(e) {
             console.error(e);
-            alert("Kauf fehlgeschlagen.");
+            alert("Kauf fehlgeschlagen (Fehler beim Abbuchen).");
         }
     };
 
@@ -698,7 +726,7 @@ const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
                         <h3 className="font-bold text-xl text-purple-700 mb-4 flex items-center gap-2"><Icon name="castle"/> Immobilien (Gems)</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">{GARDEN_UPGRADES.filter(g => g.id > 0).map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); return <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}><div className="text-3xl mb-2">🏞️</div><div className="font-bold">{g.name}</div><button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>{owned ? 'Gekauft' : `${g.price} 💎`}</button></div> })}</div>
                         <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><Icon name="store"/> Markt (Münzen)</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(BASE_ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${(item as any).css ? (item as any).css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{(item as any).icon && !(item as any).img && <>{(item as any).icon as string}</>}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(BASE_ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${(item as any).css ? (item as any).css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{(item as any).icon && !(item as any).img && <>{String((item as any).icon)}</>}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
                     </div>
                 )}
                 
@@ -715,60 +743,92 @@ const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
     );
 };
 
-const LoginScreen = ({ onLogin }) => (
-    <div className="h-full flex flex-col items-center justify-center p-6 bg-gradient-to-b from-green-300 to-green-100 text-center">
-        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full animate-pop">
-            <div className="text-6xl mb-4">🌱</div>
-            <h1 className="text-3xl font-black text-green-700 mb-2">DuoBloom</h1>
-            <p className="text-gray-500 mb-8">Gemeinsam gärtnern, gemeinsam wachsen.</p>
-            <button onClick={onLogin} className="w-full bg-white border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 text-gray-700 font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all transform active:scale-95">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="G" />
-                Mit Google anmelden
-            </button>
-            <p className="text-xs text-gray-400 mt-6">Version 25.1 (Schwarzmarkt Fix)</p>
-        </div>
-    </div>
-);
-
 const App = () => {
-    const [user, setUser] = React.useState(null);
-    const [loading, setLoading] = React.useState(true);
-    const [view, setView] = React.useState('login'); 
-    const [currentRoom, setCurrentRoom] = React.useState(localStorage.getItem('lastRoom') || null);
+    const [user, setUser] = React.useState<any>(null);
+    const [view, setView] = React.useState("menu");
+    const [roomCode, setRoomCode] = React.useState("");
     const [isSpectator, setIsSpectator] = React.useState(false);
+    const [loading, setLoading] = React.useState(true);
 
     React.useEffect(() => {
         const unsub = onAuthStateChanged(auth, (u) => {
             setUser(u);
             setLoading(false);
-            if (u) setView('menu');
-            else setView('login');
         });
         return () => unsub();
     }, []);
 
-    const handleLogin = async () => { try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (e) { alert("Login fehlgeschlagen: " + e.message); } };
-    const handleMenuAction = async (action, payload, payload2) => {
-        if (action === 'community') setView('community');
-        else if (action === 'create') {
-            const newCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-            await setDoc(doc(db, 'rooms', newCode), { roomName: payload2 || "Mein Garten", owner: user.uid, ownerName: user.displayName, createdAt: new Date().toISOString(), users: [user.uid], tasks: [], inventory: { carrot_seed: 2 }, coins: 50, gems: 0, gardens: { 0: {} }, unlockedGardens: [0], likes: 0 });
-            enterRoom(newCode, false);
-        } else if (action === 'join' || action === 'resume') { const snap = await getDoc(doc(db, 'rooms', payload)); if (snap.exists()) enterRoom(payload, false); else alert("Garten nicht gefunden!"); }
+    const handleAction = async (action: string, code?: string, payload?: any) => {
+        if (action === 'community') {
+            setView('community');
+        } else if (action === 'create') {
+            if (!user) return;
+            const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            try {
+                await setDoc(doc(db, 'rooms', newRoomId), {
+                    creatorId: user.uid,
+                    roomName: payload || "Unbenannter Garten",
+                    coins: 100,
+                    gems: 0,
+                    unlockedGardens: [0],
+                    inventory: {},
+                    gardens: { 0: {} },
+                    tasks: [],
+                    createdAt: new Date().toISOString(),
+                    likes: 0,
+                    lastStreakDate: null,
+                    currentStreak: 0,
+                    customDefinitions: {}
+                });
+                setRoomCode(newRoomId);
+                setIsSpectator(false);
+                setView('game');
+                localStorage.setItem('lastRoom', newRoomId);
+            } catch (e) {
+                console.error("Create Error", e);
+                alert("Fehler beim Erstellen.");
+            }
+        } else if (action === 'join' || action === 'resume') {
+            const targetCode = code || payload;
+            if (!targetCode) return;
+            const snap = await getDoc(doc(db, 'rooms', targetCode));
+            if (snap.exists()) {
+                setRoomCode(targetCode);
+                setIsSpectator(false);
+                setView('game');
+                localStorage.setItem('lastRoom', targetCode);
+            } else {
+                alert("Garten nicht gefunden!");
+            }
+        }
     };
-    const enterRoom = (code, spectator) => { if (!spectator) localStorage.setItem('lastRoom', code); setCurrentRoom(code); setIsSpectator(spectator); setView('game'); };
-    const handleBackToMenu = () => { if (isSpectator) { const myLastRoom = localStorage.getItem('lastRoom'); setCurrentRoom(myLastRoom); setIsSpectator(false); } setView('menu'); };
 
-    if (loading) return <div className="h-full flex items-center justify-center bg-slate-50 text-green-600 animate-pulse"><Icon name="loader-2" className="animate-spin mr-2"/> Lade DuoBloom...</div>;
-    if (!user) return <LoginScreen onLogin={handleLogin} />;
+    const handleVisit = (id: string) => {
+        setRoomCode(id);
+        setIsSpectator(true);
+        setView('game');
+    };
 
-    return (
-        <ErrorBoundary roomCode={currentRoom}>
-            {view === 'menu' && <MainMenu user={user} currentRoom={currentRoom} onAction={handleMenuAction} />}
-            {view === 'community' && <CommunityList onVisit={(id) => enterRoom(id, true)} onBack={() => setView('menu')} />}
-            {view === 'game' && <GameApp user={user} roomCode={currentRoom} isSpectator={isSpectator} onBackToMenu={handleBackToMenu} />}
-        </ErrorBoundary>
-    );
+    if (loading) return <div className="h-full flex items-center justify-center">Laden...</div>;
+
+    if (!user) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center bg-slate-50 p-4">
+                <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center gap-6 max-w-sm w-full text-center">
+                    <div className="text-6xl animate-bounce">🌻</div>
+                    <h1 className="text-3xl font-black text-slate-800">DuoBloom</h1>
+                    <button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="w-full bg-slate-900 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-black transition-all">
+                         Google Anmeldung
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (view === 'game') return <GameApp user={user} roomCode={roomCode} isSpectator={isSpectator} onBackToMenu={() => setView('menu')} />;
+    if (view === 'community') return <CommunityList onVisit={handleVisit} onBack={() => setView('menu')} />;
+
+    return <MainMenu user={user} onAction={handleAction} currentRoom={localStorage.getItem('lastRoom')} />;
 };
 
 const root = createRoot(document.getElementById('root'));
