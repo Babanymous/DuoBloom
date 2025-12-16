@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, addDoc, arrayUnion, increment, deleteField, query, limit, orderBy, collectionGroup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { GoogleGenAI } from "@google/genai";
 
 // CONFIG
 const firebaseConfig = {
@@ -153,12 +154,13 @@ const Modal = ({ children, onClose, title }: { children: React.ReactNode, onClos
 const OctoChat = ({ user, roomData }) => {
     const [isOpen, setIsOpen] = React.useState(false);
     const [messages, setMessages] = React.useState([
-        { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo.` }
+        { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo, dein Garten-Assistent. Ich kann jetzt deinen ganzen Garten sehen!` }
     ]);
     const [input, setInput] = React.useState("");
     const [isTyping, setIsTyping] = React.useState(false);
     const messagesEndRef = React.useRef(null);
     
+    // Fallback Wissen für den Fall, dass keine API verfügbar ist
     const OCTO_KNOWLEDGE = [
         { keys: ["schwarzmarkt", "black market", "illegal"], answer: "Psst! 🤫 Auf dem Schwarzmarkt kannst du eigene Pflanzen verkaufen. Aber Vorsicht: Die Teilnahme kostet Gems!" },
         { keys: ["hallo", "hi ", "hey", "moin"], answer: "Blub Blub! 👋 Schön dich zu sehen! Wie laufen die Geschäfte im Garten? 🐙" },
@@ -175,13 +177,69 @@ const OctoChat = ({ user, roomData }) => {
         setMessages(p => [...p, { role: 'user', text: userText }]);
         setInput("");
         setIsTyping(true);
-        setTimeout(() => {
-            const t = userText.toLowerCase();
-            const hit = OCTO_KNOWLEDGE.find(k => k.keys.some(key => t.includes(key)));
-            const reply = hit ? hit.answer : "Blub? 🫧 Das verstehe ich nicht ganz. Frag mich nach 'Schwarzmarkt', 'Gießen' oder 'Gems'! 🐙";
-            setMessages(p => [...p, { role: 'model', text: reply }]);
+
+        try {
+            // 1. Kontext sammeln (Daten für die KI)
+            const inventoryItems = Object.entries(roomData.inventory || {})
+                .filter(([_, count]) => (count as number) > 0)
+                .map(([id, count]) => `${count}x ${id.replace('_seed', '').replace('_', ' ')}`)
+                .join(', ') || "Leer";
+
+            const plantedCount = Object.values(roomData.gardens || {}).reduce((acc: number, garden: any) => {
+                return acc + Object.values(garden).filter((cell: any) => cell.item).length;
+            }, 0);
+
+            const contextData = {
+                playerName: user.displayName,
+                gardenName: roomData.roomName,
+                coins: roomData.coins,
+                gems: roomData.gems,
+                streak: roomData.currentStreak,
+                inventory: inventoryItems,
+                plantedPlants: plantedCount,
+                unlockedAreas: roomData.unlockedGardens?.length || 1,
+                lastLogin: new Date().toLocaleTimeString()
+            };
+
+            // 2. Gemini API aufrufen
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: userText,
+                config: {
+                    systemInstruction: `Du bist Octo, ein fröhlicher, intelligenter Oktopus-Gärtner 🐙. 
+                    Du hilfst dem Spieler in der App 'DuoBloom'.
+                    Sprich Deutsch. Sei kurz, prägnant und lustig (nutze Emojis wie 🐙, 🌿, 💧).
+                    
+                    AKTUELLE SPIELER-DATEN:
+                    ${JSON.stringify(contextData, null, 2)}
+                    
+                    REGELN & TIPPS:
+                    - Pflanzen wachsen nur, wenn man sie alle 6h gießt.
+                    - Gems (💎) sind selten. Man kriegt sie selten beim Ernten oder durch Aufgaben.
+                    - Münzen (💰) braucht man für Seeds im Shop.
+                    - Schwarzmarkt: Man kann für 50 Gems eigene Pflanzen erstellen.
+                    
+                    Wenn der Spieler fragt "Was soll ich tun?", schau auf sein Inventar oder Münzen und gib einen passenden Tipp.
+                    Wenn er fragt "Wie viel Geld habe ich?", antworte basierend auf den Daten.
+                    `
+                }
+            });
+
+            setMessages(p => [...p, { role: 'model', text: response.text }]);
+
+        } catch (e) {
+            console.warn("AI Error, falling back to local logic", e);
+            // Fallback auf die alte Logik, falls API failt
+            setTimeout(() => {
+                const t = userText.toLowerCase();
+                const hit = OCTO_KNOWLEDGE.find(k => k.keys.some(key => t.includes(key)));
+                const reply = hit ? hit.answer : "Blub? 🫧 Das Wasser ist heute trüb (Verbindungsproblem). Aber ich bin sicher, du machst das toll! 🐙";
+                setMessages(p => [...p, { role: 'model', text: reply }]);
+            }, 800);
+        } finally {
             setIsTyping(false);
-        }, 800);
+        }
     };
 
     React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
@@ -195,19 +253,19 @@ const OctoChat = ({ user, roomData }) => {
                 <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
                     <div className="bg-white w-full md:w-[380px] h-[60vh] md:h-[500px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4 overflow-hidden">
                         <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
-                            <div className="flex items-center gap-3"><img src={OCTO_IMG} className="w-8 h-8"/> <span className="font-bold">Octo Helfer</span></div>
+                            <div className="flex items-center gap-3"><img src={OCTO_IMG} className="w-8 h-8"/> <span className="font-bold">Octo AI</span></div>
                             <button onClick={() => setIsOpen(false)}><Icon name="x" size={20}/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
                             {messages.map((m, i) => (
                                 <div key={i} className={`p-3 rounded-2xl text-sm max-w-[80%] ${m.role === 'user' ? 'bg-purple-600 text-white ml-auto rounded-br-none' : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'}`}>{m.text}</div>
                             ))}
-                            {isTyping && <div className="text-gray-400 text-xs ml-2">Octo tippt...</div>}
+                            {isTyping && <div className="text-gray-400 text-xs ml-2">Octo denkt nach... 🫧</div>}
                             <div ref={messagesEndRef} />
                         </div>
                         <div className="p-3 bg-white border-t flex gap-2">
                             <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Frag Octo..." className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none" />
-                            <button onClick={handleSend} className="bg-purple-600 text-white p-2 rounded-xl"><Icon name="send" size={20}/></button>
+                            <button onClick={handleSend} disabled={isTyping} className="bg-purple-600 text-white p-2 rounded-xl disabled:bg-gray-300"><Icon name="send" size={20}/></button>
                         </div>
                     </div>
                 </div>
