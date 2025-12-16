@@ -235,34 +235,40 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
         const unsub = onSnapshot(q, (snap) => {
             const l = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             setListings(l);
+        }, (error) => {
+            console.error("BlackMarket Snapshot Error:", error);
         });
         return () => unsub();
     }, []);
 
     const handleCreateListing = async () => {
-        const supplyVal = parseInt(newSupply as any) || 1;
-        const gemCost = supplyVal * 50;
-        
-        if (!roomData) return alert("Fehler: Keine Raumdaten.");
-        if ((roomData.gems || 0) < gemCost) return alert(`Nicht genug Gems! Du brauchst ${gemCost} Gems.`);
-        if (!newName.trim()) return alert("Name fehlt!");
-
-        setCreatingStep(true);
         try {
-            // 1. Deduct Gems safely
-            await updateDoc(doc(db, 'rooms', roomCode), {
+            const supplyVal = Math.max(1, parseInt(String(newSupply), 10) || 1);
+            const gemCost = supplyVal * 50;
+            const priceVal = Math.max(0, parseInt(String(newPrice), 10) || 0);
+            const stagesVal = Math.max(1, parseInt(String(newStages), 10) || 1);
+            
+            if (!roomData) throw new Error("Keine Raumdaten geladen.");
+            if ((roomData.gems || 0) < gemCost) throw new Error(`Nicht genug Gems! Du hast ${roomData.gems}, brauchst ${gemCost}.`);
+            if (!newName.trim()) throw new Error("Bitte einen Namen eingeben.");
+
+            setCreatingStep(true);
+
+            // 1. Deduct Gems
+            const roomRef = doc(db, 'rooms', roomCode);
+            await updateDoc(roomRef, {
                 gems: increment(-gemCost)
             });
 
             // 2. Create Listing
             await addDoc(collection(db, 'blackMarket'), {
                 creatorId: user.uid,
-                creatorName: user.displayName || 'Anonym',
+                creatorName: user.displayName || 'Unbekannt',
                 creatorRoom: roomCode,
-                name: newName,
-                icon: newIcon || '📦',
-                stages: parseInt(newStages as any) || 3,
-                price: parseInt(newPrice as any) || 100,
+                name: newName.trim(),
+                icon: newIcon.trim() || '📦',
+                stages: stagesVal,
+                price: priceVal,
                 supply: supplyVal,
                 maxSupply: supplyVal,
                 createdAt: new Date().toISOString(),
@@ -272,10 +278,15 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
             });
 
             setIsCreating(false);
-            setNewName(""); setNewPrice(100); setNewSupply(5);
-        } catch(e) {
+            setNewName(""); 
+            setNewPrice(100); 
+            setNewSupply(5);
+            setNewIcon("🌿");
+            alert("Angebot erfolgreich erstellt!");
+        } catch(e: any) {
             console.error("Blackmarket Error:", e);
-            alert("Fehler beim Erstellen. Bitte versuche es erneut.");
+            // Fehleranzeige für den Nutzer
+            alert("Fehler: " + (e.message || e));
         } finally {
             setCreatingStep(false);
         }
@@ -379,23 +390,23 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase">Preis (Münzen)</label>
-                                <input type="number" value={newPrice} onChange={e => setNewPrice(parseInt(e.target.value)||0)} className="w-full border-2 border-slate-200 rounded-xl p-2 outline-none focus:border-slate-800" />
+                                <input type="number" value={newPrice} onChange={e => setNewPrice(parseInt(e.target.value) || 0)} className="w-full border-2 border-slate-200 rounded-xl p-2 outline-none focus:border-slate-800" />
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-gray-500 uppercase">Phasen</label>
-                                <input type="number" min="1" max="10" value={newStages} onChange={e => setNewStages(parseInt(e.target.value)||1)} className="w-full border-2 border-slate-200 rounded-xl p-2 outline-none focus:border-slate-800" />
+                                <input type="number" min="1" max="10" value={newStages} onChange={e => setNewStages(parseInt(e.target.value) || 1)} className="w-full border-2 border-slate-200 rounded-xl p-2 outline-none focus:border-slate-800" />
                             </div>
                         </div>
                         <div>
                             <label className="text-xs font-bold text-gray-500 uppercase">Verkaufsmenge (Supply)</label>
-                            <input type="range" min="1" max="20" value={newSupply} onChange={e => setNewSupply(parseInt(e.target.value)||1)} className="w-full accent-slate-800" />
+                            <input type="range" min="1" max="20" value={newSupply} onChange={e => setNewSupply(parseInt(e.target.value) || 1)} className="w-full accent-slate-800" />
                             <div className="flex justify-between text-sm mt-1">
                                 <span>{newSupply} Stück</span>
                                 <span className="font-bold text-purple-600">Kosten: {newSupply * 50} 💎</span>
                             </div>
                         </div>
                         <div className="bg-yellow-50 p-3 rounded-xl text-xs text-yellow-800 border border-yellow-200">
-                            Du erhältst <strong>{Math.floor((parseInt(newPrice as any)||0) * 0.6)} Münzen</strong> pro Verkauf.
+                            Du erhältst <strong>{Math.floor((parseInt(String(newPrice))||0) * 0.6)} Münzen</strong> pro Verkauf.
                         </div>
                         <button onClick={handleCreateListing} disabled={creatingStep || roomData.gems < (newSupply * 50)} className="w-full bg-slate-800 disabled:bg-slate-300 text-white font-bold py-3 rounded-xl hover:bg-black transition-colors">
                             {creatingStep ? 'Wird geschmuggelt...' : `Angebot erstellen (-${newSupply * 50} 💎)`}
@@ -687,7 +698,7 @@ const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
                         <h3 className="font-bold text-xl text-purple-700 mb-4 flex items-center gap-2"><Icon name="castle"/> Immobilien (Gems)</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">{GARDEN_UPGRADES.filter(g => g.id > 0).map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); return <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}><div className="text-3xl mb-2">🏞️</div><div className="font-bold">{g.name}</div><button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>{owned ? 'Gekauft' : `${g.price} 💎`}</button></div> })}</div>
                         <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><Icon name="store"/> Markt (Münzen)</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(BASE_ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${(item as any).css ? (item as any).css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{(item as any).icon && !(item as any).img && <>{(item as any).icon}</>}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(BASE_ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${(item as any).css ? (item as any).css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{(item as any).icon && !(item as any).img && <>{(item as any).icon as string}</>}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
                     </div>
                 )}
                 
