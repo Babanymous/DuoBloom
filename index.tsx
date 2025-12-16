@@ -68,7 +68,7 @@ const ItemDisplay = ({ item, className = "" }) => {
     if (item.img && !hasError) {
         return <img src={item.img} alt={item.name} className={`${className} object-contain drop-shadow-md`} onError={() => setHasError(true)} />;
     }
-    return <span className={`flex items-center justify-center ${className} text-2xl`}>{item.icon || "•"}</span>;
+    return <span className={`flex items-center justify-center ${className} text-2xl`}>{String(item.icon || "•")}</span>;
 };
 
 const getStreakStyle = (streak) => {
@@ -219,7 +219,7 @@ const OctoChat = ({ user, roomData }) => {
 // --- BLACK MARKET COMPONENT ---
 
 const BlackMarket = ({ roomData, roomCode, user }) => {
-    const [listings, setListings] = React.useState([]);
+    const [listings, setListings] = React.useState<any[]>([]);
     const [isCreating, setIsCreating] = React.useState(false);
     
     // New Item Form State
@@ -229,24 +229,23 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
     const [newPrice, setNewPrice] = React.useState(100);
     const [newSupply, setNewSupply] = React.useState(5);
     const [creatingStep, setCreatingStep] = React.useState(false);
+    const [permissionError, setPermissionError] = React.useState(false);
 
     React.useEffect(() => {
-        // CHANGED: Use collectionGroup to find 'blackMarket' collections in ANY room
-        // Removed 'orderBy' to avoid index requirement error on initial load
+        setPermissionError(false);
         const q = query(collectionGroup(db, 'blackMarket'), limit(50));
         
         const unsub = onSnapshot(q, (snap) => {
             const l = snap.docs.map(d => {
                 const data = d.data();
-                // Manually sort client side since we removed orderBy
-                return { id: d.id, ...data, path: d.ref.path }; // Store path for buying
+                return { id: d.id, ...data, path: d.ref.path }; 
             }).sort((a,b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
             
             setListings(l);
         }, (error) => {
-            console.error("BlackMarket Snapshot Error (likely index missing):", error);
-            // Fallback: If collectionGroup fails (index error), try listing just CURRENT room's items
-            // This ensures at least the user sees their own/local items
+            console.error("BlackMarket Snapshot Error:", error);
+            if(error.code === 'permission-denied') setPermissionError(true);
+            
             try {
                  const localQ = query(collection(db, 'rooms', roomCode, 'blackMarket'), limit(20));
                  getDocs(localQ).then(sn => {
@@ -259,6 +258,7 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
 
     const handleCreateListing = async () => {
         try {
+            setPermissionError(false);
             const supplyVal = Math.max(1, parseInt(String(newSupply), 10) || 1);
             const gemCost = supplyVal * 50;
             const priceVal = Math.max(0, parseInt(String(newPrice), 10) || 0);
@@ -277,7 +277,6 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
             });
 
             // 2. Create Listing in CURRENT ROOM's subcollection
-            // CHANGED: Using subcollection 'rooms/{roomCode}/blackMarket' instead of root 'blackMarket'
             await addDoc(collection(db, 'rooms', roomCode, 'blackMarket'), {
                 creatorId: user.uid,
                 creatorName: user.displayName || 'Unbekannt',
@@ -302,7 +301,11 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
             alert("Angebot erfolgreich erstellt!");
         } catch(e: any) {
             console.error("Blackmarket Error:", e);
-            alert("Fehler: " + (e.message || e));
+            if (e.code === 'permission-denied') {
+                setPermissionError(true);
+            } else {
+                alert("Fehler: " + (e.message || e));
+            }
         } finally {
             setCreatingStep(false);
         }
@@ -316,7 +319,6 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
         try {
             const revenue = Math.floor(listing.price * 0.6);
 
-            // 1. Buyer pays & gets Item definition (Local Update)
             await updateDoc(doc(db, 'rooms', roomCode), {
                 coins: increment(-listing.price),
                 [`inventory.${listing.id}`]: increment(1),
@@ -331,37 +333,59 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
                 }
             });
 
-            // 2. Update Supply (Remote Update)
-            // CHANGED: Update the specific document in the seller's room subcollection
-            // Try/Catch block added because if rules are strict, this might fail.
             try {
-                // Construct path to seller's item: rooms/{creatorRoom}/blackMarket/{listingId}
                 const sellerItemRef = doc(db, 'rooms', listing.creatorRoom, 'blackMarket', listing.id);
                 await updateDoc(sellerItemRef, {
                     supply: increment(-1)
                 });
-            } catch(e) {
-                console.warn("Could not update seller supply (permission issue?), but item bought locally.");
+            } catch(e: any) {
+                console.warn("Update seller failed:", e);
+                if(e.code === 'permission-denied') {
+                    setPermissionError(true);
+                    return; // Stop here if permissions are broken
+                }
             }
 
-            // 3. Seller gets money (Remote Update)
             try {
                 if (listing.creatorRoom) {
                     await updateDoc(doc(db, 'rooms', listing.creatorRoom), {
                         coins: increment(revenue)
                     });
                 }
-            } catch(e) { 
-                console.warn("Verkäufer konnte nicht bezahlt werden (Permissions).", e); 
-            }
+            } catch(e) { console.warn("Seller payment failed", e); }
             
             alert("Gekauft!");
 
         } catch(e) {
             console.error(e);
-            alert("Kauf fehlgeschlagen (Fehler beim Abbuchen).");
+            alert("Kauf fehlgeschlagen.");
         }
     };
+
+    if (permissionError) {
+        return (
+            <div className="p-6 bg-red-50 border-2 border-red-200 rounded-3xl m-4 animate-pop">
+                <h3 className="text-red-600 font-bold text-lg mb-2 flex items-center gap-2"><Icon name="alert-triangle"/> Firebase Regeln aktualisieren</h3>
+                <p className="text-sm text-red-800 mb-4">
+                    Deine Datenbank erlaubt diese Aktion nicht. Um den Schwarzmarkt zu nutzen, musst du die Sicherheitsregeln anpassen.
+                </p>
+                <div className="bg-white p-3 rounded-xl border border-red-100 font-mono text-xs overflow-x-auto mb-4 text-gray-600">
+                    <pre>{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}`}</pre>
+                </div>
+                <div className="text-xs text-gray-500 mb-4">
+                    Geh zur <strong>Firebase Console</strong> &rarr; <strong>Firestore</strong> &rarr; <strong>Regeln</strong> und füge diesen Code ein.
+                </div>
+                <button onClick={() => setPermissionError(false)} className="bg-red-600 text-white font-bold py-2 px-4 rounded-xl w-full hover:bg-red-700">Verstanden</button>
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 md:max-w-4xl md:mx-auto pb-32">
@@ -695,7 +719,7 @@ const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
                                 {Array.from({ length: 25 }).map((_, i) => ( <GridCell key={i} x={i%5} y={Math.floor(i/5)} cell={(getGardens()[activeGardenIdx] || {})[`${i%5},${Math.floor(i/5)}`] || {}} handleGridClick={handleGridClick} now={now} items={items} /> ))}
                             </div>
                         </div>
-                        {!isSpectator && <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100"><h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3><div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">{Object.entries(getInventory()).map(([id, count]) => { if ((count as number) <= 0) return null; return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><ItemDisplay item={items[id] || {name:'?', icon:'❓'}} className="w-8 h-8" /><span className="text-xs font-bold text-gray-600">{count}x</span></button> })}</div></div>}
+                        {!isSpectator && <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100"><h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3><div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">{Object.entries(getInventory()).map(([id, count]) => { if ((count as number) <= 0) return null; return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><ItemDisplay item={items[id] || {name:'?', icon:'❓'}} className="w-8 h-8" /><span className="text-xs font-bold text-gray-600">{String(count)}x</span></button> })}</div></div>}
                     </div>
                 )}
 
@@ -726,7 +750,7 @@ const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
                         <h3 className="font-bold text-xl text-purple-700 mb-4 flex items-center gap-2"><Icon name="castle"/> Immobilien (Gems)</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">{GARDEN_UPGRADES.filter(g => g.id > 0).map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); return <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}><div className="text-3xl mb-2">🏞️</div><div className="font-bold">{g.name}</div><button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>{owned ? 'Gekauft' : `${g.price} 💎`}</button></div> })}</div>
                         <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><Icon name="store"/> Markt (Münzen)</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(BASE_ITEMS).map(item => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${(item as any).css ? (item as any).css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{(item as any).icon && !(item as any).img && <>{String((item as any).icon)}</>}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(BASE_ITEMS).map((item: any) => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{item.icon && !item.img && <>{String(item.icon)}</>}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
                     </div>
                 )}
                 
