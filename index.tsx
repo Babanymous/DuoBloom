@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, addDoc, arrayUnion, increment, deleteField, query, limit, orderBy, collectionGroup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { GoogleGenAI } from "@google/genai";
 
 // CONFIG
 const firebaseConfig = {
@@ -154,13 +153,12 @@ const Modal = ({ children, onClose, title }: { children: React.ReactNode, onClos
 const OctoChat = ({ user, roomData }) => {
     const [isOpen, setIsOpen] = React.useState(false);
     const [messages, setMessages] = React.useState([
-        { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo, dein Garten-Assistent.` }
+        { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo.` }
     ]);
     const [input, setInput] = React.useState("");
     const [isTyping, setIsTyping] = React.useState(false);
     const messagesEndRef = React.useRef(null);
     
-    // Fallback Wissen für den Fall, dass keine API verfügbar ist
     const OCTO_KNOWLEDGE = [
         { keys: ["schwarzmarkt", "black market", "illegal"], answer: "Psst! 🤫 Auf dem Schwarzmarkt kannst du eigene Pflanzen verkaufen. Aber Vorsicht: Die Teilnahme kostet Gems!" },
         { keys: ["hallo", "hi ", "hey", "moin"], answer: "Blub Blub! 👋 Schön dich zu sehen! Wie laufen die Geschäfte im Garten? 🐙" },
@@ -177,72 +175,13 @@ const OctoChat = ({ user, roomData }) => {
         setMessages(p => [...p, { role: 'user', text: userText }]);
         setInput("");
         setIsTyping(true);
-
-        try {
-            // Check if process/API key is available before trying to use SDK
-            if (!process?.env?.API_KEY) throw new Error("Kein API Key");
-
-            // 1. Kontext sammeln (Daten für die KI)
-            const inventoryItems = Object.entries(roomData.inventory || {})
-                .filter(([_, count]) => (count as number) > 0)
-                .map(([id, count]) => `${count}x ${id.replace('_seed', '').replace('_', ' ')}`)
-                .join(', ') || "Leer";
-
-            const plantedCount = Object.values(roomData.gardens || {}).reduce((acc: number, garden: any) => {
-                return acc + Object.values(garden).filter((cell: any) => cell.item).length;
-            }, 0);
-
-            const contextData = {
-                playerName: user.displayName,
-                gardenName: roomData.roomName,
-                coins: roomData.coins,
-                gems: roomData.gems,
-                streak: roomData.currentStreak,
-                inventory: inventoryItems,
-                plantedPlants: plantedCount,
-                unlockedAreas: roomData.unlockedGardens?.length || 1,
-                lastLogin: new Date().toLocaleTimeString()
-            };
-
-            // 2. Gemini API aufrufen
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: userText,
-                config: {
-                    systemInstruction: `Du bist Octo, ein fröhlicher, intelligenter Oktopus-Gärtner 🐙. 
-                    Du hilfst dem Spieler in der App 'DuoBloom'.
-                    Sprich Deutsch. Sei kurz, prägnant und lustig (nutze Emojis wie 🐙, 🌿, 💧).
-                    
-                    AKTUELLE SPIELER-DATEN:
-                    ${JSON.stringify(contextData, null, 2)}
-                    
-                    REGELN & TIPPS:
-                    - Pflanzen wachsen nur, wenn man sie alle 6h gießt.
-                    - Gems (💎) sind selten. Man kriegt sie selten beim Ernten oder durch Aufgaben.
-                    - Münzen (💰) braucht man für Seeds im Shop.
-                    - Schwarzmarkt: Man kann für 50 Gems eigene Pflanzen erstellen.
-                    
-                    Wenn der Spieler fragt "Was soll ich tun?", schau auf sein Inventar oder Münzen und gib einen passenden Tipp.
-                    Wenn er fragt "Wie viel Geld habe ich?", antworte basierend auf den Daten.
-                    `
-                }
-            });
-
-            setMessages(p => [...p, { role: 'model', text: response.text }]);
-
-        } catch (e) {
-            console.warn("AI Error, falling back to local logic", e);
-            // Fallback auf die alte Logik, falls API failt
-            setTimeout(() => {
-                const t = userText.toLowerCase();
-                const hit = OCTO_KNOWLEDGE.find(k => k.keys.some(key => t.includes(key)));
-                const reply = hit ? hit.answer : "Blub? 🫧 Das Wasser ist heute trüb (Verbindungsproblem). Aber ich bin sicher, du machst das toll! 🐙";
-                setMessages(p => [...p, { role: 'model', text: reply }]);
-            }, 800);
-        } finally {
+        setTimeout(() => {
+            const t = userText.toLowerCase();
+            const hit = OCTO_KNOWLEDGE.find(k => k.keys.some(key => t.includes(key)));
+            const reply = hit ? hit.answer : "Blub? 🫧 Das verstehe ich nicht ganz. Frag mich nach 'Schwarzmarkt', 'Gießen' oder 'Gems'! 🐙";
+            setMessages(p => [...p, { role: 'model', text: reply }]);
             setIsTyping(false);
-        }
+        }, 800);
     };
 
     React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
@@ -256,19 +195,19 @@ const OctoChat = ({ user, roomData }) => {
                 <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
                     <div className="bg-white w-full md:w-[380px] h-[60vh] md:h-[500px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4 overflow-hidden">
                         <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
-                            <div className="flex items-center gap-3"><img src={OCTO_IMG} className="w-8 h-8"/> <span className="font-bold">Octo AI</span></div>
+                            <div className="flex items-center gap-3"><img src={OCTO_IMG} className="w-8 h-8"/> <span className="font-bold">Octo Helfer</span></div>
                             <button onClick={() => setIsOpen(false)}><Icon name="x" size={20}/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
                             {messages.map((m, i) => (
                                 <div key={i} className={`p-3 rounded-2xl text-sm max-w-[80%] ${m.role === 'user' ? 'bg-purple-600 text-white ml-auto rounded-br-none' : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'}`}>{m.text}</div>
                             ))}
-                            {isTyping && <div className="text-gray-400 text-xs ml-2">Octo denkt nach... 🫧</div>}
+                            {isTyping && <div className="text-gray-400 text-xs ml-2">Octo tippt...</div>}
                             <div ref={messagesEndRef} />
                         </div>
                         <div className="p-3 bg-white border-t flex gap-2">
                             <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Frag Octo..." className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none" />
-                            <button onClick={handleSend} disabled={isTyping} className="bg-purple-600 text-white p-2 rounded-xl disabled:bg-gray-300"><Icon name="send" size={20}/></button>
+                            <button onClick={handleSend} className="bg-purple-600 text-white p-2 rounded-xl"><Icon name="send" size={20}/></button>
                         </div>
                     </div>
                 </div>
@@ -590,7 +529,7 @@ const MainMenu = ({ user, onAction, currentRoom }) => {
         <div className="h-full bg-slate-100 flex flex-col md:flex-row max-w-5xl mx-auto shadow-xl md:rounded-3xl md:my-8 overflow-hidden">
             <div className="bg-white p-6 flex flex-col items-center border-b md:border-b-0 md:border-r border-gray-100 shadow-sm z-10 md:w-1/3 flex-shrink-0">
                 <div className="flex items-center gap-4 w-full md:flex-col">
-                    <img src={user.photoURL} className="w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-green-50 shadow-lg" />
+                    <img src={user.photoURL} className="w-16 h-16 md:w-24 md:h-24 rounded-full border-4 border-green-500 shadow-lg" />
                     <div className="text-left md:text-center"><h1 className="text-xl md:text-2xl font-bold text-gray-800">{user.displayName}</h1><p className="text-xs text-gray-400">ID: {user.uid.slice(0,5)}</p></div>
                     <button onClick={() => auth.signOut()} className="ml-auto md:ml-0 md:mt-auto text-red-500 font-bold bg-red-50 p-2 rounded-lg"><Icon name="log-out" /></button>
                 </div>
@@ -630,241 +569,290 @@ const MainMenu = ({ user, onAction, currentRoom }) => {
     );
 };
 
-// --- GAME SCREEN ---
-
-const GameScreen = ({ user, roomCode, roomData, onBack }) => {
+const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
+    const [roomData, setRoomData] = React.useState(null);
+    const [tab, setTab] = React.useState('garden');
+    const [activeGardenIdx, setActiveGardenIdx] = React.useState(0);
+    const [selectedItem, setSelectedItem] = React.useState(null);
+    const [isTaskModalOpen, setTaskModalOpen] = React.useState(false);
+    const [taskFilter, setTaskFilter] = React.useState('active'); 
+    const [newTaskTitle, setNewTaskTitle] = React.useState("");
+    const [newTaskReward, setNewTaskReward] = React.useState(15);
+    const [newTaskType, setNewTaskType] = React.useState("once");
+    const [newTaskDeadline, setNewTaskDeadline] = React.useState("");
+    const [now, setNow] = React.useState(Date.now());
+    const [hasLiked, setHasLiked] = React.useState(false);
     const [items, setItems] = React.useState(BASE_ITEMS);
-    const [selectedItem, setSelectedItem] = React.useState<string | null>(null);
-    const [activeGarden, setActiveGarden] = React.useState(0);
-    const [shopOpen, setShopOpen] = React.useState(false);
-    const [bmOpen, setBmOpen] = React.useState(false);
 
     React.useEffect(() => {
-        if (roomData.customDefinitions) {
-            setItems(prev => ({ ...BASE_ITEMS, ...roomData.customDefinitions }));
-        }
-    }, [roomData.customDefinitions]);
+        if(!roomCode || !db) return;
+        const unsub = onSnapshot(doc(db, 'rooms', roomCode), (snap) => {
+            if (snap.exists()) {
+                const data = snap.data();
+                if(!data.tasks) data.tasks = [];
+                if(!data.inventory) data.inventory = {};
+                if(!data.gardens) data.gardens = { 0: {} };
+                if(!data.unlockedGardens) data.unlockedGardens = [0];
+                if(!data.customDefinitions) data.customDefinitions = {};
+                
+                // Merge base items with custom items bought from market
+                const merged = { ...BASE_ITEMS, ...data.customDefinitions };
+                setItems(merged);
+                setRoomData(data);
+            } else if (isSpectator) { alert("Raum nicht gefunden."); onBackToMenu(); }
+        }, err => console.log("DB Error", err));
+        if (localStorage.getItem(`liked_${roomCode}`)) setHasLiked(true);
+        return () => unsub();
+    }, [roomCode, isSpectator]);
 
-    // Update streak logic
-    React.useEffect(() => {
-        const updateStreak = async () => {
-             const today = new Date().toISOString().split('T')[0];
-             const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-             const last = roomData.lastStreakDate;
-             if (last === today) return;
+    React.useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+    React.useEffect(() => { const t = setTimeout(() => { if((window as any).lucide) try{(window as any).lucide.createIcons();}catch(e){} }, 100); return () => clearTimeout(t); }, [roomData, tab, taskFilter]);
 
-             let s = roomData.currentStreak || 0;
-             if (last === yesterday) s++; else s = 1;
-             
-             await updateDoc(doc(db, 'rooms', roomCode), {
-                 currentStreak: s,
-                 lastStreakDate: today
-             });
-        };
-        updateStreak();
-    }, [roomCode]); 
+    const getGardens = () => roomData?.gardens || { 0: {} };
+    const getCurrentGrid = () => (getGardens()[activeGardenIdx] || {});
+    const getInventory = () => roomData?.inventory || {};
+    const getTasks = () => Array.isArray(roomData?.tasks) ? roomData.tasks : [];
 
+    const handleLike = async () => { if(hasLiked || !isSpectator) return; await updateDoc(doc(db, 'rooms', roomCode), { likes: increment(1) }); localStorage.setItem(`liked_${roomCode}`, 'true'); setHasLiked(true); };
+    
     const handleGridClick = async (x, y) => {
-        const cellKey = `${x},${y}`;
-        const garden = roomData.gardens?.[activeGarden] || {};
-        const cell = garden[cellKey] || {};
+        if (isSpectator || !roomData) return;
+        const key = `${x},${y}`;
+        const cell = getCurrentGrid()[key] || {};
+        const roomRef = doc(db, 'rooms', roomCode);
+        const path = `gardens.${activeGardenIdx}.${key}`;
 
-        if (cell.item) {
-             const item = items[cell.item];
-             if (!item) return; 
-             if (item.type === 'seed') {
-                 if (cell.grown) {
-                     const reward = item.reward || 10;
-                     const dropGem = Math.random() < 0.05 ? 1 : 0;
-                     await updateDoc(doc(db, 'rooms', roomCode), {
-                         coins: increment(reward),
-                         gems: increment(dropGem),
-                         [`gardens.${activeGarden}.${cellKey}`]: deleteField()
-                     });
-                 } else {
-                     const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
-                     if (Date.now() - lastWatered > WATER_COOLDOWN) {
-                         const nextStage = (cell.stage || 0) + 1;
-                         await updateDoc(doc(db, 'rooms', roomCode), {
-                             [`gardens.${activeGarden}.${cellKey}.lastWatered`]: new Date().toISOString(),
-                             [`gardens.${activeGarden}.${cellKey}.stage`]: nextStage,
-                             [`gardens.${activeGarden}.${cellKey}.grown`]: nextStage >= item.stages
-                         });
-                     } else {
-                         alert("Pflanze ist noch feucht!");
-                     }
-                 }
-             } else if (item.type === 'deco') {
-                 if (confirm("Item aufnehmen?")) {
-                      await updateDoc(doc(db, 'rooms', roomCode), {
-                         [`gardens.${activeGarden}.${cellKey}`]: deleteField(),
-                         [`inventory.${cell.item}`]: increment(1)
-                     });
-                 }
-             }
-        } else if (selectedItem) {
-            const item = items[selectedItem];
-            const count = roomData.inventory?.[selectedItem] || 0;
-            if (count > 0) {
-                 const isFloor = item.type === 'floor';
-                 const update = { [`inventory.${selectedItem}`]: increment(-1) };
-                 if (isFloor) update[`gardens.${activeGarden}.${cellKey}.floor`] = selectedItem;
-                 else update[`gardens.${activeGarden}.${cellKey}`] = { item: selectedItem, stage: 0, lastWatered: 0, grown: false };
-                 
-                 await updateDoc(doc(db, 'rooms', roomCode), update);
-            } else {
-                alert("Nicht genug im Inventar!");
+        if (selectedItem) {
+            const itemDef = items[selectedItem];
+            if(!itemDef) return;
+
+            const invCount = getInventory()[selectedItem] || 0;
+            if (invCount > 0) {
+                if (itemDef.type === 'floor') { if (cell.item) return alert("Erst Pflanze entfernen!"); await updateDoc(roomRef, { [`${path}.floor`]: selectedItem, [`inventory.${selectedItem}`]: increment(-1) }); }
+                else if (itemDef.type === 'seed' && !cell.floor && !cell.item) await updateDoc(roomRef, { [`${path}.item`]: selectedItem, [`${path}.stage`]: 0, [`${path}.plantedAt`]: new Date().toISOString(), [`inventory.${selectedItem}`]: increment(-1) });
+                else if (itemDef.type === 'deco' && !cell.item) await updateDoc(roomRef, { [`${path}.item`]: selectedItem, [`inventory.${selectedItem}`]: increment(-1) });
+                if (invCount - 1 <= 0) setSelectedItem(null);
             }
+            return;
         }
+        if (cell.item) {
+            const itemDef = items[cell.item];
+            if(!itemDef) return; 
+            if (cell.grown && itemDef.type === 'seed') { await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`${path}.stage`]: deleteField(), [`${path}.grown`]: deleteField(), gems: increment(itemDef.reward || 0) }); } 
+            else if (itemDef.type === 'seed') { const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0; if (now - lastWatered > WATER_COOLDOWN) { const newStage = (cell.stage || 0) + 1; await updateDoc(roomRef, { [`${path}.stage`]: newStage, [`${path}.grown`]: newStage >= itemDef.stages, [`${path}.lastWatered`]: new Date().toISOString() }); } }
+            else if (itemDef.type === 'deco') { if(confirm(`${itemDef.name} ins Inventar zurück?`)) { await updateDoc(roomRef, { [`${path}.item`]: deleteField(), [`inventory.${cell.item}`]: increment(1) }); } }
+            return;
+        }
+        if (cell.floor) { const floorDef = items[cell.floor]; if(confirm(`${floorDef.name} aufheben?`)) { await updateDoc(roomRef, { [`${path}.floor`]: deleteField(), [`inventory.${cell.floor}`]: increment(1) }); } }
     };
 
-    const buy = async (id) => {
-        const price = items[id].price;
-        if (roomData.coins >= price) {
-            await updateDoc(doc(db, 'rooms', roomCode), {
-                coins: increment(-price),
-                [`inventory.${id}`]: increment(1)
-            });
-        } else alert("Nicht genug Münzen!");
+    const createTask = async () => { if (!newTaskTitle.trim()) return; const task = { id: Date.now().toString(), title: newTaskTitle, reward: parseInt(newTaskReward as any), type: newTaskType, deadline: newTaskDeadline || null, done: false, lastDone: null, completedBy: null, completedAt: null, completedAtISO: null }; await updateDoc(doc(db, 'rooms', roomCode), { tasks: arrayUnion(task) }); setTaskModalOpen(false); setNewTaskTitle(""); };
+    
+    // --- STREAK LOGIC UPDATE ---
+    const toggleTask = async (task) => { 
+        if (isSpectator) return; 
+        const d = new Date(); 
+        const today = d.toISOString().split('T')[0]; 
+        const nowStr = d.toLocaleString('de-DE'); 
+        
+        // Optimistic UI updates handled via Snapshot, here we prep DB updates
+        let updates: any = { coins: increment(task.reward) };
+        
+        // Update Task List
+        const updatedTasks = getTasks().map(t => { 
+            if (t.id === task.id) { 
+                return t.type === 'daily' ? { ...t, done: true, lastDone: today, completedBy: user.displayName, completedAt: nowStr } : { ...t, done: true, completedBy: user.displayName, completedAt: nowStr }; 
+            } 
+            return t; 
+        });
+        updates.tasks = updatedTasks;
+
+        // --- STREAK CALCULATION ---
+        const lastStreakDate = roomData.lastStreakDate;
+        const currentStreak = roomData.currentStreak || 0;
+
+        if (lastStreakDate !== today) {
+             const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+             let newStreak = 1;
+             
+             if (lastStreakDate === yesterday) {
+                 newStreak = currentStreak + 1;
+             } 
+             // If last streak was older than yesterday, it resets to 1 (which we initialized)
+             
+             updates.lastStreakDate = today;
+             updates.currentStreak = newStreak;
+        }
+
+        await updateDoc(doc(db, 'rooms', roomCode), updates); 
     };
+
+    const deleteTask = async (task) => { if(!confirm("Wirklich löschen?")) return; const newTasks = getTasks().filter(t => t.id !== task.id); await updateDoc(doc(db, 'rooms', roomCode), { tasks: newTasks }); };
+    const buy = async (id, isGarden) => { if (isSpectator) return; if(isGarden) { const g = GARDEN_UPGRADES.find(x => x.id === id); if(roomData.gems >= g.price) await updateDoc(doc(db, 'rooms', roomCode), { gems: increment(-g.price), unlockedGardens: arrayUnion(id), [`gardens.${id}`]: {} }); } else { const item = items[id]; if (roomData.coins >= item.price) await updateDoc(doc(db, 'rooms', roomCode), { coins: increment(-item.price), [`inventory.${id}`]: increment(1) }); } };
+
+    if (!roomData) return <div className="h-full flex items-center justify-center animate-pulse">Lade Garten...</div>;
 
     return (
-        <div className="h-full flex flex-col bg-slate-800 text-white overflow-hidden">
-            <div className="p-4 bg-white/10 backdrop-blur-md flex justify-between items-center z-10 shadow-lg">
-                <div className="flex items-center gap-4">
-                    <button onClick={onBack}><Icon name="arrow-left" /></button>
-                    <div>
-                        <div className="font-bold">{roomData.roomName}</div>
-                        <div className="text-xs text-slate-300 flex gap-3">
-                            <span className="text-yellow-400 font-bold">{roomData.coins} 💰</span>
-                            <span className="text-purple-400 font-bold">{roomData.gems} 💎</span>
+        <div className={`flex h-full bg-slate-100 overflow-hidden md:max-w-7xl md:mx-auto md:my-8 md:rounded-3xl md:shadow-2xl md:border ${isSpectator ? 'border-purple-300 ring-4 ring-purple-100' : 'border-slate-200'}`}>
+            <nav className="fixed bottom-0 left-0 w-full bg-white border-t z-40 flex justify-around p-2 pb-safe md:relative md:w-64 md:flex-col md:justify-start md:border-t-0 md:border-r md:p-6 md:gap-4">
+                <div className="hidden md:block mb-8"><h1 className="text-2xl font-bold text-green-600 flex items-center gap-2"><Icon name="sprout"/> DuoBloom</h1>{isSpectator && <div className="bg-purple-100 text-purple-600 text-xs px-2 py-1 rounded mt-2 font-bold uppercase text-center">Zuschauer</div>}</div>
+                <button onClick={() => setTab('garden')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'garden' ? 'bg-green-50 text-green-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="flower-2"/> <span className="text-[10px] md:text-sm">Garten</span></button>
+                {!isSpectator && (
+                    <>
+                        <button onClick={() => setTab('tasks')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'tasks' ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="check-square"/> <span className="text-[10px] md:text-sm">Aufgaben</span></button>
+                        <button onClick={() => setTab('shop')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'shop' ? 'bg-orange-50 text-orange-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="shopping-cart"/> <span className="text-[10px] md:text-sm">Shop</span></button>
+                        <button onClick={() => setTab('blackmarket')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'blackmarket' ? 'bg-slate-800 text-white font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="skull"/> <span className="text-[10px] md:text-sm">Schwarzmarkt</span></button>
+                    </>
+                )}
+            </nav>
+            <main className="flex-1 overflow-y-auto bg-[#eefcf3] relative pb-28 md:pb-0">
+                <header className={`sticky top-0 backdrop-blur-md p-4 shadow-sm z-30 flex justify-between items-center px-6 ${isSpectator ? 'bg-purple-50/90' : 'bg-white/90'}`}>
+                    <div className="flex items-center gap-4"><button onClick={onBackToMenu} className="bg-white border p-2 rounded-xl hover:bg-gray-100 shadow-sm" title="Zurück"><Icon name="home" className="text-gray-600"/></button><div className="flex flex-col"><span className="font-bold text-gray-700 truncate max-w-[150px] md:max-w-none text-lg">{roomData.roomName}</span><span className="text-[10px] text-gray-400 font-mono">{isSpectator ? `Besuche: ${roomCode}` : `Code: ${roomCode}`}</span></div></div>
+                    <div className="flex gap-4 ml-auto items-center">{isSpectator ? <button onClick={handleLike} className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold transition-all ${hasLiked ? 'bg-red-100 text-red-500' : 'bg-white border hover:bg-red-50 text-gray-500'}`}><Icon name="heart" className={hasLiked ? "fill-red-500" : ""}/> {roomData.likes || 0}</button> : <div className="flex flex-col items-end"><span className="font-bold text-yellow-600 text-lg flex items-center gap-1">💰 {roomData.coins}</span><span className="font-bold text-purple-600 text-lg flex items-center gap-1">💎 {roomData.gems}</span></div>}</div>
+                </header>
+                
+                {tab === 'garden' && (
+                    <div className="p-4 md:p-8 flex flex-col items-center">
+                        <div className="flex gap-2 mb-4 overflow-x-auto w-full justify-center">{GARDEN_UPGRADES.map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); if(!owned) return null; return <button key={g.id} onClick={() => setActiveGardenIdx(g.id)} className={`px-4 py-1 rounded-full text-sm font-bold border ${activeGardenIdx === g.id ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-700 border-green-200'}`}>{g.name}</button> })}</div>
+                        <div className="p-4 rounded-xl shadow-2xl relative inline-block bg-cover bg-center" style={{ backgroundImage: `url(${GARDEN_BG})`, backgroundColor: '#5c4033' }}>
+                            <div className="grid grid-cols-5 gap-0 border-2 border-black/10 shadow-inner">
+                                {Array.from({ length: 25 }).map((_, i) => ( <GridCell key={i} x={i%5} y={Math.floor(i/5)} cell={(getGardens()[activeGardenIdx] || {})[`${i%5},${Math.floor(i/5)}`] || {}} handleGridClick={handleGridClick} now={now} items={items} /> ))}
+                            </div>
+                        </div>
+                        {!isSpectator && <div className="mt-8 w-full max-w-2xl bg-white p-4 rounded-2xl shadow-lg border border-gray-100"><h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Werkzeugkasten</h3><div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">{Object.entries(getInventory()).map(([id, count]) => { if ((count as number) <= 0) return null; return <button key={id} onClick={() => setSelectedItem(selectedItem === id ? null : id)} className={`flex-shrink-0 flex flex-col items-center p-3 rounded-xl border-2 transition-all min-w-[80px] ${selectedItem === id ? 'border-blue-500 bg-blue-50 shadow-md transform -translate-y-1' : 'border-gray-100 hover:bg-gray-50'}`}><ItemDisplay item={items[id] || {name:'?', icon:'❓'}} className="w-8 h-8" /><span className="text-xs font-bold text-gray-600">{String(count)}x</span></button> })}</div></div>}
+                    </div>
+                )}
+
+                {tab === 'tasks' && !isSpectator && (
+                    <div className="p-6 md:max-w-3xl md:mx-auto">
+                        <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-700">Aufgaben</h2><button onClick={() => setTaskModalOpen(true)} className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg flex items-center gap-2"><Icon name="plus" /> Neu</button></div>
+                        <div className="flex gap-2 mb-4 bg-white p-1 rounded-xl w-fit border border-gray-200"><button onClick={() => setTaskFilter('active')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${taskFilter === 'active' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>Offen</button><button onClick={() => setTaskFilter('done')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${taskFilter === 'done' ? 'bg-green-100 text-green-600' : 'text-gray-400 hover:text-gray-600'}`}>Erledigt</button></div>
+                        <div className="space-y-3 pb-12">
+                            {getTasks().filter(task => { const today = new Date().toISOString().split('T')[0]; const isDoneToday = task.type === 'daily' && task.lastDone === today; const isDoneEver = task.type === 'once' && task.done; return taskFilter === 'active' ? (!isDoneEver && !isDoneToday) : (isDoneEver || isDoneToday); }).map(task => (
+                                <div key={task.id} className={`bg-white p-5 rounded-2xl shadow-sm border ${taskFilter === 'done' ? 'border-green-100 opacity-80' : 'border-gray-100'} flex justify-between items-center`}>
+                                    <div className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2"><span className={`font-bold text-lg ${taskFilter === 'done' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{task.title}</span>{task.type === 'daily' && <span className="text-blue-500"><Icon name="repeat" size={14}/></span>}</div>
+                                        <div className="flex gap-3 text-xs">{taskFilter === 'done' ? <span className="text-gray-500 flex items-center gap-1"><Icon name="check-circle" size={12}/> {task.completedBy} ({task.completedAt})</span> : <><span className="text-green-600 font-bold">+{task.reward} Münzen</span>{task.deadline && <span className="text-red-400 font-bold flex items-center gap-1"><Icon name="calendar" size={10}/> {task.deadline}</span>}</>}</div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => deleteTask(task)} className="w-8 h-8 rounded-full border-2 border-red-100 hover:border-red-500 hover:bg-red-50 flex items-center justify-center transition-colors text-red-300 hover:text-red-500"><Icon name="trash-2" size={14}/></button>
+                                        {taskFilter === 'active' && <button onClick={() => toggleTask(task)} className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors"><Icon name="check" className="text-transparent hover:text-green-500 w-4 h-4"/></button>}
+                                    </div>
+                                </div>
+                            ))}
+                            {getTasks().filter(t => taskFilter === 'active' ? (!t.done || (t.type==='daily' && t.lastDone!==new Date().toISOString().split('T')[0])) : (t.done || (t.type==='daily' && t.lastDone===new Date().toISOString().split('T')[0]))).length === 0 && <div className="text-center py-8 text-gray-400 italic">Keine Aufgaben in dieser Liste.</div>}
                         </div>
                     </div>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => setBmOpen(true)} className="p-2 bg-slate-900 rounded-xl border border-slate-700"><Icon name="skull"/></button>
-                    <button onClick={() => setShopOpen(true)} className="p-2 bg-green-600 rounded-xl border border-green-500 shadow-lg"><Icon name="shopping-cart"/></button>
-                </div>
-            </div>
+                )}
 
-            <div className="flex-1 overflow-auto p-4 flex justify-center items-center relative">
-                 <div className="relative p-6 rounded-3xl shadow-2xl border-4 border-[#3a5a2a] bg-[#5c8d41]" style={{backgroundImage: `url(${GARDEN_BG})`, backgroundSize: 'cover'}}>
-                      <div className="grid grid-cols-6 gap-1 md:gap-2">
-                           {Array.from({length: 36}).map((_, i) => {
-                               const x = i % 6;
-                               const y = Math.floor(i / 6);
-                               const cell = roomData.gardens?.[activeGarden]?.[`${x},${y}`] || {};
-                               return <GridCell key={i} x={x} y={y} cell={cell} handleGridClick={handleGridClick} now={Date.now()} items={items} />;
-                           })}
-                      </div>
-                 </div>
-            </div>
+                {tab === 'shop' && !isSpectator && (
+                    <div className="p-6 md:max-w-4xl md:mx-auto pb-32">
+                        <h3 className="font-bold text-xl text-purple-700 mb-4 flex items-center gap-2"><Icon name="castle"/> Immobilien (Gems)</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">{GARDEN_UPGRADES.filter(g => g.id > 0).map(g => { const owned = (roomData.unlockedGardens || []).includes(g.id); return <div key={g.id} className={`p-4 rounded-2xl border-2 flex flex-col items-center ${owned ? 'bg-gray-50 border-gray-200' : 'bg-purple-50 border-purple-200'}`}><div className="text-3xl mb-2">🏞️</div><div className="font-bold">{g.name}</div><button onClick={() => !owned && buy(g.id, true)} disabled={owned || roomData.gems < g.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold ${owned ? 'text-gray-400 bg-gray-200' : 'bg-purple-600 text-white'}`}>{owned ? 'Gekauft' : `${g.price} 💎`}</button></div> })}</div>
+                        <h3 className="font-bold text-xl text-orange-600 mb-4 flex items-center gap-2"><Icon name="store"/> Markt (Münzen)</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Object.values(BASE_ITEMS).map((item: any) => (<div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center"><div className={`text-4xl mb-3 mt-2 ${item.css ? item.css + ' w-12 h-12 rounded flex items-center justify-center' : ''}`}>{item.icon && !item.img && <>{String(item.icon)}</>}<ItemDisplay item={item} className="w-12 h-12" /></div><h3 className="font-bold text-gray-700 text-center text-sm">{item.name}</h3><button onClick={() => buy(item.id, false)} disabled={roomData.coins < item.price} className={`mt-2 w-full py-2 rounded-xl text-sm font-bold transition-all ${roomData.coins >= item.price ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{item.price} 💰</button></div>))}</div>
+                    </div>
+                )}
+                
+                {tab === 'blackmarket' && !isSpectator && (
+                    <BlackMarket roomData={roomData} roomCode={roomCode} user={user} />
+                )}
 
-            <div className="bg-white/90 p-2 overflow-x-auto flex gap-2 z-10 border-t border-white/20 h-24 items-center">
-                <button onClick={() => setSelectedItem(null)} className={`w-16 h-16 rounded-xl border-2 flex-shrink-0 flex items-center justify-center ${selectedItem === null ? 'border-red-500 bg-red-50 text-red-500' : 'border-slate-300 text-slate-400'}`}><Icon name="mouse-pointer"/></button>
-                {Object.entries(roomData.inventory || {}).map(([id, count]) => {
-                    if ((count as number) <= 0) return null;
-                    const it = items[id];
-                    if(!it) return null;
-                    return (
-                        <button key={id} onClick={() => setSelectedItem(id)} className={`relative w-16 h-16 rounded-xl border-2 flex-shrink-0 flex items-center justify-center overflow-hidden ${selectedItem === id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white'}`}>
-                            <ItemDisplay item={it} className="w-10 h-10" />
-                            <span className="absolute bottom-0 right-1 text-xs font-bold text-slate-700 bg-white/80 px-1 rounded">{count as number}</span>
-                        </button>
-                    );
-                })}
-            </div>
-
+            </main>
+            {isTaskModalOpen && (
+                <Modal title="Neue Aufgabe" onClose={() => setTaskModalOpen(false)}><div className="space-y-4"><div><label className="text-xs font-bold text-gray-400 uppercase">Titel</label><input value={newTaskTitle} onChange={e => setNewTaskTitle(e.target.value)} placeholder="Titel..." className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500" /></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Belohnung: {newTaskReward}</label><input type="range" min="10" max="100" step="5" value={newTaskReward} onChange={e => setNewTaskReward(parseInt(e.target.value)||10)} className="w-full accent-blue-500 mt-2" /></div></div><div className="flex gap-4"><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Typ</label><select value={newTaskType} onChange={e => setNewTaskType(e.target.value)} className="w-full border rounded-xl p-2 mt-1"><option value="once">Einmalig</option><option value="daily">Täglich</option></select></div><div className="flex-1"><label className="text-xs font-bold text-gray-400 uppercase">Frist</label><input type="date" value={newTaskDeadline} onChange={e => setNewTaskDeadline(e.target.value)} className="w-full border rounded-xl p-2 mt-1" /></div></div><div className="flex gap-2 mt-2"><button onClick={() => setTaskModalOpen(false)} className="flex-1 bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Abbrechen</button><button onClick={createTask} className="flex-1 bg-blue-500 text-white font-bold py-3 rounded-xl">Erstellen</button></div></div></Modal>
+            )}
             <OctoChat user={user} roomData={roomData} />
-
-            {shopOpen && (
-                <Modal title="Laden" onClose={() => setShopOpen(false)}>
-                    <div className="grid grid-cols-2 gap-3">
-                        {Object.values(BASE_ITEMS).map((it: any) => (
-                            <button key={it.id} onClick={() => buy(it.id)} className="border p-3 rounded-xl flex flex-col items-center hover:bg-slate-50">
-                                <ItemDisplay item={it} className="w-12 h-12 mb-2"/>
-                                <span className="font-bold text-slate-700 text-sm">{it.name}</span>
-                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded mt-1 font-bold">{it.price} 💰</span>
-                            </button>
-                        ))}
-                    </div>
-                </Modal>
-            )}
-
-            {bmOpen && (
-                <div className="fixed inset-0 bg-white z-50 flex flex-col animate-pop">
-                    <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-                        <h2 className="font-bold text-lg">Schwarzmarkt</h2>
-                        <button onClick={() => setBmOpen(false)}><Icon name="x"/></button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                        <BlackMarket roomData={roomData} roomCode={roomCode} user={user} />
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
 
-// --- APP COMPONENT ---
-
 const App = () => {
-    const [user, setUser] = React.useState(null);
+    const [user, setUser] = React.useState<any>(null);
     const [view, setView] = React.useState("menu");
-    const [roomCode, setRoomCode] = React.useState(localStorage.getItem("lastRoom") || "");
-    const [roomData, setRoomData] = React.useState(null);
+    const [roomCode, setRoomCode] = React.useState("");
+    const [isSpectator, setIsSpectator] = React.useState(false);
     const [loading, setLoading] = React.useState(true);
 
     React.useEffect(() => {
-        return onAuthStateChanged(auth, u => {
+        const unsub = onAuthStateChanged(auth, (u) => {
             setUser(u);
             setLoading(false);
         });
+        return () => unsub();
     }, []);
 
-    React.useEffect(() => {
-        if (!user || !roomCode || view !== 'game') return;
-        const unsub = onSnapshot(doc(db, 'rooms', roomCode), (d) => {
-            if (d.exists()) setRoomData(d.data());
-            else { alert("Garten existiert nicht!"); setView("menu"); }
-        });
-        return () => unsub();
-    }, [user, roomCode, view]);
-
-    const handleAction = async (action, code, name) => {
-        if (action === 'create') {
-            const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-            await setDoc(doc(db, 'rooms', newCode), {
-                roomName: name, creatorId: user.uid, coins: 100, gems: 5, 
-                inventory: { carrot_seed: 5, water_bucket: 1 },
-                gardens: { 0: {} }, unlockedGardens: [0], createdAt: new Date().toISOString(), likes: 0,
-                currentStreak: 0, lastStreakDate: ''
-            });
-            setRoomCode(newCode); localStorage.setItem("lastRoom", newCode); setView("game");
+    const handleAction = async (action: string, code?: string, payload?: any) => {
+        if (action === 'community') {
+            setView('community');
+        } else if (action === 'create') {
+            if (!user) return;
+            const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            try {
+                await setDoc(doc(db, 'rooms', newRoomId), {
+                    creatorId: user.uid,
+                    roomName: payload || "Unbenannter Garten",
+                    coins: 100,
+                    gems: 0,
+                    unlockedGardens: [0],
+                    inventory: {},
+                    gardens: { 0: {} },
+                    tasks: [],
+                    createdAt: new Date().toISOString(),
+                    likes: 0,
+                    lastStreakDate: null,
+                    currentStreak: 0,
+                    customDefinitions: {}
+                });
+                setRoomCode(newRoomId);
+                setIsSpectator(false);
+                setView('game');
+                localStorage.setItem('lastRoom', newRoomId);
+            } catch (e) {
+                console.error("Create Error", e);
+                alert("Fehler beim Erstellen.");
+            }
         } else if (action === 'join' || action === 'resume') {
-            setRoomCode(code); localStorage.setItem("lastRoom", code); setView("game");
-        } else if (action === 'community') {
-            setView("community");
+            const targetCode = code || payload;
+            if (!targetCode) return;
+            const snap = await getDoc(doc(db, 'rooms', targetCode));
+            if (snap.exists()) {
+                setRoomCode(targetCode);
+                setIsSpectator(false);
+                setView('game');
+                localStorage.setItem('lastRoom', targetCode);
+            } else {
+                alert("Garten nicht gefunden!");
+            }
         }
     };
 
-    if (loading) return <div className="h-screen w-full flex items-center justify-center bg-slate-100">Lade DuoBloom...</div>;
+    const handleVisit = (id: string) => {
+        setRoomCode(id);
+        setIsSpectator(true);
+        setView('game');
+    };
 
-    if (!user) return (
-        <div className="h-screen w-full flex flex-col items-center justify-center bg-gradient-to-b from-green-50 to-green-100 p-6">
-            <h1 className="text-5xl font-black text-green-800 mb-2 tracking-tighter">DuoBloom 🌸</h1>
-            <p className="text-green-700 mb-8 font-medium">Dein gemeinsamer Garten wartet.</p>
-            <button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="bg-white px-8 py-4 rounded-2xl shadow-xl flex items-center gap-4 font-bold text-gray-700 hover:scale-105 transition-transform">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6"/>
-                Mit Google anmelden
-            </button>
-        </div>
-    );
+    if (loading) return <div className="h-full flex items-center justify-center">Laden...</div>;
 
-    if (view === 'community') return <CommunityList onVisit={(id) => { setRoomCode(id); setView("game"); }} onBack={() => setView("menu")} />;
-    if (view === 'game' && roomData) return <GameScreen user={user} roomCode={roomCode} roomData={roomData} onBack={() => setView("menu")} />;
-    
-    return <MainMenu user={user} currentRoom={roomCode} onAction={handleAction} />;
+    if (!user) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center bg-slate-50 p-4">
+                <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center gap-6 max-w-sm w-full text-center">
+                    <div className="text-6xl animate-bounce">🌻</div>
+                    <h1 className="text-3xl font-black text-slate-800">DuoBloom</h1>
+                    <button onClick={() => signInWithPopup(auth, new GoogleAuthProvider())} className="w-full bg-slate-900 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-black transition-all">
+                         Google Anmeldung
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (view === 'game') return <GameApp user={user} roomCode={roomCode} isSpectator={isSpectator} onBackToMenu={() => setView('menu')} />;
+    if (view === 'community') return <CommunityList onVisit={handleVisit} onBack={() => setView('menu')} />;
+
+    return <MainMenu user={user} onAction={handleAction} currentRoom={localStorage.getItem('lastRoom')} />;
 };
 
 const root = createRoot(document.getElementById('root'));
