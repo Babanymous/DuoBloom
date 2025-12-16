@@ -22,24 +22,12 @@
         @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
     </style>
 
-    <!-- Polyfill for process.env to prevent ReferenceError in Browser -->
-    <script>
-        window.process = {
-            env: {
-                NODE_ENV: 'development',
-                // Using the provided API Key for Gemini
-                API_KEY: 'AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg' 
-            }
-        };
-    </script>
-
     <!-- Map imports for React modules -->
     <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@18.2.0",
     "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "@google/genai": "https://esm.sh/@google/genai@0.0.10",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/"
   }
