@@ -9,5 +9,10 @@
   "start_url": "/",
   "theme_color": "#ffffff",
   "id": "DuoBloom",
-  "description": "DuoBloom is a cooperative productivity app."
+  "description": "DuoBloom is a cooperative productivity app.",
+  "icons": [ { 
+    "src": "android/android-launchericon-512-512.png",
+    "sizes": "512x512",
+    "type": "image/png",
+    "purpose": "any" } ]
 }
