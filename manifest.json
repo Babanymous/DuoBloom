@@ -1,18 +1,32 @@
 {
-  "background_color": "#ffffff",
-  "dir": "ltr",
+  "background_color": "#68e39e",
+  "dir": "auto",
   "display": "standalone",
   "name": "DuoBloom",
   "orientation": "any",
   "scope": "/DuoBloom/",
   "short_name": "DuoBloom",
   "start_url": "/DuoBloom/",
-  "theme_color": "#ffffff",
-  "id": "DuoBloom",
+  "theme_color": "#baf6ab",
+  "id": "DBloom",
   "description": "DuoBloom is a cooperative productivity app.",
-  "icons": [ { 
-    "src": "android/android-launchericon-512-512.png",
-    "sizes": "512x512",
-    "type": "image/png",
-    "purpose": "any" } ]
+  "icons": [
+    {
+      "src": "android/android-launchericon-512-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "lang": "de",
+  "categories": [
+    "business",
+    "education",
+    "fitness",
+    "games",
+    "lifestyle",
+    "personalization",
+    "productivity",
+    "social"
+  ]
 }
