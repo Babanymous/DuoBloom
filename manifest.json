@@ -12,7 +12,7 @@
   "description": "DuoBloom is a cooperative productivity app.",
   "icons": [
     {
-      "src": "android/android-launchericon-512-512.png",
+      "src": "icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
