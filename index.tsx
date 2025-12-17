@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, addDoc, arrayUnion, increment, deleteField, query, limit, orderBy, collectionGroup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { GoogleGenAI } from "@google/genai";
 
 // CONFIG
 const firebaseConfig = {
@@ -15,9 +14,6 @@ const firebaseConfig = {
     appId: "1:118209789780:web:ce2563e693a76f09a7d2c1",
     measurementId: "G-Z0W0LK6D88"
 };
-
-// Initialize Gemini AI
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 let firebaseApp, auth, db;
 try {
@@ -157,83 +153,38 @@ const Modal = ({ children, onClose, title }: { children: React.ReactNode, onClos
 const OctoChat = ({ user, roomData }) => {
     const [isOpen, setIsOpen] = React.useState(false);
     const [messages, setMessages] = React.useState([
-        { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo, dein KI-Gartenassistent. Wie kann ich helfen?` }
+        { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo.` }
     ]);
     const [input, setInput] = React.useState("");
     const [isTyping, setIsTyping] = React.useState(false);
     const messagesEndRef = React.useRef(null);
-    const chatRef = React.useRef(null);
-
-    React.useEffect(() => {
-        if (!chatRef.current) {
-            chatRef.current = ai.chats.create({
-                model: "gemini-2.5-flash",
-                config: {
-                    systemInstruction: `Du bist Octo, der freundliche, intelligente Oktopus-Assistent im Spiel DuoBloom.
-                    
-                    Deine Persönlichkeit:
-                    - Du bist verspielt, hilfreich und nutzt gerne Ozean-Metaphern oder Emojis (🐙, 🌊, 🫧, 🌿).
-                    - Du bist motivierend und humorvoll.
-                    
-                    Dein Wissen über DuoBloom:
-                    - Pflanzen: Müssen alle 6 Stunden gegossen werden (blaues Schild).
-                    - Währungen: Münzen 💰 (für den Shop) und Gems 💎 (selten, für Schwarzmarkt).
-                    - Schwarzmarkt (Totenkopf-Icon): Hier können Spieler eigene Pflanzen kreieren (kostet Gems) oder Pflanzen anderer Spieler kaufen.
-                    - Community: Man kann andere Gärten besuchen und Likes dalassen.
-                    - Aufgaben: Geben Münzen und helfen beim Fortschritt.
-                    
-                    Antworte immer hilfsbereit und auf Deutsch. Formatier deine Antworten schön mit Markdown wenn nötig.`,
-                }
-            });
-        }
-    }, []);
+    
+    const OCTO_KNOWLEDGE = [
+        { keys: ["schwarzmarkt", "black market", "illegal"], answer: "Psst! 🤫 Auf dem Schwarzmarkt kannst du eigene Pflanzen verkaufen. Aber Vorsicht: Die Teilnahme kostet Gems!" },
+        { keys: ["hallo", "hi ", "hey", "moin"], answer: "Blub Blub! 👋 Schön dich zu sehen! Wie laufen die Geschäfte im Garten? 🐙" },
+        { keys: ["karotte", "möhre"], answer: "Karotten 🥕 sind der perfekte Einstieg! Sie sind billig, wachsen schnell und schmecken knackig." },
+        { keys: ["gießen", "wasser"], answer: "Wasser marsch! 💧 Pflanzen brauchen alle 6 Stunden Wasser. Achte auf das blaue Schild." },
+        { keys: ["gems", "edelsteine"], answer: "Gems sind super selten! 💎 Du bekommst sie durch Ernten. Auf dem Schwarzmarkt brauchst du sie, um eigene Pflanzen anzubieten." },
+        { keys: ["coins", "münzen"], answer: "Münzen kriegst du durch Aufgaben. Auf dem Schwarzmarkt kannst du damit die verrücktesten Pflanzen anderer Spieler kaufen!" },
+        { keys: ["selbst erstellen", "eigene pflanze"], answer: "Geh zum Schwarzmarkt Tab (das Totenkopf-Icon 💀). Dort kannst du für 50 Gems pro Stück deine eigenen Kreationen anbieten!" }
+    ];
 
     const handleSend = async () => {
         if(!input.trim()) return;
         const userText = input;
-        
         setMessages(p => [...p, { role: 'user', text: userText }]);
         setInput("");
         setIsTyping(true);
-
-        try {
-            if (!chatRef.current) throw new Error("Chat not initialized");
-            
-            // Add optimistic placeholder
-            setMessages(p => [...p, { role: 'model', text: "" }]);
-            
-            const resultStream = await chatRef.current.sendMessageStream({ message: userText });
-            
-            let fullText = "";
-            for await (const chunk of resultStream) {
-                const text = chunk.text;
-                if (text) {
-                    fullText += text;
-                    setMessages(p => {
-                        const newMsgs = [...p];
-                        newMsgs[newMsgs.length - 1].text = fullText;
-                        return newMsgs;
-                    });
-                }
-            }
-        } catch (error) {
-            console.error("Chat error:", error);
-            setMessages(p => {
-                const newMsgs = [...p];
-                // Remove empty placeholder if it exists and replace with error
-                if (newMsgs[newMsgs.length-1].text === "") {
-                     newMsgs[newMsgs.length-1].text = "Blub? Meine Tinte ist alle! Da ist etwas schiefgelaufen. 🫧 (Verbindungsfehler)";
-                } else {
-                     newMsgs.push({ role: 'model', text: "Blub? Meine Tinte ist alle! 🫧" });
-                }
-                return newMsgs;
-            });
-        } finally {
+        setTimeout(() => {
+            const t = userText.toLowerCase();
+            const hit = OCTO_KNOWLEDGE.find(k => k.keys.some(key => t.includes(key)));
+            const reply = hit ? hit.answer : "Blub? 🫧 Das verstehe ich nicht ganz. Frag mich nach 'Schwarzmarkt', 'Gießen' oder 'Gems'! 🐙";
+            setMessages(p => [...p, { role: 'model', text: reply }]);
             setIsTyping(false);
-        }
+        }, 800);
     };
 
-    React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen, isTyping]);
+    React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
 
     return (
         <>
@@ -244,36 +195,19 @@ const OctoChat = ({ user, roomData }) => {
                 <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
                     <div className="bg-white w-full md:w-[380px] h-[60vh] md:h-[500px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4 overflow-hidden">
                         <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
-                            <div className="flex items-center gap-3"><img src={OCTO_IMG} className="w-8 h-8"/> <span className="font-bold">Octo AI</span></div>
+                            <div className="flex items-center gap-3"><img src={OCTO_IMG} className="w-8 h-8"/> <span className="font-bold">Octo Helfer</span></div>
                             <button onClick={() => setIsOpen(false)}><Icon name="x" size={20}/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
                             {messages.map((m, i) => (
-                                <div key={i} className={`p-3 rounded-2xl text-sm max-w-[85%] leading-relaxed ${m.role === 'user' ? 'bg-purple-600 text-white ml-auto rounded-br-none' : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'}`}>
-                                    {m.text}
-                                </div>
+                                <div key={i} className={`p-3 rounded-2xl text-sm max-w-[80%] ${m.role === 'user' ? 'bg-purple-600 text-white ml-auto rounded-br-none' : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'}`}>{m.text}</div>
                             ))}
-                            {isTyping && messages[messages.length-1]?.text === "" && (
-                                <div className="bg-white border text-gray-800 rounded-2xl rounded-bl-none shadow-sm p-3 w-fit">
-                                    <div className="flex gap-1">
-                                        <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay:'0ms'}}></span>
-                                        <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{animationDelay:'150ms'}}></span>
-                                        <span className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{animationDelay:'300ms'}}></span>
-                                    </div>
-                                </div>
-                            )}
+                            {isTyping && <div className="text-gray-400 text-xs ml-2">Octo tippt...</div>}
                             <div ref={messagesEndRef} />
                         </div>
                         <div className="p-3 bg-white border-t flex gap-2">
-                            <input 
-                                value={input} 
-                                onChange={e => setInput(e.target.value)} 
-                                onKeyDown={e => e.key === 'Enter' && handleSend()} 
-                                placeholder="Frag Octo..." 
-                                className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-purple-200 transition-all"
-                                disabled={isTyping}
-                            />
-                            <button onClick={handleSend} disabled={isTyping || !input.trim()} className="bg-purple-600 disabled:bg-gray-300 text-white p-2 rounded-xl transition-colors"><Icon name="send" size={20}/></button>
+                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Frag Octo..." className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none" />
+                            <button onClick={handleSend} className="bg-purple-600 text-white p-2 rounded-xl"><Icon name="send" size={20}/></button>
                         </div>
                     </div>
                 </div>
