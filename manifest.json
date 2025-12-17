@@ -1,15 +1,13 @@
 {
-  "name": "DuoBloom",
-  "short_name": "DuoBloom",
-  "start_url": ".",
+  "background_color": "#ffffff",
+  "dir": "ltr",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#4ade80",
-  "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/628/628283.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+  "name": "babanymous.github",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "babanymous.github",
+  "start_url": "/",
+  "theme_color": "#ffffff",
+  "id": "BabaDuoBloom",
+  "description": "DuoBloom is a cooperative productivity app."
 }
