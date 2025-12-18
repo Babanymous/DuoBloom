@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, addDoc, arrayUnion, increment, deleteField, query, limit, orderBy, collectionGroup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
 
 // CONFIG
 const firebaseConfig = {
@@ -150,38 +151,69 @@ const Modal = ({ children, onClose, title }: { children: React.ReactNode, onClos
 
 // --- OCTO CHAT ---
 
+// --- OCTO CHAT MIT GEMINI ---
+
 const OctoChat = ({ user, roomData }) => {
     const [isOpen, setIsOpen] = React.useState(false);
+    // Startnachricht
     const [messages, setMessages] = React.useState([
-        { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo.` }
+        { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo. Frag mich alles über deinen Garten!` }
     ]);
     const [input, setInput] = React.useState("");
     const [isTyping, setIsTyping] = React.useState(false);
     const messagesEndRef = React.useRef(null);
-    
-    const OCTO_KNOWLEDGE = [
-        { keys: ["schwarzmarkt", "black market", "illegal"], answer: "Psst! 🤫 Auf dem Schwarzmarkt kannst du eigene Pflanzen verkaufen. Aber Vorsicht: Die Teilnahme kostet Gems!" },
-        { keys: ["hallo", "hi ", "hey", "moin"], answer: "Blub Blub! 👋 Schön dich zu sehen! Wie laufen die Geschäfte im Garten? 🐙" },
-        { keys: ["karotte", "möhre"], answer: "Karotten 🥕 sind der perfekte Einstieg! Sie sind billig, wachsen schnell und schmecken knackig." },
-        { keys: ["gießen", "wasser"], answer: "Wasser marsch! 💧 Pflanzen brauchen alle 6 Stunden Wasser. Achte auf das blaue Schild." },
-        { keys: ["gems", "edelsteine"], answer: "Gems sind super selten! 💎 Du bekommst sie durch Ernten. Auf dem Schwarzmarkt brauchst du sie, um eigene Pflanzen anzubieten." },
-        { keys: ["coins", "münzen"], answer: "Münzen kriegst du durch Aufgaben. Auf dem Schwarzmarkt kannst du damit die verrücktesten Pflanzen anderer Spieler kaufen!" },
-        { keys: ["selbst erstellen", "eigene pflanze"], answer: "Geh zum Schwarzmarkt Tab (das Totenkopf-Icon 💀). Dort kannst du für 50 Gems pro Stück deine eigenen Kreationen anbieten!" }
-    ];
+
+    // HIER DEINEN API KEY EINFÜGEN
+    // Vite nutzt import.meta.env, Create-React-App nutzt process.env
+    const API_KEY = import.meta.env.VITE_GEMINI_KEY; 
+
 
     const handleSend = async () => {
         if(!input.trim()) return;
         const userText = input;
+        
+        // 1. User Nachricht sofort anzeigen
         setMessages(p => [...p, { role: 'user', text: userText }]);
         setInput("");
         setIsTyping(true);
-        setTimeout(() => {
-            const t = userText.toLowerCase();
-            const hit = OCTO_KNOWLEDGE.find(k => k.keys.some(key => t.includes(key)));
-            const reply = hit ? hit.answer : "Blub? 🫧 Das verstehe ich nicht ganz. Frag mich nach 'Schwarzmarkt', 'Gießen' oder 'Gems'! 🐙";
-            setMessages(p => [...p, { role: 'model', text: reply }]);
+
+        try {
+            // 2. Gemini initialisieren
+            const genAI = new GoogleGenerativeAI(API_KEY);
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+            // 3. Octos Persönlichkeit definieren (System Prompt)
+            // Wir geben ihm Kontext über das Spiel und seine Rolle
+            const contextPrompt = `
+                Du bist Octo, ein freundlicher, hilfsbereiter Oktopus, der in einem Garten-Spiel lebt.
+                Deine Persönlichkeit:
+                - Du sagst oft "Blub Blub" oder benutzt Oktopus/Wasser Emojis 🐙 💧.
+                - Du bist witzig und motivierend.
+                - Du fasst dich kurz (max 2-3 Sätze).
+                
+                Wissen über das Spiel:
+                - Es gibt Pflanzen wie Karotten (schnell), Sonnenblumen und Vergissmeinnicht.
+                - Pflanzen muss man alle 6 Stunden gießen.
+                - Auf dem Schwarzmarkt (Totenkopf-Icon) kann man eigene Pflanzen gegen Gems verkaufen.
+                - Gems (Edelsteine) sind selten, Münzen sind häufig.
+                
+                Der Spieler fragt: "${userText}"
+                Antworte als Octo:
+            `;
+
+            // 4. Anfrage an die KI
+            const result = await model.generateContent(contextPrompt);
+            const response = result.response.text();
+
+            // 5. Antwort anzeigen
+            setMessages(p => [...p, { role: 'model', text: response }]);
+
+        } catch (error) {
+            console.error("Gemini Error:", error);
+            setMessages(p => [...p, { role: 'model', text: "Blub? Mein Kopf tut weh... (API Fehler) 😵‍💫" }]);
+        } finally {
             setIsTyping(false);
-        }, 800);
+        }
     };
 
     React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
@@ -195,14 +227,15 @@ const OctoChat = ({ user, roomData }) => {
                 <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
                     <div className="bg-white w-full md:w-[380px] h-[60vh] md:h-[500px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4 overflow-hidden">
                         <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
-                            <div className="flex items-center gap-3"><img src={OCTO_IMG} className="w-8 h-8"/> <span className="font-bold">Octo Helfer</span></div>
+                            <div className="flex items-center gap-3"><img src={OCTO_IMG} className="w-8 h-8"/> <span className="font-bold">Octo KI</span></div>
                             <button onClick={() => setIsOpen(false)}><Icon name="x" size={20}/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
                             {messages.map((m, i) => (
-                                <div key={i} className={`p-3 rounded-2xl text-sm max-w-[80%] ${m.role === 'user' ? 'bg-purple-600 text-white ml-auto rounded-br-none' : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'}`}>{m.text}</div>
+                                <div key={i} className={`p-3 rounded-2xl text-sm max-w-[80%] ${m.role === 'user' ?
+                                'bg-purple-600 text-white ml-auto rounded-br-none' : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'}`}>{m.text}</div>
                             ))}
-                            {isTyping && <div className="text-gray-400 text-xs ml-2">Octo tippt...</div>}
+                            {isTyping && <div className="text-gray-400 text-xs ml-2 animate-pulse">Octo denkt nach... 🫧</div>}
                             <div ref={messagesEndRef} />
                         </div>
                         <div className="p-3 bg-white border-t flex gap-2">
