@@ -181,7 +181,7 @@ const OctoChat = ({ user, roomData }) => {
         try {
             // 2. Gemini initialisieren
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+            const model = genAI.getGenerativeModel({ model: "gemma-3-1b" });
 
 
             // 3. Octos Persönlichkeit definieren (System Prompt)
