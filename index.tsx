@@ -263,6 +263,8 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
             const gemCost = supplyVal * 50;
             const priceVal = Math.max(0, parseInt(String(newPrice), 10) || 0);
             const stagesVal = Math.max(1, parseInt(String(newStages), 10) || 1);
+
+            const calculatedReward = Math.floor(stagesVal / 2) * 10; 
             
             if (!roomData) throw new Error("Keine Raumdaten geladen.");
             if ((roomData.gems || 0) < gemCost) throw new Error(`Nicht genug Gems! Du hast ${roomData.gems}, brauchst ${gemCost}.`);
@@ -290,7 +292,7 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
                 createdAt: new Date().toISOString(),
                 type: 'seed',
                 growsInto: 'custom',
-                reward: 10 
+                reward: calculatedReward
             });
 
             setIsCreating(false);
@@ -328,9 +330,11 @@ const BlackMarket = ({ roomData, roomCode, user }) => {
                     icon: listing.icon,
                     stages: listing.stages,
                     type: 'seed',
-                    reward: listing.reward || 10,
+                    // NEU: Berechnung beim Kauf erzwingen
+                    reward: Math.floor(listing.stages / 2) * 10, 
                     price: listing.price 
                 }
+
             });
 
             try {
