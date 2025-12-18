@@ -168,7 +168,6 @@ const OctoChat = ({ user, roomData }) => {
     // Vite nutzt import.meta.env, Create-React-App nutzt process.env
     const API_KEY = import.meta.env.VITE_GEMINI_KEY; 
 
-
     const handleSend = async () => {
         if(!input.trim()) return;
         const userText = input;
@@ -179,37 +178,43 @@ const OctoChat = ({ user, roomData }) => {
         setIsTyping(true);
 
         try {
-            // 2. Gemini initialisieren
+            // --- HIER BAUEN WIR DEN SPICKZETTEL ---
+            const coins = roomData?.coins || 0;
+            const gems = roomData?.gems || 0;
+            
+            // Wir holen uns die Namen der Pflanzen aus dem Inventar
+            const allItems = { ...BASE_ITEMS, ...(roomData?.customDefinitions || {}) };
+            const inventory = roomData?.inventory || {};
+            
+            const plantList = Object.entries(inventory)
+                .filter(([id, count]) => count > 0) // Nur was man wirklich hat
+                .map(([id, count]) => {
+                    const item = allItems[id];
+                    return item ? `${count}x ${item.name}` : `${count}x Unbekannt`;
+                })
+                .join(", ");
+
+            // ---------------------------------------
+
             const genAI = new GoogleGenerativeAI(API_KEY);
             const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
-
-            // 3. Octos Persönlichkeit definieren (System Prompt)
-            // Wir geben ihm Kontext über das Spiel und seine Rolle
             const contextPrompt = `
-                Du bist Octo, ein freundlicher, hilfsbereiter Oktopus, der in einem Garten-Spiel lebt.
-                Deine Persönlichkeit:
-                - Du sagst oft "Blub Blub" oder benutzt Oktopus/Wasser Emojis 🐙 💧.
-                - Du bist witzig und motivierend.
-                - Du fasst dich kurz (max 2-3 Sätze).
+                [SYSTEM INFO - NICHT VORLESEN]
+                Du bist Octo, der Oktopus-Gärtner.
+                Aktueller Spielstand des Spielers:
+                - Münzen: ${coins} 💰
+                - Edelsteine: ${gems} 💎
+                - Sachen im Inventar/Garten: ${plantList || "Nichts"}
                 
-                Wissen über das Spiel:
-                - Es gibt Pflanzen wie Karotten (schnell), Sonnenblumen und Vergissmeinnicht.
-                - Pflanzen muss man alle 6 Stunden gießen.
-                - Auf dem Schwarzmarkt (Totenkopf-Icon) kann man eigene Pflanzen gegen Gems verkaufen.
-                - Gems (Edelsteine) sind selten, Münzen sind häufig.
-                
+                Antworte kurz, witzig (mit "Blub") und beziehe dich auf diese Infos, wenn es passt.
                 Der Spieler fragt: "${userText}"
-                Antworte als Octo:
             `;
 
-            // 4. Anfrage an die KI
             const result = await model.generateContent(contextPrompt);
             const response = result.response.text();
 
-            // 5. Antwort anzeigen
             setMessages(p => [...p, { role: 'model', text: response }]);
-
         } catch (error) {
             console.error("Gemini Error:", error);
             setMessages(p => [...p, { role: 'model', text: "Blub? Mein Kopf tut weh... (API Fehler) 😵‍💫" }]);
@@ -217,6 +222,7 @@ const OctoChat = ({ user, roomData }) => {
             setIsTyping(false);
         }
     };
+
 
     React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
 
