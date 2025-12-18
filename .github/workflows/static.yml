@@ -5,10 +5,8 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
-# --- HIER IST DER SCHLÜSSEL FÜR DEN FIX ---
 permissions:
   contents: write
-# ------------------------------------------
 
 jobs:
   build-and-deploy:
@@ -27,10 +25,11 @@ jobs:
           npm install
           npm run build
         env:
-          # Hier wird dein API Key in die App geladen
           VITE_GEMINI_KEY: ${{ secrets.VITE_GEMINI_KEY }}
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: dist
+          branch: gh-pages
+          token: ${{ secrets.GITHUB_TOKEN }}
