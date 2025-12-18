@@ -31,6 +31,5 @@ jobs:
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: dist
-          # TRICK: Wir nehmen einen neuen Namen!
-          branch: website
+          branch: gh-pages
           token: ${{ secrets.GITHUB_TOKEN }}
