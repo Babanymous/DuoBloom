@@ -166,7 +166,7 @@ const OctoChat = ({ user, roomData }) => {
 
     // HIER DEINEN API KEY EINFÜGEN
     // Vite nutzt import.meta.env, Create-React-App nutzt process.env
-    const API_KEY = "AIzaSyCyZ5EXw8Z2B6JSdVfUjqluqnOPpvTWzT4"; 
+    const API_KEY = import.meta.env.VITE_GEMINI_KEY; 
 
 
     const handleSend = async () => {
