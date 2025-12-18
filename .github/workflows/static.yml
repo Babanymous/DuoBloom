@@ -1,41 +1,35 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+name: Deploy to GitHub Pages
 
 on:
-  # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# --- HIER IST DER SCHLÜSSEL FÜR DEN FIX ---
 permissions:
   contents: write
-  pages: write
-  id-token: write
-
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+# ------------------------------------------
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
       - name: Install and Build
         run: |
           npm install
           npm run build
         env:
-          # Hier wird das Secret in den Build injiziert
-          VITE_GEMINI_KEY: ${{ secrets.VITE_GEMINI_KEY }} 
-          
+          # Hier wird dein API Key in die App geladen
+          VITE_GEMINI_KEY: ${{ secrets.VITE_GEMINI_KEY }}
+
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
