@@ -43,6 +43,30 @@ const GARDEN_UPGRADES = [
     { id: 2, name: "Waldlichtung", price: 650 },
 ];
 
+// --- STYLES FOR TEXTURES ---
+const GlobalStyles = () => (
+    <style>{`
+        .texture-stone {
+            background-color: #a8a29e;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(0,0,0,0.1) 1px, transparent 1px),
+                radial-gradient(circle at 10% 10%, rgba(255,255,255,0.2) 1px, transparent 1px);
+            background-size: 10px 10px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
+        .texture-wood {
+            background-color: #855e42;
+            background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 2px, transparent 2px, transparent 8px);
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    `}</style>
+);
+
 // --- COMPONENTS ---
 
 const Icon = ({ name, size = 24, className = "" }) => {
@@ -125,17 +149,6 @@ const GridCell = ({ x, y, cell, handleGridClick, now, items }: { x: number, y: n
     );
 };
 
-// --- ERROR & MODALS ---
-
-class ErrorBoundary extends React.Component<any, any> {
-    constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-    static getDerivedStateFromError(error) { return { hasError: true, error }; }
-    render() {
-        if (this.state.hasError) { return <div className="p-4 text-red-500">Kritischer Fehler. <button onClick={()=>window.location.reload()} className="underline">Neustart</button></div>; }
-        return this.props.children; 
-    }
-}
-
 const Modal = ({ children, onClose, title }: { children: React.ReactNode, onClose: () => void, title: string }) => (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-pop">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]">
@@ -171,8 +184,8 @@ const OctoChat = ({ user, roomData }) => {
         // 2. Antwort Logik (Keyword basierter Spickzettel)
         setTimeout(() => {
             const lowerText = userText.toLowerCase();
-            let response = "Blub? Das verstehe ich nicht. Frag mich nach 'Geld', 'Wasser' oder 'Hilfe'. 🐙";
-            
+            let response = ""; // Leer initialisieren
+
             // DATEN HOLEN
             const coins = roomData?.coins || 0;
             const gems = roomData?.gems || 0;
@@ -182,11 +195,14 @@ const OctoChat = ({ user, roomData }) => {
             // LOGIK
             if (lowerText.includes("hallo") || lowerText.includes("hi") || lowerText.includes("moin")) {
                 response = "Blub Blub! Schön dich zu sehen! 👋 Wie geht's deinem Garten?";
-            } else if (lowerText.includes("geld") || lowerText.includes("münzen") || lowerText.includes("money") || lowerText.includes("coins")) {
-                response = `Du bist reich! (oder auch nicht...) Blub! 💰 Du hast aktuell ${coins} Münzen.`;
-            } else if (lowerText.includes("gem") || lowerText.includes("edelstein") || lowerText.includes("dia")) {
-                response = `Funkel funkel! 💎 Du besitzt ${gems} Edelsteine. Sparsam damit umgehen! Blub!`;
-            } else if (lowerText.includes("inventar") || lowerText.includes("tasche") || lowerText.includes("habe ich")) {
+            } 
+            else if (lowerText.includes("geld") || lowerText.includes("münzen") || lowerText.includes("money") || lowerText.includes("coins")) {
+                response = `Du hast aktuell ${coins} Münzen. 💰`;
+            } 
+            else if (lowerText.includes("gem") || lowerText.includes("edelstein") || lowerText.includes("dia")) {
+                response = `Funkel funkel! 💎 Du besitzt ${gems} Edelsteine.`;
+            } 
+            else if (lowerText.includes("inventar") || lowerText.includes("tasche") || lowerText.includes("habe ich")) {
                 if (invItems.length === 0) {
                     response = "Deine Taschen sind leer wie mein Magen... Blub. Kauf was im Shop!";
                 } else {
@@ -195,23 +211,33 @@ const OctoChat = ({ user, roomData }) => {
                          return `${count}x ${itemDef.name}`;
                     }).join(", ") + ".";
                 }
-            } else if (lowerText.includes("wasser") || lowerText.includes("gießen")) {
-                response = "Pflanzen brauchen Wasser! 💧 Klicke auf eine Pflanze, um sie zu gießen. Wenn sie blau leuchtet, braucht sie Wasser. Blub!";
-            } else if (lowerText.includes("hilfe") || lowerText.includes("help") || lowerText.includes("was tun")) {
-                response = "Hier bin ich! 🐙\n1. Kaufe Samen im Shop.\n2. Pflanze sie im Garten.\n3. Gieße sie regelmäßig.\n4. Ernte sie für Münzen!\n5. Erfülle Aufgaben für Extra-Belohnungen.";
-            } else if (lowerText.includes("shop") || lowerText.includes("kaufen")) {
+            } 
+            else if (lowerText.includes("wasser") || lowerText.includes("gießen")) {
+                response = "Pflanzen brauchen Wasser! 💧 Klicke auf eine Pflanze, um sie zu gießen.";
+            } 
+            else if (lowerText.includes("hilfe") || lowerText.includes("help") || lowerText.includes("was tun")) {
+                response = "Hier bin ich! 🐙\n1. Kaufe Samen im Shop.\n2. Pflanze sie im Garten.\n3. Gieße sie regelmäßig.\n4. Ernte sie für Münzen!";
+            } 
+            else if (lowerText.includes("shop") || lowerText.includes("kaufen")) {
                 response = "Der Shop ist unten im Menü. Dort gibt es Samen für Münzen und neue Gärten für Edelsteine! 🛒";
-            } else if (lowerText.includes("schwarzmarkt")) {
-                response = "Psst... 💀 Der Schwarzmarkt ist gefährlich. Aber lukrativ! Du kannst dort eigene Pflanzen erstellen.";
-            } else if (lowerText.includes("wetter")) {
+            } 
+            else if (lowerText.includes("schwarzmarkt")) {
+                response = "Psst... 💀 Der Schwarzmarkt ist gefährlich. Aber lukrativ!";
+            } 
+            else if (lowerText.includes("wetter")) {
                 response = "Unter Wasser ist das Wetter immer nass! Blub! 🌧️";
-            } else if (lowerText.includes("danke")) {
+            } 
+            else if (lowerText.includes("danke")) {
                 response = "Gerne! Blub! ❤️";
+            }
+            else {
+                // FALLBACK - KEIN API FEHLER MEHR
+                response = "Blub? Das verstehe ich nicht ganz. 🐙\nIch kenne mich aus mit:\n- 'Geld' oder 'Münzen' 💰\n- 'Inventar' 🎒\n- 'Hilfe' ❓\n- 'Wasser' 💧";
             }
 
             setMessages(p => [...p, { role: 'model', text: response }]);
             setIsTyping(false);
-        }, 800); // Kleine Verzögerung für "Realismus"
+        }, 800); 
     };
 
     React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
@@ -729,6 +755,7 @@ const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
 
     return (
         <div className={`flex h-full bg-slate-100 overflow-hidden md:max-w-7xl md:mx-auto md:my-8 md:rounded-3xl md:shadow-2xl md:border ${isSpectator ? 'border-purple-300 ring-4 ring-purple-100' : 'border-slate-200'}`}>
+            <GlobalStyles />
             <nav className="fixed bottom-0 left-0 w-full bg-white border-t z-40 flex justify-around p-2 pb-safe md:relative md:w-64 md:flex-col md:justify-start md:border-t-0 md:border-r md:p-6 md:gap-4">
                 <div className="hidden md:block mb-8"><h1 className="text-2xl font-bold text-green-600 flex items-center gap-2"><Icon name="sprout"/> DuoBloom</h1>{isSpectator && <div className="bg-purple-100 text-purple-600 text-xs px-2 py-1 rounded mt-2 font-bold uppercase text-center">Zuschauer</div>}</div>
                 <button onClick={() => setTab('garden')} className={`p-3 rounded-xl flex md:flex-row flex-col items-center gap-3 transition-all ${tab === 'garden' ? 'bg-green-50 text-green-600 font-bold' : 'text-gray-400 hover:bg-gray-50'}`}><Icon name="flower-2"/> <span className="text-[10px] md:text-sm">Garten</span></button>
