@@ -1,10 +1,8 @@
-// NEU (EINFÜGEN):
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, getDoc, getDocs, addDoc, arrayUnion, increment, deleteField, query, limit, orderBy, collectionGroup } from "firebase/firestore";
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { GoogleGenerativeAI } from "@google/generative-ai"; // Falls du die KI schon drin hast
 
 // CONFIG
 const firebaseConfig = {
@@ -150,79 +148,71 @@ const Modal = ({ children, onClose, title }: { children: React.ReactNode, onClos
     </div>
 );
 
-// --- OCTO CHAT ---
-
-// --- OCTO CHAT MIT GEMINI ---
+// --- OCTO CHAT (KEYWORD BASIERT / OHNE KI) ---
 
 const OctoChat = ({ user, roomData }) => {
     const [isOpen, setIsOpen] = React.useState(false);
-    // Startnachricht
     const [messages, setMessages] = React.useState([
-        { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo. Frag mich alles über deinen Garten!` }
+        { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo. Frag mich nach 'Hilfe', 'Geld', 'Inventar' oder 'Garten'. Blub!` }
     ]);
     const [input, setInput] = React.useState("");
     const [isTyping, setIsTyping] = React.useState(false);
     const messagesEndRef = React.useRef(null);
 
-    // HIER DEINEN API KEY EINFÜGEN
-    // Vite nutzt import.meta.env, Create-React-App nutzt process.env
-    const API_KEY = import.meta.env.VITE_GEMINI_KEY; 
-
-    const handleSend = async () => {
+    const handleSend = () => {
         if(!input.trim()) return;
         const userText = input;
         
-        // 1. User Nachricht sofort anzeigen
+        // 1. User Nachricht anzeigen
         setMessages(p => [...p, { role: 'user', text: userText }]);
         setInput("");
         setIsTyping(true);
 
-        try {
-            // --- HIER BAUEN WIR DEN SPICKZETTEL ---
+        // 2. Antwort Logik (Keyword basierter Spickzettel)
+        setTimeout(() => {
+            const lowerText = userText.toLowerCase();
+            let response = "Blub? Das verstehe ich nicht. Frag mich nach 'Geld', 'Wasser' oder 'Hilfe'. 🐙";
+            
+            // DATEN HOLEN
             const coins = roomData?.coins || 0;
             const gems = roomData?.gems || 0;
-            
-            // Wir holen uns die Namen der Pflanzen aus dem Inventar
-            const allItems = { ...BASE_ITEMS, ...(roomData?.customDefinitions || {}) };
             const inventory = roomData?.inventory || {};
-            
-            const plantList = Object.entries(inventory)
-                .filter(([id, count]) => count > 0) // Nur was man wirklich hat
-                .map(([id, count]) => {
-                    const item = allItems[id];
-                    return item ? `${count}x ${item.name}` : `${count}x Unbekannt`;
-                })
-                .join(", ");
+            const invItems = Object.entries(inventory).filter(([_,c]) => (c as number) > 0);
 
-            // ---------------------------------------
-
-            const genAI = new GoogleGenerativeAI(API_KEY);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-
-            const contextPrompt = `
-                [SYSTEM INFO - NICHT VORLESEN]
-                Du bist Octo, der Oktopus-Gärtner.
-                Aktueller Spielstand des Spielers:
-                - Münzen: ${coins} 💰
-                - Edelsteine: ${gems} 💎
-                - Sachen im Inventar/Garten: ${plantList || "Nichts"}
-                
-                Antworte kurz, witzig (mit "Blub") und beziehe dich auf diese Infos, wenn es passt.
-                Der Spieler fragt: "${userText}"
-            `;
-
-            const result = await model.generateContent(contextPrompt);
-            const response = result.response.text();
+            // LOGIK
+            if (lowerText.includes("hallo") || lowerText.includes("hi") || lowerText.includes("moin")) {
+                response = "Blub Blub! Schön dich zu sehen! 👋 Wie geht's deinem Garten?";
+            } else if (lowerText.includes("geld") || lowerText.includes("münzen") || lowerText.includes("money") || lowerText.includes("coins")) {
+                response = `Du bist reich! (oder auch nicht...) Blub! 💰 Du hast aktuell ${coins} Münzen.`;
+            } else if (lowerText.includes("gem") || lowerText.includes("edelstein") || lowerText.includes("dia")) {
+                response = `Funkel funkel! 💎 Du besitzt ${gems} Edelsteine. Sparsam damit umgehen! Blub!`;
+            } else if (lowerText.includes("inventar") || lowerText.includes("tasche") || lowerText.includes("habe ich")) {
+                if (invItems.length === 0) {
+                    response = "Deine Taschen sind leer wie mein Magen... Blub. Kauf was im Shop!";
+                } else {
+                    response = "In deinen Taschen finde ich: " + invItems.map(([id, count]) => {
+                         const itemDef = BASE_ITEMS[id] || (roomData.customDefinitions?.[id]) || {name: 'Unbekannt'};
+                         return `${count}x ${itemDef.name}`;
+                    }).join(", ") + ".";
+                }
+            } else if (lowerText.includes("wasser") || lowerText.includes("gießen")) {
+                response = "Pflanzen brauchen Wasser! 💧 Klicke auf eine Pflanze, um sie zu gießen. Wenn sie blau leuchtet, braucht sie Wasser. Blub!";
+            } else if (lowerText.includes("hilfe") || lowerText.includes("help") || lowerText.includes("was tun")) {
+                response = "Hier bin ich! 🐙\n1. Kaufe Samen im Shop.\n2. Pflanze sie im Garten.\n3. Gieße sie regelmäßig.\n4. Ernte sie für Münzen!\n5. Erfülle Aufgaben für Extra-Belohnungen.";
+            } else if (lowerText.includes("shop") || lowerText.includes("kaufen")) {
+                response = "Der Shop ist unten im Menü. Dort gibt es Samen für Münzen und neue Gärten für Edelsteine! 🛒";
+            } else if (lowerText.includes("schwarzmarkt")) {
+                response = "Psst... 💀 Der Schwarzmarkt ist gefährlich. Aber lukrativ! Du kannst dort eigene Pflanzen erstellen.";
+            } else if (lowerText.includes("wetter")) {
+                response = "Unter Wasser ist das Wetter immer nass! Blub! 🌧️";
+            } else if (lowerText.includes("danke")) {
+                response = "Gerne! Blub! ❤️";
+            }
 
             setMessages(p => [...p, { role: 'model', text: response }]);
-        } catch (error) {
-            console.error("Gemini Error:", error);
-            setMessages(p => [...p, { role: 'model', text: "Blub? Mein Kopf tut weh... (API Fehler) 😵‍💫" }]);
-        } finally {
             setIsTyping(false);
-        }
+        }, 800); // Kleine Verzögerung für "Realismus"
     };
-
 
     React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
 
@@ -235,19 +225,19 @@ const OctoChat = ({ user, roomData }) => {
                 <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
                     <div className="bg-white w-full md:w-[380px] h-[60vh] md:h-[500px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4 overflow-hidden">
                         <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
-                            <div className="flex items-center gap-3"><img src={OCTO_IMG} className="w-8 h-8"/> <span className="font-bold">Octo KI</span></div>
+                            <div className="flex items-center gap-3"><img src={OCTO_IMG} className="w-8 h-8"/> <span className="font-bold">Octo Guide</span></div>
                             <button onClick={() => setIsOpen(false)}><Icon name="x" size={20}/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
                             {messages.map((m, i) => (
-                                <div key={i} className={`p-3 rounded-2xl text-sm max-w-[80%] ${m.role === 'user' ?
+                                <div key={i} className={`p-3 rounded-2xl text-sm max-w-[80%] whitespace-pre-wrap ${m.role === 'user' ?
                                 'bg-purple-600 text-white ml-auto rounded-br-none' : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'}`}>{m.text}</div>
                             ))}
-                            {isTyping && <div className="text-gray-400 text-xs ml-2 animate-pulse">Octo denkt nach... 🫧</div>}
+                            {isTyping && <div className="text-gray-400 text-xs ml-2 animate-pulse">Octo blubbert... 🫧</div>}
                             <div ref={messagesEndRef} />
                         </div>
                         <div className="p-3 bg-white border-t flex gap-2">
-                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Frag Octo..." className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none" />
+                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Frag: Geld, Inventar, Hilfe..." className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none" />
                             <button onClick={handleSend} className="bg-purple-600 text-white p-2 rounded-xl"><Icon name="send" size={20}/></button>
                         </div>
                     </div>
@@ -902,3 +892,4 @@ const App = () => {
 
 const root = createRoot(document.getElementById('root'));
 root.render(<App />);
+
