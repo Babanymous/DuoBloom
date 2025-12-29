@@ -290,6 +290,84 @@ const GridCell = ({ x, y, cell, handleGridClick, now, items }) => {
 };
 
 // ==================== OCTO CHAT ====================
+const ProgressCard = ({ stats }) => {
+  const [animProgress, setAnimProgress] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimProgress(stats.productivityScore), 300);
+    return () => clearTimeout(timer);
+  }, [stats.productivityScore]);
+
+  return (
+    <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl p-5 border-2 border-purple-200 my-2">
+      <div className="text-center mb-4">
+        <div className="text-4xl mb-2">📊</div>
+        <h3 className="font-bold text-lg text-gray-800">Deine Produktivität</h3>
+        <p className="text-xs text-gray-500">Letzte 7 Tage</p>
+      </div>
+
+      <div className="space-y-4">
+        {/* Productivity Score */}
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-bold text-gray-600">Produktivitätswert</span>
+            <span className="text-2xl font-black text-purple-600">{stats.productivityScore}/10</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-1000 ease-out"
+              style={{ width: `${animProgress * 10}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-2 text-center">{stats.productivityMessage}</p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+            <div className="text-2xl mb-1">✅</div>
+            <div className="text-xl font-bold text-green-600">{stats.tasksCompleted}</div>
+            <div className="text-xs text-gray-500">Aufgaben</div>
+          </div>
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+            <div className="text-2xl mb-1">🌱</div>
+            <div className="text-xl font-bold text-blue-600">{stats.plantsHarvested}</div>
+            <div className="text-xs text-gray-500">Geerntet</div>
+          </div>
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+            <div className="text-2xl mb-1">🔥</div>
+            <div className="text-xl font-bold text-orange-600">{stats.currentStreak}</div>
+            <div className="text-xs text-gray-500">Streak</div>
+          </div>
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+            <div className="text-2xl mb-1">💰</div>
+            <div className="text-xl font-bold text-yellow-600">{stats.coinsEarned}</div>
+            <div className="text-xs text-gray-500">Verdient</div>
+          </div>
+        </div>
+
+        {/* Motivation Message */}
+        <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl p-3 text-white text-center text-sm font-medium">
+          {stats.motivationMessage}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const LoadingAnimation = () => (
+  <div className="flex flex-col items-center justify-center py-6">
+    <div className="relative w-16 h-16 mb-3">
+      <div className="absolute inset-0 border-4 border-purple-200 rounded-full animate-ping" />
+      <div className="absolute inset-0 border-4 border-t-purple-600 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin" />
+      <div className="absolute inset-2 bg-purple-100 rounded-full flex items-center justify-center">
+        <span className="text-2xl">📊</span>
+      </div>
+    </div>
+    <p className="text-sm text-gray-500 animate-pulse">Analysiere deinen Fortschritt...</p>
+  </div>
+);
+
 const OctoChat = ({ user, roomData }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -302,6 +380,7 @@ const OctoChat = ({ user, roomData }) => {
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Advanced keyword matching with fuzzy understanding
@@ -309,8 +388,279 @@ const OctoChat = ({ user, roomData }) => {
     return keywords.some(keyword => text.includes(keyword));
   };
 
+  const calculateProductivityStats = () => {
+    const tasks = roomData?.tasks || [];
+    const streak = roomData?.currentStreak || 0;
+    const coins = roomData?.coins || 0;
+    const gems = roomData?.gems || 0;
+    
+    // Calculate completed tasks (approximation for last 7 days)
+    const completedTasks = tasks.filter(t => t.done).length;
+    
+    // Estimate plants harvested based on gems (rough estimate)
+    const plantsHarvested = Math.floor(gems / 10); // Assuming avg 10 gems per harvest
+    
+    // Calculate productivity score (1-10)
+    let score = 0;
+    if (streak > 0) score += Math.min(3, streak / 2); // Max 3 points for streak
+    if (completedTasks > 0) score += Math.min(3, completedTasks / 3); // Max 3 points for tasks
+    if (plantsHarvested > 0) score += Math.min(2, plantsHarvested / 5); // Max 2 points for harvests
+    if (coins > 50) score += Math.min(2, coins / 100); // Max 2 points for coins
+    
+    score = Math.min(10, Math.round(score));
+
+    // Productivity message based on score
+    let productivityMessage = "";
+    let motivationMessage = "";
+    
+    if (score === 0) {
+      productivityMessage = "Zeit, loszulegen! 🌱";
+      motivationMessage = "Jeder Meistergärtner fängt klein an! 💪";
+    } else if (score <= 3) {
+      productivityMessage = "Guter Start! 👍";
+      motivationMessage = "Du bist auf dem richtigen Weg! Weiter so! 🌟";
+    } else if (score <= 5) {
+      productivityMessage = "Solide Leistung! 💪";
+      motivationMessage = "Du machst großartige Fortschritte! 🚀";
+    } else if (score <= 7) {
+      productivityMessage = "Beeindruckend! 🌟";
+      motivationMessage = "Du bist echt fleißig! Respekt! 🎉";
+    } else if (score <= 9) {
+      productivityMessage = "Fantastisch! 🔥";
+      motivationMessage = "Du bist ein wahrer Garten-Meister! 👑";
+    } else {
+      productivityMessage = "PERFEKT! 🏆";
+      motivationMessage = "LEGENDE! Du bist unaufhaltsam! ⭐✨";
+    }
+
+    return {
+      productivityScore: score,
+      productivityMessage,
+      motivationMessage,
+      tasksCompleted: completedTasks,
+      plantsHarvested,
+      currentStreak: streak,
+      coinsEarned: coins
+    };
+  };
+
   const getOctoResponse = (userText: string) => {
     const text = userText.toLowerCase().trim();
+    
+    // Check for progress request FIRST
+    if (matchesKeywords(text, ['progress', 'fortschritt', 'statistik', 'stats', 'produktiv', 'leistung', 'bilanz'])) {
+      return { type: 'progress' };
+    }
+    
+    // Get data
+    const coins = roomData?.coins || 0;
+    const gems = roomData?.gems || 0;
+    const inventory = roomData?.inventory || {};
+    const tasks = roomData?.tasks || [];
+    const gardens = roomData?.gardens || {};
+    const streak = roomData?.currentStreak || 0;
+    const invItems = Object.entries(inventory).filter(([_, c]) => (c as number) > 0);
+    
+    // Count plants in garden
+    let plantCount = 0;
+    let grownPlants = 0;
+    Object.values(gardens).forEach((grid: any) => {
+      Object.values(grid).forEach((cell: any) => {
+        if (cell.item && BASE_ITEMS[cell.item]?.type === 'seed') {
+          plantCount++;
+          if (cell.grown) grownPlants++;
+        }
+      });
+    });
+
+    // GREETINGS & SOCIAL
+    if (matchesKeywords(text, ['hallo', 'hi', 'hey', 'moin', 'servus', 'grüß'])) {
+      const responses = [
+        `Blub Blub! Schön dich zu sehen, ${user.displayName?.split(" ")[0]}! 👋 Dein Garten sieht ${coins > 50 ? 'prächtig' : 'vielversprechend'} aus!`,
+        `Hey! 🐙 Willkommen zurück! Du hast ${plantCount} Pflanzen im Garten. ${grownPlants > 0 ? `${grownPlants} sind bereit zur Ernte! 🌱` : ''}`,
+        `Blub! Freut mich dass du da bist! 💙 Mit ${coins} Münzen kannst du richtig loslegen!`
+      ];
+      return { type: 'text', text: responses[Math.floor(Math.random() * responses.length)] };
+    }
+
+    // MONEY & RESOURCES
+    if (matchesKeywords(text, ['geld', 'münze', 'coin', 'money', 'reich', 'arm', 'verdien', 'kriege'])) {
+      if (coins < 20) {
+        return { type: 'text', text: `Blub... Du hast nur noch ${coins} Münzen. 😰 Ernte deine Pflanzen oder erledige Aufgaben für mehr Geld!` };
+      } else if (coins < 100) {
+        return { type: 'text', text: `Du hast ${coins} Münzen. 💰 Nicht schlecht! Investiere sie weise in Samen oder spare für neue Gärten.` };
+      } else {
+        return { type: 'text', text: `Wow! ${coins} Münzen! 🤑 Du bist ja reich! Vielleicht magst du auf dem Schwarzmarkt eigene Pflanzen verkaufen?` };
+      }
+    }
+
+    if (matchesKeywords(text, ['gem', 'edelstein', 'diamant', 'juwel', 'kristall'])) {
+      if (gems === 0) {
+        return { type: 'text', text: `Keine Edelsteine... 😢 Ernte gewachsene Pflanzen, um welche zu bekommen! Je schwieriger die Pflanze, desto mehr Gems gibt's! 💎` };
+      } else if (gems < 100) {
+        return { type: 'text', text: `Du hast ${gems} Edelsteine! ✨ Damit kannst du bald einen neuen Garten kaufen (kostet 200 Gems).` };
+      } else {
+        return { type: 'text', text: `${gems} Edelsteine! 💎✨ Du schwimmst ja im Reichtum! Gönn dir einen neuen Garten oder verkauf was auf dem Schwarzmarkt!` };
+      }
+    }
+
+    // INVENTORY
+    if (matchesKeywords(text, ['inventar', 'tasche', 'habe', 'besitz', 'item', 'gegenstand'])) {
+      if (invItems.length === 0) {
+        return { type: 'text', text: `Deine Taschen sind so leer wie das Meer vor dem Leben... Blub. 😅 Geh shoppen! Im Shop unten gibt's alles was dein Gärtnerherz begehrt! 🛒` };
+      }
+      const itemList = invItems.map(([id, count]) => {
+        const itemDef = BASE_ITEMS[id] || roomData.customDefinitions?.[id] || { name: 'Unbekannt' };
+        return `${count}x ${itemDef.name}`;
+      }).join(", ");
+      return { type: 'text', text: `In deinen Taschen schwimmen: ${itemList}! 🎒\n\nKlicke auf einen Gegenstand und dann auf den Garten, um ihn zu platzieren. Blub!` };
+    }
+
+    // GARDEN & PLANTS
+    if (matchesKeywords(text, ['garten', 'pflanze', 'pflanzen', 'garden', 'blume', 'wachs'])) {
+      if (plantCount === 0) {
+        return { type: 'text', text: `Dein Garten ist leer! 🏜️ Kaufe Samen im Shop und pflanze sie, indem du sie im Inventar auswählst und dann auf ein freies Feld klickst. Los geht's! 🌱` };
+      }
+      return { type: 'text', text: `Du hast ${plantCount} Pflanzen im Garten! 🌿 Davon sind ${grownPlants} bereit zur Ernte. ${plantCount - grownPlants > 0 ? `Die anderen brauchen noch Wasser! 💧` : 'Tolle Arbeit! 👏'}` };
+    }
+
+    if (matchesKeywords(text, ['wasser', 'gieß', 'trink', 'nass', 'durst'])) {
+      const needWater = plantCount - grownPlants;
+      if (needWater > 0) {
+        return { type: 'text', text: `${needWater} Pflanzen brauchen Wasser! 💧 Klicke auf eine Pflanze im Garten, um sie zu gießen. Nach 6 Stunden kannst du nochmal gießen. Geduld ist der Schlüssel! 🕐` };
+      }
+      return { type: 'text', text: `Alle Pflanzen sind gewachsen oder brauchen gerade kein Wasser! 💦 Ernte sie ab oder pflanze neue Samen! 🌻` };
+    }
+
+    if (matchesKeywords(text, ['ernte', 'sammeln', 'abhol', 'fertig', 'gewachs'])) {
+      if (grownPlants > 0) {
+        return { type: 'text', text: `Juhu! 🎉 Du hast ${grownPlants} Pflanzen zum Ernten! Klicke auf die gewachsenen Pflanzen, um sie einzusammeln und Edelsteine zu verdienen! 💎` };
+      }
+      return { type: 'text', text: `Noch keine Pflanzen bereit. ⏳ Gieße sie regelmäßig und sei geduldig, dann werden sie groß und stark! Blub blub! 🌱` };
+    }
+
+    // TASKS & STREAK
+    if (matchesKeywords(text, ['aufgabe', 'task', 'todo', 'erledige', 'mission'])) {
+      const activeTasks = tasks.filter(t => !t.done || (t.type === 'daily' && t.lastDone !== new Date().toISOString().split('T')[0]));
+      if (activeTasks.length === 0) {
+        return { type: 'text', text: `Keine offenen Aufgaben! 🎯 Erstelle neue im Aufgaben-Tab. Aufgaben bringen dir Münzen und pushen deinen Streak! 🔥` };
+      }
+      const totalReward = activeTasks.reduce((sum, t) => sum + (t.reward || 0), 0);
+      return { type: 'text', text: `Du hast ${activeTasks.length} offene Aufgaben! ✅ Wenn du alle erledigst, verdienst du ${totalReward} Münzen! Ran an die Arbeit! 💪` };
+    }
+
+    if (matchesKeywords(text, ['streak', 'serie', 'täglich', 'jeden tag', 'dran bleib'])) {
+      if (streak === 0) {
+        return { type: 'text', text: `Du hast noch keinen Streak! 😢 Erledige täglich mindestens eine Aufgabe, um deinen Streak zu starten. Je länger, desto cooler wird das Badge! 🔥` };
+      } else if (streak < 7) {
+        return { type: 'text', text: `${streak} Tage Streak! 🔥 Super Anfang! Mach weiter so und du wirst belohnt mit einem noch krasseren Badge! Keep going! 💪` };
+      } else {
+        return { type: 'text', text: `WOW! ${streak} Tage Streak! 🔥🔥🔥 Du bist absolut unaufhaltsam! Deine Disziplin ist legendary! Weiter so, Champion! 👑` };
+      }
+    }
+
+    // SHOP & BUYING
+    if (matchesKeywords(text, ['shop', 'kauf', 'kauf', 'market', 'store', 'verkauf'])) {
+      if (coins < 20) {
+        return { type: 'text', text: `Du hast nur ${coins} Münzen... 💸 Die günstigsten Samen kosten 20 Münzen. Erledige erst ein paar Aufgaben! 💼` };
+      }
+      return { type: 'text', text: `Der Shop ist im unteren Menü! 🛒 Du kannst Samen kaufen (ab 20 Münzen) oder neue Gärten freischalten (kostet Edelsteine 💎). Viel Spaß beim Shoppen!` };
+    }
+
+    // BLACK MARKET
+    if (matchesKeywords(text, ['schwarzmarkt', 'black market', 'illegal', 'schmuggel', 'handel'])) {
+      if (gems < 50) {
+        return { type: 'text', text: `Schwarzmarkt? Gefährlich... aber lukrativ! 💀 Du brauchst mindestens 50 Edelsteine, um dort ein Angebot zu erstellen. Spare fleißig! 💎` };
+      }
+      return { type: 'text', text: `Psst... 💀 Im Schwarzmarkt kannst du eigene Pflanzen-Items erstellen und verkaufen! Du verdienst 60% pro Verkauf. Kosten: 50 Gems pro Item. Interessant, nicht wahr? 😏` };
+    }
+
+    // HELP
+    if (matchesKeywords(text, ['hilfe', 'help', 'tutorial', 'anleitung', 'wie', 'was mach', 'versteh nicht'])) {
+      return { type: 'text', text: `Kein Problem! Hier die Basics: 🐙\n\n1️⃣ Kaufe Samen im Shop\n2️⃣ Wähle sie im Inventar aus\n3️⃣ Klicke auf den Garten zum Pflanzen\n4️⃣ Gieße regelmäßig (alle 6h)\n5️⃣ Ernte für Edelsteine 💎\n6️⃣ Erledige Aufgaben für Münzen 💰\n\nFrag mich, wenn du mehr wissen willst! Blub!` };
+    }
+
+    // EMOTIONAL SUPPORT
+    if (matchesKeywords(text, ['traurig', 'sad', 'schlecht', 'mies', 'down', 'depri'])) {
+      return { type: 'text', text: `Ach nein! 😢 Kopf hoch, ${user.displayName?.split(" ")[0]}! Ein schöner Garten hebt die Stimmung. Pflanze ein paar Blumen und schau zu, wie sie wachsen! 🌻 Ich glaube an dich! 💙` };
+    }
+
+    if (matchesKeywords(text, ['danke', 'dank', 'thank', 'lieb', 'toll', 'super'])) {
+      const responses = [
+        `Gerne doch! Blub! ❤️ Ich bin immer für dich da!`,
+        `Kein Problem! 🐙 Frag mich jederzeit, wenn du Hilfe brauchst!`,
+        `Freut mich zu helfen! 💙 Viel Erfolg mit deinem Garten! 🌻`
+      ];
+      return { type: 'text', text: responses[Math.floor(Math.random() * responses.length)] };
+    }
+
+    if (matchesKeywords(text, ['gut', 'toll', 'schön', 'nice', 'cool', 'awesome'])) {
+      return { type: 'text', text: `Freut mich, dass es dir gefällt! 🎉 Mit ${coins} Münzen und ${gems} Gems bist du auf einem guten Weg! Keep it up! 💪` };
+    }
+
+    // SMALL TALK
+    if (matchesKeywords(text, ['wetter', 'weather', 'regen', 'sonne'])) {
+      return { type: 'text', text: `Unter Wasser ist das Wetter immer gleich: nass! 🌊 Aber deine Pflanzen mögen's! Blub blub! 💧` };
+    }
+
+    if (matchesKeywords(text, ['wer bist du', 'who are you', 'name', 'octopus', 'krake'])) {
+      return { type: 'text', text: `Ich bin Octo! 🐙 Ein freundlicher Oktopus, der dir bei deinem Garten hilft! Ich kenne alle Geheimnisse von DuoBloom und bin immer für dich da! Blub! 💙` };
+    }
+
+    if (matchesKeywords(text, ['wie geht', 'how are you', 'alles gut'])) {
+      return { type: 'text', text: `Mir geht's super! 🐙 Unter Wasser ist's gemütlich! Aber wichtiger: Wie geht's DIR? Dein Garten hat ${plantCount} Pflanzen und du ${coins} Münzen - läuft doch! 🌱` };
+    }
+
+    // QUESTIONS ABOUT GAME MECHANICS
+    if (matchesKeywords(text, ['level', 'unlock', 'freischalt', 'neu'])) {
+      const unlockedCount = roomData?.unlockedGardens?.length || 1;
+      return { type: 'text', text: `Du hast ${unlockedCount} von 3 Gärten freigeschaltet! 🏞️ Der nächste kostet ${unlockedCount === 1 ? '200' : '650'} Edelsteine. Mehr Platz = mehr Pflanzen = mehr Profit! 💎` };
+    }
+
+    if (matchesKeywords(text, ['code', 'teilen', 'freunde', 'zusammen', 'multi'])) {
+      return { type: 'text', text: `Du kannst deinen Garten-Code mit Freunden teilen! 🤝 Sie finden den Code oben im Header. So könnt ihr zusammen gärtnern! Außerdem gibt's die Community-Liste zum Stöbern! 🌍` };
+    }
+
+    // FALLBACK - But smarter
+    const intelligentFallback = [
+      `Blub? Hmm... 🤔 Ich glaube, ich verstehe! Probier's vielleicht nochmal anders zu formulieren? Oder frag nach: Geld, Inventar, Garten, Aufgaben, Shop, Progress, Hilfe! 🐙`,
+      `Interessante Frage! 💭 Ich bin mir nicht ganz sicher, aber ich kann dir helfen mit: deinem Kontostand, Inventar, Garteninfos, Aufgaben, Fortschritt oder dem Shop! Was brauchst du? 🌊`,
+      `Blub blub! 🐙 Ich möchte dir helfen, aber das hab ich nicht ganz verstanden. Frag mich einfach: "Wie viel Geld habe ich?", "Was ist im Inventar?" oder "Progress"! 💧`
+    ];
+    return { type: 'text', text: intelligentFallback[Math.floor(Math.random() * intelligentFallback.length)] };
+  };
+
+  const handleSend = () => {
+    if (!input.trim()) return;
+    const userText = input;
+
+    setMessages((p) => [...p, { role: "user", text: userText }]);
+    setInput("");
+    setIsTyping(true);
+    setShowProgress(false);
+
+    setTimeout(() => {
+      const response = getOctoResponse(userText);
+      
+      if (response.type === 'progress') {
+        // Show loading animation
+        setMessages((p) => [...p, { role: "loading", text: "" }]);
+        
+        // After 1.5 seconds, replace loading with progress card
+        setTimeout(() => {
+          const stats = calculateProductivityStats();
+          setMessages((p) => {
+            const filtered = p.filter(m => m.role !== 'loading');
+            return [...filtered, { role: "progress", stats }];
+          });
+          setIsTyping(false);
+        }, 1500);
+      } else {
+        setMessages((p) => [...p, { role: "model", text: response.text }]);
+        setIsTyping(false);
+      }
+    }, 300);
+  };
     
     // Get data
     const coins = roomData?.coins || 0;
@@ -523,7 +873,7 @@ const OctoChat = ({ user, roomData }) => {
       </button>
       {isOpen && (
         <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
-          <div className="bg-white w-full md:w-[380px] h-[60vh] md:h-[500px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4 overflow-hidden">
+          <div className="bg-white w-full md:w-[400px] h-[65vh] md:h-[550px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4 overflow-hidden">
             <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
               <div className="flex items-center gap-3">
                 <img src={OCTO_IMG} className="w-8 h-8" alt="Octo" />
@@ -533,20 +883,28 @@ const OctoChat = ({ user, roomData }) => {
                 <Icon name="x" size={20} />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`p-3 rounded-2xl text-sm max-w-[80%] whitespace-pre-wrap ${
-                    m.role === "user"
-                      ? "bg-purple-600 text-white ml-auto rounded-br-none"
-                      : "bg-white border text-gray-800 rounded-bl-none shadow-sm"
-                  }`}
-                >
-                  {m.text}
-                </div>
-              ))}
-              {isTyping && (
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4 no-scrollbar">
+              {messages.map((m, i) => {
+                if (m.role === "loading") {
+                  return <LoadingAnimation key={i} />;
+                }
+                if (m.role === "progress") {
+                  return <ProgressCard key={i} stats={m.stats} />;
+                }
+                return (
+                  <div
+                    key={i}
+                    className={`p-3 rounded-2xl text-sm max-w-[85%] whitespace-pre-wrap ${
+                      m.role === "user"
+                        ? "bg-purple-600 text-white ml-auto rounded-br-none"
+                        : "bg-white border text-gray-800 rounded-bl-none shadow-sm"
+                    }`}
+                  >
+                    {m.text}
+                  </div>
+                );
+              })}
+              {isTyping && messages[messages.length - 1]?.role !== 'loading' && (
                 <div className="text-gray-400 text-xs ml-2 animate-pulse">
                   Octo blubbert... 🫧
                 </div>
@@ -559,11 +917,11 @@ const OctoChat = ({ user, roomData }) => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
                 placeholder="Frag mich was du willst..."
-                className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none"
+                className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none text-sm"
               />
               <button
                 onClick={handleSend}
-                className="bg-purple-600 text-white p-2 rounded-xl"
+                className="bg-purple-600 text-white p-2 rounded-xl hover:bg-purple-700 transition-colors"
               >
                 <Icon name="send" size={20} />
               </button>
