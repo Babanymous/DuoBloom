@@ -297,12 +297,198 @@ const OctoChat = ({ user, roomData }) => {
       role: "model",
       text: `Blub Blub! 🐙 Hallo ${
         user.displayName?.split(" ")[0] || "Freund"
-      }! Ich bin Octo. Frag mich nach 'Hilfe', 'Geld', 'Inventar' oder 'Garten'. Blub!`
+      }! Ich bin Octo, dein persönlicher Garten-Guide! Frag mich was du willst - ich verstehe dich! 💙`
     }
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Advanced keyword matching with fuzzy understanding
+  const matchesKeywords = (text: string, keywords: string[]) => {
+    return keywords.some(keyword => text.includes(keyword));
+  };
+
+  const getOctoResponse = (userText: string) => {
+    const text = userText.toLowerCase().trim();
+    
+    // Get data
+    const coins = roomData?.coins || 0;
+    const gems = roomData?.gems || 0;
+    const inventory = roomData?.inventory || {};
+    const tasks = roomData?.tasks || [];
+    const gardens = roomData?.gardens || {};
+    const streak = roomData?.currentStreak || 0;
+    const invItems = Object.entries(inventory).filter(([_, c]) => (c as number) > 0);
+    
+    // Count plants in garden
+    let plantCount = 0;
+    let grownPlants = 0;
+    Object.values(gardens).forEach((grid: any) => {
+      Object.values(grid).forEach((cell: any) => {
+        if (cell.item && BASE_ITEMS[cell.item]?.type === 'seed') {
+          plantCount++;
+          if (cell.grown) grownPlants++;
+        }
+      });
+    });
+
+    // GREETINGS & SOCIAL
+    if (matchesKeywords(text, ['hallo', 'hi', 'hey', 'moin', 'servus', 'grüß'])) {
+      const responses = [
+        `Blub Blub! Schön dich zu sehen, ${user.displayName?.split(" ")[0]}! 👋 Dein Garten sieht ${coins > 50 ? 'prächtig' : 'vielversprechend'} aus!`,
+        `Hey! 🐙 Willkommen zurück! Du hast ${plantCount} Pflanzen im Garten. ${grownPlants > 0 ? `${grownPlants} sind bereit zur Ernte! 🌱` : ''}`,
+        `Blub! Freut mich dass du da bist! 💙 Mit ${coins} Münzen kannst du richtig loslegen!`
+      ];
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+
+    // MONEY & RESOURCES
+    if (matchesKeywords(text, ['geld', 'münze', 'coin', 'money', 'reich', 'arm', 'verdien', 'kriege'])) {
+      if (coins < 20) {
+        return `Blub... Du hast nur noch ${coins} Münzen. 😰 Ernte deine Pflanzen oder erledige Aufgaben für mehr Geld!`;
+      } else if (coins < 100) {
+        return `Du hast ${coins} Münzen. 💰 Nicht schlecht! Investiere sie weise in Samen oder spare für neue Gärten.`;
+      } else {
+        return `Wow! ${coins} Münzen! 🤑 Du bist ja reich! Vielleicht magst du auf dem Schwarzmarkt eigene Pflanzen verkaufen?`;
+      }
+    }
+
+    if (matchesKeywords(text, ['gem', 'edelstein', 'diamant', 'juwel', 'kristall'])) {
+      if (gems === 0) {
+        return `Keine Edelsteine... 😢 Ernte gewachsene Pflanzen, um welche zu bekommen! Je schwieriger die Pflanze, desto mehr Gems gibt's! 💎`;
+      } else if (gems < 100) {
+        return `Du hast ${gems} Edelsteine! ✨ Damit kannst du bald einen neuen Garten kaufen (kostet 200 Gems).`;
+      } else {
+        return `${gems} Edelsteine! 💎✨ Du schwimmst ja im Reichtum! Gönn dir einen neuen Garten oder verkauf was auf dem Schwarzmarkt!`;
+      }
+    }
+
+    // INVENTORY
+    if (matchesKeywords(text, ['inventar', 'tasche', 'habe', 'besitz', 'item', 'gegenstand'])) {
+      if (invItems.length === 0) {
+        return `Deine Taschen sind so leer wie das Meer vor dem Leben... Blub. 😅 Geh shoppen! Im Shop unten gibt's alles was dein Gärtnerherz begehrt! 🛒`;
+      }
+      const itemList = invItems.map(([id, count]) => {
+        const itemDef = BASE_ITEMS[id] || roomData.customDefinitions?.[id] || { name: 'Unbekannt' };
+        return `${count}x ${itemDef.name}`;
+      }).join(", ");
+      return `In deinen Taschen schwimmen: ${itemList}! 🎒\n\nKlicke auf einen Gegenstand und dann auf den Garten, um ihn zu platzieren. Blub!`;
+    }
+
+    // GARDEN & PLANTS
+    if (matchesKeywords(text, ['garten', 'pflanze', 'pflanzen', 'garden', 'blume', 'wachs'])) {
+      if (plantCount === 0) {
+        return `Dein Garten ist leer! 🏜️ Kaufe Samen im Shop und pflanze sie, indem du sie im Inventar auswählst und dann auf ein freies Feld klickst. Los geht's! 🌱`;
+      }
+      return `Du hast ${plantCount} Pflanzen im Garten! 🌿 Davon sind ${grownPlants} bereit zur Ernte. ${plantCount - grownPlants > 0 ? `Die anderen brauchen noch Wasser! 💧` : 'Tolle Arbeit! 👏'}`;
+    }
+
+    if (matchesKeywords(text, ['wasser', 'gieß', 'trink', 'nass', 'durst'])) {
+      const needWater = plantCount - grownPlants;
+      if (needWater > 0) {
+        return `${needWater} Pflanzen brauchen Wasser! 💧 Klicke auf eine Pflanze im Garten, um sie zu gießen. Nach 6 Stunden kannst du nochmal gießen. Geduld ist der Schlüssel! 🕐`;
+      }
+      return `Alle Pflanzen sind gewachsen oder brauchen gerade kein Wasser! 💦 Ernte sie ab oder pflanze neue Samen! 🌻`;
+    }
+
+    if (matchesKeywords(text, ['ernte', 'sammeln', 'abhol', 'fertig', 'gewachs'])) {
+      if (grownPlants > 0) {
+        return `Juhu! 🎉 Du hast ${grownPlants} Pflanzen zum Ernten! Klicke auf die gewachsenen Pflanzen, um sie einzusammeln und Edelsteine zu verdienen! 💎`;
+      }
+      return `Noch keine Pflanzen bereit. ⏳ Gieße sie regelmäßig und sei geduldig, dann werden sie groß und stark! Blub blub! 🌱`;
+    }
+
+    // TASKS & STREAK
+    if (matchesKeywords(text, ['aufgabe', 'task', 'todo', 'erledige', 'mission'])) {
+      const activeTasks = tasks.filter(t => !t.done || (t.type === 'daily' && t.lastDone !== new Date().toISOString().split('T')[0]));
+      if (activeTasks.length === 0) {
+        return `Keine offenen Aufgaben! 🎯 Erstelle neue im Aufgaben-Tab. Aufgaben bringen dir Münzen und pushen deinen Streak! 🔥`;
+      }
+      const totalReward = activeTasks.reduce((sum, t) => sum + (t.reward || 0), 0);
+      return `Du hast ${activeTasks.length} offene Aufgaben! ✅ Wenn du alle erledigst, verdienst du ${totalReward} Münzen! Ran an die Arbeit! 💪`;
+    }
+
+    if (matchesKeywords(text, ['streak', 'serie', 'täglich', 'jeden tag', 'dran bleib'])) {
+      if (streak === 0) {
+        return `Du hast noch keinen Streak! 😢 Erledige täglich mindestens eine Aufgabe, um deinen Streak zu starten. Je länger, desto cooler wird das Badge! 🔥`;
+      } else if (streak < 7) {
+        return `${streak} Tage Streak! 🔥 Super Anfang! Mach weiter so und du wirst belohnt mit einem noch krasseren Badge! Keep going! 💪`;
+      } else {
+        return `WOW! ${streak} Tage Streak! 🔥🔥🔥 Du bist absolut unaufhaltsam! Deine Disziplin ist legendary! Weiter so, Champion! 👑`;
+      }
+    }
+
+    // SHOP & BUYING
+    if (matchesKeywords(text, ['shop', 'kauf', 'kauf', 'market', 'store', 'verkauf'])) {
+      if (coins < 20) {
+        return `Du hast nur ${coins} Münzen... 💸 Die günstigsten Samen kosten 20 Münzen. Erledige erst ein paar Aufgaben! 💼`;
+      }
+      return `Der Shop ist im unteren Menü! 🛒 Du kannst Samen kaufen (ab 20 Münzen) oder neue Gärten freischalten (kostet Edelsteine 💎). Viel Spaß beim Shoppen!`;
+    }
+
+    // BLACK MARKET
+    if (matchesKeywords(text, ['schwarzmarkt', 'black market', 'illegal', 'schmuggel', 'handel'])) {
+      if (gems < 50) {
+        return `Schwarzmarkt? Gefährlich... aber lukrativ! 💀 Du brauchst mindestens 50 Edelsteine, um dort ein Angebot zu erstellen. Spare fleißig! 💎`;
+      }
+      return `Psst... 💀 Im Schwarzmarkt kannst du eigene Pflanzen-Items erstellen und verkaufen! Du verdienst 60% pro Verkauf. Kosten: 50 Gems pro Item. Interessant, nicht wahr? 😏`;
+    }
+
+    // HELP
+    if (matchesKeywords(text, ['hilfe', 'help', 'tutorial', 'anleitung', 'wie', 'was mach', 'versteh nicht'])) {
+      return `Kein Problem! Hier die Basics: 🐙\n\n1️⃣ Kaufe Samen im Shop\n2️⃣ Wähle sie im Inventar aus\n3️⃣ Klicke auf den Garten zum Pflanzen\n4️⃣ Gieße regelmäßig (alle 6h)\n5️⃣ Ernte für Edelsteine 💎\n6️⃣ Erledige Aufgaben für Münzen 💰\n\nFrag mich, wenn du mehr wissen willst! Blub!`;
+    }
+
+    // EMOTIONAL SUPPORT
+    if (matchesKeywords(text, ['traurig', 'sad', 'schlecht', 'mies', 'down', 'depri'])) {
+      return `Ach nein! 😢 Kopf hoch, ${user.displayName?.split(" ")[0]}! Ein schöner Garten hebt die Stimmung. Pflanze ein paar Blumen und schau zu, wie sie wachsen! 🌻 Ich glaube an dich! 💙`;
+    }
+
+    if (matchesKeywords(text, ['danke', 'dank', 'thank', 'lieb', 'toll', 'super'])) {
+      const responses = [
+        `Gerne doch! Blub! ❤️ Ich bin immer für dich da!`,
+        `Kein Problem! 🐙 Frag mich jederzeit, wenn du Hilfe brauchst!`,
+        `Freut mich zu helfen! 💙 Viel Erfolg mit deinem Garten! 🌻`
+      ];
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+
+    if (matchesKeywords(text, ['gut', 'toll', 'schön', 'nice', 'cool', 'awesome'])) {
+      return `Freut mich, dass es dir gefällt! 🎉 Mit ${coins} Münzen und ${gems} Gems bist du auf einem guten Weg! Keep it up! 💪`;
+    }
+
+    // SMALL TALK
+    if (matchesKeywords(text, ['wetter', 'weather', 'regen', 'sonne'])) {
+      return `Unter Wasser ist das Wetter immer gleich: nass! 🌊 Aber deine Pflanzen mögen's! Blub blub! 💧`;
+    }
+
+    if (matchesKeywords(text, ['wer bist du', 'who are you', 'name', 'octopus', 'krake'])) {
+      return `Ich bin Octo! 🐙 Ein freundlicher Oktopus, der dir bei deinem Garten hilft! Ich kenne alle Geheimnisse von DuoBloom und bin immer für dich da! Blub! 💙`;
+    }
+
+    if (matchesKeywords(text, ['wie geht', 'how are you', 'alles gut'])) {
+      return `Mir geht's super! 🐙 Unter Wasser ist's gemütlich! Aber wichtiger: Wie geht's DIR? Dein Garten hat ${plantCount} Pflanzen und du ${coins} Münzen - läuft doch! 🌱`;
+    }
+
+    // QUESTIONS ABOUT GAME MECHANICS
+    if (matchesKeywords(text, ['level', 'unlock', 'freischalt', 'neu'])) {
+      const unlockedCount = roomData?.unlockedGardens?.length || 1;
+      return `Du hast ${unlockedCount} von 3 Gärten freigeschaltet! 🏞️ Der nächste kostet ${unlockedCount === 1 ? '200' : '650'} Edelsteine. Mehr Platz = mehr Pflanzen = mehr Profit! 💎`;
+    }
+
+    if (matchesKeywords(text, ['code', 'teilen', 'freunde', 'zusammen', 'multi'])) {
+      return `Du kannst deinen Garten-Code mit Freunden teilen! 🤝 Sie finden den Code oben im Header. So könnt ihr zusammen gärtnern! Außerdem gibt's die Community-Liste zum Stöbern! 🌍`;
+    }
+
+    // FALLBACK - But smarter
+    const intelligentFallback = [
+      `Blub? Hmm... 🤔 Ich glaube, ich verstehe! Probier's vielleicht nochmal anders zu formulieren? Oder frag nach: Geld, Inventar, Garten, Aufgaben, Shop, Hilfe! 🐙`,
+      `Interessante Frage! 💭 Ich bin mir nicht ganz sicher, aber ich kann dir helfen mit: deinem Kontostand, Inventar, Garteninfos, Aufgaben oder dem Shop! Was brauchst du? 🌊`,
+      `Blub blub! 🐙 Ich möchte dir helfen, aber das hab ich nicht ganz verstanden. Frag mich einfach: "Wie viel Geld habe ich?", "Was ist im Inventar?" oder "Wie funktioniert das Gießen?" 💧`
+    ];
+    return intelligentFallback[Math.floor(Math.random() * intelligentFallback.length)];
+  };
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -313,75 +499,7 @@ const OctoChat = ({ user, roomData }) => {
     setIsTyping(true);
 
     setTimeout(() => {
-      const lowerText = userText.toLowerCase();
-      let response = "";
-
-      const coins = roomData?.coins || 0;
-      const gems = roomData?.gems || 0;
-      const inventory = roomData?.inventory || {};
-      const invItems = Object.entries(inventory).filter(([_, c]) => (c as number) > 0);
-
-      if (
-        lowerText.includes("hallo") ||
-        lowerText.includes("hi") ||
-        lowerText.includes("moin")
-      ) {
-        response = "Blub Blub! Schön dich zu sehen! 👋 Wie geht's deinem Garten?";
-      } else if (
-        lowerText.includes("geld") ||
-        lowerText.includes("münzen") ||
-        lowerText.includes("money") ||
-        lowerText.includes("coins")
-      ) {
-        response = `Du hast aktuell ${coins} Münzen. 💰`;
-      } else if (
-        lowerText.includes("gem") ||
-        lowerText.includes("edelstein") ||
-        lowerText.includes("dia")
-      ) {
-        response = `Funkel funkel! 💎 Du besitzt ${gems} Edelsteine.`;
-      } else if (
-        lowerText.includes("inventar") ||
-        lowerText.includes("tasche") ||
-        lowerText.includes("habe ich")
-      ) {
-        if (invItems.length === 0) {
-          response = "Deine Taschen sind leer wie mein Magen... Blub. Kauf was im Shop!";
-        } else {
-          response =
-            "In deinen Taschen finde ich: " +
-            invItems
-              .map(([id, count]) => {
-                const itemDef =
-                  BASE_ITEMS[id] || roomData.customDefinitions?.[id] || { name: "Unbekannt" };
-                return `${count}x ${itemDef.name}`;
-              })
-              .join(", ") +
-            ".";
-        }
-      } else if (lowerText.includes("wasser") || lowerText.includes("gießen")) {
-        response = "Pflanzen brauchen Wasser! 💧 Klicke auf eine Pflanze, um sie zu gießen.";
-      } else if (
-        lowerText.includes("hilfe") ||
-        lowerText.includes("help") ||
-        lowerText.includes("was tun")
-      ) {
-        response =
-          "Hier bin ich! 🐙\n1. Kaufe Samen im Shop.\n2. Pflanze sie im Garten.\n3. Gieße sie regelmäßig.\n4. Ernte sie für Münzen!";
-      } else if (lowerText.includes("shop") || lowerText.includes("kaufen")) {
-        response =
-          "Der Shop ist unten im Menü. Dort gibt es Samen für Münzen und neue Gärten für Edelsteine! 🛒";
-      } else if (lowerText.includes("schwarzmarkt")) {
-        response = "Psst... 💀 Der Schwarzmarkt ist gefährlich. Aber lukrativ!";
-      } else if (lowerText.includes("wetter")) {
-        response = "Unter Wasser ist das Wetter immer nass! Blub! 🌧️";
-      } else if (lowerText.includes("danke")) {
-        response = "Gerne! Blub! ❤️";
-      } else {
-        response =
-          "Blub? Das verstehe ich nicht ganz. 🐙\nIch kenne mich aus mit:\n- 'Geld' oder 'Münzen' 💰\n- 'Inventar' 🎒\n- 'Hilfe' ❓\n- 'Wasser' 💧";
-      }
-
+      const response = getOctoResponse(userText);
       setMessages((p) => [...p, { role: "model", text: response }]);
       setIsTyping(false);
     }, 800);
@@ -440,7 +558,7 @@ const OctoChat = ({ user, roomData }) => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder="Frag: Geld, Inventar, Hilfe..."
+                placeholder="Frag mich was du willst..."
                 className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none"
               />
               <button
