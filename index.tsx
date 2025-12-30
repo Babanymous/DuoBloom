@@ -25,7 +25,7 @@ import {
   signInWithPopup
 } from "firebase/auth";
 
-// ==================== CONFIG ====================
+// CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
   authDomain: "duobloom-a9b7b.firebaseapp.com",
@@ -42,88 +42,22 @@ try {
   auth = getAuth(firebaseApp);
   db = getFirestore(firebaseApp);
 } catch (e) {
-  console.error("Firebase Init Error", e);
+  console.error("Init Error", e);
 }
 
-// ==================== CONSTANTS ====================
-const WATER_COOLDOWN = 6 * 60 * 60 * 1000; // 6 hours
+const WATER_COOLDOWN = 6 * 60 * 60 * 1000;
 const GARDEN_BG = "assets/gbg.png";
 const OCTO_IMG = "https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Octopus.png";
 
 const BASE_ITEMS = {
-  carrot_seed: {
-    id: "carrot_seed",
-    name: "Karotte",
-    type: "seed",
-    price: 20,
-    img: "https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Food/Carrot.png",
-    icon: "🥕",
-    growsInto: "carrot",
-    stages: 3,
-    reward: 10
-  },
-  sunflower_seed: {
-    id: "sunflower_seed",
-    name: "Sonnenblume",
-    type: "seed",
-    price: 60,
-    img: "assets/sunflower.png",
-    icon: "🌻",
-    growsInto: "sunflower",
-    stages: 4,
-    reward: 20
-  },
-  forgetmenot_seed: {
-    id: "forgetmenot_seed",
-    name: "Vergissmeinnicht",
-    type: "seed",
-    price: 100,
-    img: "assets/forgetmenot.png",
-    icon: "🪻",
-    growsInto: "forgetmenot",
-    stages: 6,
-    reward: 50
-  },
-  stone_floor: {
-    id: "stone_floor",
-    name: "Steinweg",
-    type: "floor",
-    price: 10,
-    css: "texture-stone",
-    icon: "🪨"
-  },
-  wood_floor: {
-    id: "wood_floor",
-    name: "Holzboden",
-    type: "floor",
-    price: 25,
-    css: "texture-wood",
-    icon: "🪵"
-  },
-  fence: {
-    id: "fence",
-    name: "Zaun",
-    type: "deco",
-    price: 15,
-    img: "assets/fence.png",
-    icon: "🚧"
-  },
-  bench: {
-    id: "bench",
-    name: "Bank",
-    type: "deco",
-    price: 150,
-    img: "assets/bench.png",
-    icon: "🪑"
-  },
-  gnome: {
-    id: "gnome",
-    name: "Zwerg",
-    type: "deco",
-    price: 250,
-    img: "assets/gnome.png",
-    icon: "🎅"
-  }
+  carrot_seed: { id: 'carrot_seed', name: 'Karotte', type: 'seed', price: 20, img: 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Food/Carrot.png', icon: '🥕', growsInto: 'carrot', stages: 3, reward: 10 },
+  sunflower_seed: { id: 'sunflower_seed', name: 'Sonnenblume', type: 'seed', price: 60, img: 'assets/sunflower.png', icon: '🌻', growsInto: 'sunflower', stages: 4, reward: 20 },
+  forgetmenot_seed: { id: 'forgetmenot_seed', name: 'Vergissmeinnicht', type: 'seed', price: 100, img: 'assets/forgetmenot.png', icon: '🪻', growsInto: 'forgetmenot', stages: 6, reward: 50 },
+  stone_floor: { id: 'stone_floor', name: 'Steinweg', type: 'floor', price: 10, css: 'texture-stone', icon: '🪨' },
+  wood_floor: { id: 'wood_floor', name: 'Holzboden', type: 'floor', price: 25, css: 'texture-wood', icon: '🪵' },
+  fence: { id: 'fence', name: 'Zaun', type: 'deco', price: 15, img: 'assets/fence.png', icon: '🚧' },
+  bench: { id: 'bench', name: 'Bank', type: 'deco', price: 150, img: 'assets/bench.png', icon: '🪑' },
+  gnome: { id: 'gnome', name: 'Zwerg', type: 'deco', price: 250, img: 'assets/gnome.png', icon: '🎅' }
 };
 
 const GARDEN_UPGRADES = [
@@ -132,14 +66,11 @@ const GARDEN_UPGRADES = [
   { id: 2, name: "Waldlichtung", price: 650 }
 ];
 
-// ==================== STYLES ====================
 const GlobalStyles = () => (
   <style>{`
     .texture-stone {
       background-color: #a8a29e;
-      background-image: 
-        radial-gradient(circle at 50% 50%, rgba(0,0,0,0.1) 1px, transparent 1px),
-        radial-gradient(circle at 10% 10%, rgba(255,255,255,0.2) 1px, transparent 1px);
+      background-image: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.1) 1px, transparent 1px), radial-gradient(circle at 10% 10%, rgba(255,255,255,0.2) 1px, transparent 1px);
       background-size: 10px 10px;
       box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
     }
@@ -149,23 +80,42 @@ const GlobalStyles = () => (
       box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
       border: 1px solid rgba(0,0,0,0.1);
     }
-    .animate-pop {
-      animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    @keyframes pop {
-      from { opacity: 0; transform: scale(0.9); }
-      to { opacity: 1; transform: scale(1); }
-    }
+    .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    @keyframes pop { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
     .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   `}</style>
 );
 
-// ==================== UTILITIES ====================
-const getStreakStyle = (streak: number) => {
+const Icon = ({ name, size = 24, className = "" }) => {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if ((window as any).lucide && ref.current) {
+      const i = document.createElement('i');
+      i.setAttribute('data-lucide', name);
+      i.setAttribute('width', String(size));
+      i.setAttribute('height', String(size));
+      if (className) i.setAttribute('class', className);
+      ref.current.innerHTML = '';
+      ref.current.appendChild(i);
+      try {
+        (window as any).lucide.createIcons({ root: ref.current, nameAttr: 'data-lucide', attrs: { width: size, height: size, class: className } });
+      } catch (e) {}
+    }
+  }, [name, size, className]);
+  return <span ref={ref} style={{ display: 'inline-flex', verticalAlign: 'middle' }} />;
+};
+
+const ItemDisplay = ({ item, className = "" }) => {
+  const [hasError, setHasError] = React.useState(false);
+  if (!item) return null;
+  if (item.img && !hasError) {
+    return <img src={item.img} alt={item.name} className={`${className} object-contain drop-shadow-md`} onError={() => setHasError(true)} />;
+  }
+  return <span className={`flex items-center justify-center ${className} text-2xl`}>{String(item.icon || "•")}</span>;
+};
+
+const getStreakStyle = (streak) => {
   if (streak === 0) return "from-slate-400 to-slate-500";
   if (streak < 3) return "from-blue-400 to-indigo-500";
   if (streak < 7) return "from-orange-500 to-red-500";
@@ -174,47 +124,46 @@ const getStreakStyle = (streak: number) => {
   return "from-yellow-400 to-yellow-600 border-2 border-yellow-200";
 };
 
-// ==================== COMPONENTS ====================
-const Icon = ({ name, size = 24, className = "" }) => {
-  const ref = useRef(null);
-  useEffect(() => {
-    if ((window as any).lucide && ref.current) {
-      const i = document.createElement("i");
-      i.setAttribute("data-lucide", name);
-      i.setAttribute("width", String(size));
-      i.setAttribute("height", String(size));
-      if (className) i.setAttribute("class", className);
-      ref.current.innerHTML = "";
-      ref.current.appendChild(i);
-      try {
-        (window as any).lucide.createIcons({
-          root: ref.current,
-          nameAttr: "data-lucide",
-          attrs: { width: size, height: size, class: className }
-        });
-      } catch (e) {}
-    }
-  }, [name, size, className]);
-  return <span ref={ref} style={{ display: "inline-flex", verticalAlign: "middle" }} />;
-};
+const GridCell = ({ x, y, cell, handleGridClick, now, items }) => {
+  const floorItem = cell.floor ? items[cell.floor] : null;
+  const objectItem = cell.item ? items[cell.item] : null;
+  let showTimer = false, timeLeftStr = "";
 
-const ItemDisplay = ({ item, className = "" }) => {
-  const [hasError, setHasError] = useState(false);
-  if (!item) return null;
-  if (item.img && !hasError) {
-    return (
-      <img
-        src={item.img}
-        alt={item.name}
-        className={`${className} object-contain drop-shadow-md`}
-        onError={() => setHasError(true)}
-      />
-    );
+  if (objectItem && objectItem.type === 'seed' && !cell.grown) {
+    const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
+    const diff = now - lastWatered;
+    if (diff < WATER_COOLDOWN) {
+      showTimer = true;
+      const ms = WATER_COOLDOWN - diff;
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      timeLeftStr = h + "h " + m + "m";
+    }
   }
+
   return (
-    <span className={`flex items-center justify-center ${className} text-2xl`}>
-      {String(item.icon || "•")}
-    </span>
+    <div onClick={() => handleGridClick(x, y)} className={`w-14 h-14 md:w-20 md:h-20 relative cursor-pointer ${floorItem ? floorItem.css : 'bg-white/10 border border-white/20'}`}>
+      {objectItem && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
+          {cell.grown || objectItem.type === 'deco' ? (
+            <ItemDisplay item={objectItem} className="w-10 h-10 md:w-16 md:h-16" />
+          ) : (
+            <div className="flex flex-col items-center relative">
+              <ItemDisplay item={objectItem} className="w-8 h-8 md:w-12 md:h-12" />
+              {showTimer ? (
+                <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">{timeLeftStr}</div>
+              ) : (
+                <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">Gießen!</div>
+              )}
+              <div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden">
+                <div className="h-full bg-blue-500 transition-all" style={{ width: `${(cell.stage / objectItem.stages) * 100}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {!objectItem && floorItem && <div className="absolute inset-0 hover:bg-white/20"></div>}
+    </div>
   );
 };
 
@@ -223,77 +172,16 @@ const Modal = ({ children, onClose, title }) => (
     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]">
       <div className="p-4 border-b flex justify-between items-center bg-gray-50">
         <h3 className="font-bold text-lg text-gray-800">{title}</h3>
-        <button onClick={onClose}>
-          <Icon name="x" className="text-gray-500 hover:text-red-500" />
-        </button>
+        <button onClick={onClose}><Icon name="x" className="text-gray-500 hover:text-red-500" /></button>
       </div>
       <div className="p-4 overflow-y-auto">{children}</div>
     </div>
   </div>
 );
 
-// ==================== GRID CELL ====================
-const GridCell = ({ x, y, cell, handleGridClick, now, items }) => {
-  const floorItem = cell.floor ? items[cell.floor] : null;
-  const objectItem = cell.item ? items[cell.item] : null;
-  let showTimer = false;
-  let timeLeftStr = "";
-
-  if (objectItem && objectItem.type === "seed" && !cell.grown) {
-    const lastWatered = cell.lastWatered ? new Date(cell.lastWatered).getTime() : 0;
-    const diff = now - lastWatered;
-    if (diff < WATER_COOLDOWN) {
-      showTimer = true;
-      const ms = WATER_COOLDOWN - diff;
-      const h = Math.floor(ms / 3600000);
-      const m = Math.floor((ms % 3600000) / 60000);
-      timeLeftStr = `${h}h ${m}m`;
-    }
-  }
-
-  return (
-    <div
-      onClick={() => handleGridClick(x, y)}
-      className={`w-14 h-14 md:w-20 md:h-20 relative cursor-pointer ${
-        floorItem ? floorItem.css : "bg-white/10 border border-white/20"
-      }`}
-    >
-      {objectItem && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 hover:scale-110 transition-transform">
-          {cell.grown || objectItem.type === "deco" ? (
-            <ItemDisplay item={objectItem} className="w-10 h-10 md:w-16 md:h-16" />
-          ) : (
-            <div className="flex flex-col items-center relative">
-              <ItemDisplay item={objectItem} className="w-8 h-8 md:w-12 md:h-12" />
-              {showTimer ? (
-                <div className="absolute -top-4 bg-black/70 text-white text-[8px] md:text-[10px] px-1.5 rounded-full backdrop-blur-sm pointer-events-none whitespace-nowrap">
-                  {timeLeftStr}
-                </div>
-              ) : (
-                <div className="absolute -top-4 bg-blue-500 text-white text-[8px] px-1 rounded-full animate-bounce">
-                  Gießen!
-                </div>
-              )}
-              <div className="w-8 h-1 bg-black/20 rounded-full mt-1 overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 transition-all"
-                  style={{ width: `${(cell.stage / objectItem.stages) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-      {!objectItem && floorItem && <div className="absolute inset-0 hover:bg-white/20" />}
-    </div>
-  );
-};
-
-// ==================== OCTO CHAT ====================
 const ProgressCard = ({ stats }) => {
-  const [animProgress, setAnimProgress] = useState(0);
-
-  useEffect(() => {
+  const [animProgress, setAnimProgress] = React.useState(0);
+  React.useEffect(() => {
     const timer = setTimeout(() => setAnimProgress(stats.productivityScore), 300);
     return () => clearTimeout(timer);
   }, [stats.productivityScore]);
@@ -305,24 +193,17 @@ const ProgressCard = ({ stats }) => {
         <h3 className="font-bold text-lg text-gray-800">Deine Produktivität</h3>
         <p className="text-xs text-gray-500">Letzte 7 Tage</p>
       </div>
-
       <div className="space-y-4">
-        {/* Productivity Score */}
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-bold text-gray-600">Produktivitätswert</span>
             <span className="text-2xl font-black text-purple-600">{stats.productivityScore}/10</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-1000 ease-out"
-              style={{ width: `${animProgress * 10}%` }}
-            />
+            <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-1000 ease-out" style={{ width: `${animProgress * 10}%` }} />
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center">{stats.productivityMessage}</p>
         </div>
-
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white rounded-xl p-3 shadow-sm text-center">
             <div className="text-2xl mb-1">✅</div>
@@ -345,8 +226,6 @@ const ProgressCard = ({ stats }) => {
             <div className="text-xs text-gray-500">Verdient</div>
           </div>
         </div>
-
-        {/* Motivation Message */}
         <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl p-3 text-white text-center text-sm font-medium">
           {stats.motivationMessage}
         </div>
@@ -369,42 +248,72 @@ const LoadingAnimation = () => (
 );
 
 const OctoChat = ({ user, roomData }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      role: "model",
-      text: `Blub Blub! 🐙 Hallo ${
-        user.displayName?.split(" ")[0] || "Freund"
-      }! Ich bin Octo, dein persönlicher Garten-Guide! Frag mich was du willst - ich verstehe dich! 💙`
-    }
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [messages, setMessages] = React.useState([
+    { role: 'model', text: `Blub Blub! 🐙 Hallo ${user.displayName?.split(' ')[0] || 'Freund'}! Ich bin Octo, dein persönlicher Garten-Guide! Frag mich was du willst - ich verstehe dich! 💙` }
   ]);
-  const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [showProgress, setShowProgress] = useState(false);
-  const messagesEndRef = useRef(null);
+  const [input, setInput] = React.useState("");
+  const [isTyping, setIsTyping] = React.useState(false);
+  const messagesEndRef = React.useRef(null);
 
-  // Advanced keyword matching with fuzzy understanding
-  const matchesKeywords = (text: string, keywords: string[]) => {
-    return keywords.some(keyword => text.includes(keyword));
+  const matchesKeywords = (text, keywords) => keywords.some(kw => text.includes(kw));
+
+  const calculateProductivityStats = () => {
+    const tasks = roomData?.tasks || [];
+    const streak = roomData?.currentStreak || 0;
+    const coins = roomData?.coins || 0;
+    const gems = roomData?.gems || 0;
+    const completedTasks = tasks.filter(t => t.done).length;
+    const plantsHarvested = Math.floor(gems / 10);
+    let score = 0;
+    if (streak > 0) score += Math.min(3, streak / 2);
+    if (completedTasks > 0) score += Math.min(3, completedTasks / 3);
+    if (plantsHarvested > 0) score += Math.min(2, plantsHarvested / 5);
+    if (coins > 50) score += Math.min(2, coins / 100);
+    score = Math.min(10, Math.round(score));
+
+    let productivityMessage = "";
+    let motivationMessage = "";
+    if (score === 0) {
+      productivityMessage = "Zeit, loszulegen! 🌱";
+      motivationMessage = "Jeder Meistergärtner fängt klein an! 💪";
+    } else if (score <= 3) {
+      productivityMessage = "Guter Start! 👍";
+      motivationMessage = "Du bist auf dem richtigen Weg! Weiter so! 🌟";
+    } else if (score <= 5) {
+      productivityMessage = "Solide Leistung! 💪";
+      motivationMessage = "Du machst großartige Fortschritte! 🚀";
+    } else if (score <= 7) {
+      productivityMessage = "Beeindruckend! 🌟";
+      motivationMessage = "Du bist echt fleißig! Respekt! 🎉";
+    } else if (score <= 9) {
+      productivityMessage = "Fantastisch! 🔥";
+      motivationMessage = "Du bist ein wahrer Garten-Meister! 👑";
+    } else {
+      productivityMessage = "PERFEKT! 🏆";
+      motivationMessage = "LEGENDE! Du bist unaufhaltsam! ⭐✨";
+    }
+
+    return { productivityScore: score, productivityMessage, motivationMessage, tasksCompleted: completedTasks, plantsHarvested, currentStreak: streak, coinsEarned: coins };
   };
 
-  const getOctoResponse = (userText: string) => {
+  const getOctoResponse = (userText) => {
     const text = userText.toLowerCase().trim();
-    
-    // Get data
+    if (matchesKeywords(text, ['progress', 'fortschritt', 'statistik', 'stats', 'produktiv'])) {
+      return { type: 'progress' };
+    }
+
     const coins = roomData?.coins || 0;
     const gems = roomData?.gems || 0;
     const inventory = roomData?.inventory || {};
     const tasks = roomData?.tasks || [];
     const gardens = roomData?.gardens || {};
     const streak = roomData?.currentStreak || 0;
-    const invItems = Object.entries(inventory).filter(([_, c]) => (c as number) > 0);
-    
-    // Count plants in garden
-    let plantCount = 0;
-    let grownPlants = 0;
-    Object.values(gardens).forEach((grid: any) => {
-      Object.values(grid).forEach((cell: any) => {
+    const invItems = Object.entries(inventory).filter(([_, c]) => c > 0);
+
+    let plantCount = 0, grownPlants = 0;
+    Object.values(gardens).forEach((grid) => {
+      Object.values(grid).forEach((cell) => {
         if (cell.item && BASE_ITEMS[cell.item]?.type === 'seed') {
           plantCount++;
           if (cell.grown) grownPlants++;
@@ -412,240 +321,126 @@ const OctoChat = ({ user, roomData }) => {
       });
     });
 
-    // GREETINGS & SOCIAL
-    if (matchesKeywords(text, ['hallo', 'hi', 'hey', 'moin', 'servus', 'grüß'])) {
+    if (matchesKeywords(text, ['hallo', 'hi', 'hey', 'moin'])) {
       const responses = [
-        `Blub Blub! Schön dich zu sehen, ${user.displayName?.split(" ")[0]}! 👋 Dein Garten sieht ${coins > 50 ? 'prächtig' : 'vielversprechend'} aus!`,
-        `Hey! 🐙 Willkommen zurück! Du hast ${plantCount} Pflanzen im Garten. ${grownPlants > 0 ? `${grownPlants} sind bereit zur Ernte! 🌱` : ''}`,
-        `Blub! Freut mich dass du da bist! 💙 Mit ${coins} Münzen kannst du richtig loslegen!`
+        `Blub Blub! Schön dich zu sehen, ${user.displayName?.split(" ")[0]}! 👋`,
+        `Hey! 🐙 Du hast ${plantCount} Pflanzen im Garten.`,
+        `Blub! Mit ${coins} Münzen kannst du loslegen!`
       ];
-      return responses[Math.floor(Math.random() * responses.length)];
+      return { type: 'text', text: responses[Math.floor(Math.random() * responses.length)] };
     }
 
-    // MONEY & RESOURCES
-    if (matchesKeywords(text, ['geld', 'münze', 'coin', 'money', 'reich', 'arm', 'verdien', 'kriege'])) {
-      if (coins < 20) {
-        return `Blub... Du hast nur noch ${coins} Münzen. 😰 Ernte deine Pflanzen oder erledige Aufgaben für mehr Geld!`;
-      } else if (coins < 100) {
-        return `Du hast ${coins} Münzen. 💰 Nicht schlecht! Investiere sie weise in Samen oder spare für neue Gärten.`;
-      } else {
-        return `Wow! ${coins} Münzen! 🤑 Du bist ja reich! Vielleicht magst du auf dem Schwarzmarkt eigene Pflanzen verkaufen?`;
-      }
+    if (matchesKeywords(text, ['geld', 'münze', 'coin'])) {
+      if (coins < 20) return { type: 'text', text: `Du hast nur ${coins} Münzen. 😰 Ernte Pflanzen!` };
+      if (coins < 100) return { type: 'text', text: `Du hast ${coins} Münzen. 💰 Investiere weise!` };
+      return { type: 'text', text: `Wow! ${coins} Münzen! 🤑 Du bist reich!` };
     }
 
-    if (matchesKeywords(text, ['gem', 'edelstein', 'diamant', 'juwel', 'kristall'])) {
-      if (gems === 0) {
-        return `Keine Edelsteine... 😢 Ernte gewachsene Pflanzen, um welche zu bekommen! Je schwieriger die Pflanze, desto mehr Gems gibt's! 💎`;
-      } else if (gems < 100) {
-        return `Du hast ${gems} Edelsteine! ✨ Damit kannst du bald einen neuen Garten kaufen (kostet 200 Gems).`;
-      } else {
-        return `${gems} Edelsteine! 💎✨ Du schwimmst ja im Reichtum! Gönn dir einen neuen Garten oder verkauf was auf dem Schwarzmarkt!`;
-      }
+    if (matchesKeywords(text, ['gem', 'edelstein'])) {
+      if (gems === 0) return { type: 'text', text: `Keine Edelsteine... 😢 Ernte Pflanzen!` };
+      if (gems < 100) return { type: 'text', text: `Du hast ${gems} Edelsteine! ✨` };
+      return { type: 'text', text: `${gems} Edelsteine! 💎✨ Reichtum!` };
     }
 
-    // INVENTORY
-    if (matchesKeywords(text, ['inventar', 'tasche', 'habe', 'besitz', 'item', 'gegenstand'])) {
-      if (invItems.length === 0) {
-        return `Deine Taschen sind so leer wie das Meer vor dem Leben... Blub. 😅 Geh shoppen! Im Shop unten gibt's alles was dein Gärtnerherz begehrt! 🛒`;
-      }
+    if (matchesKeywords(text, ['inventar', 'tasche'])) {
+      if (invItems.length === 0) return { type: 'text', text: `Deine Taschen sind leer! 😅 Geh shoppen!` };
       const itemList = invItems.map(([id, count]) => {
         const itemDef = BASE_ITEMS[id] || roomData.customDefinitions?.[id] || { name: 'Unbekannt' };
         return `${count}x ${itemDef.name}`;
       }).join(", ");
-      return `In deinen Taschen schwimmen: ${itemList}! 🎒\n\nKlicke auf einen Gegenstand und dann auf den Garten, um ihn zu platzieren. Blub!`;
+      return { type: 'text', text: `In deinen Taschen: ${itemList}! 🎒` };
     }
 
-    // GARDEN & PLANTS
-    if (matchesKeywords(text, ['garten', 'pflanze', 'pflanzen', 'garden', 'blume', 'wachs'])) {
-      if (plantCount === 0) {
-        return `Dein Garten ist leer! 🏜️ Kaufe Samen im Shop und pflanze sie, indem du sie im Inventar auswählst und dann auf ein freies Feld klickst. Los geht's! 🌱`;
-      }
-      return `Du hast ${plantCount} Pflanzen im Garten! 🌿 Davon sind ${grownPlants} bereit zur Ernte. ${plantCount - grownPlants > 0 ? `Die anderen brauchen noch Wasser! 💧` : 'Tolle Arbeit! 👏'}`;
+    if (matchesKeywords(text, ['garten', 'pflanze'])) {
+      if (plantCount === 0) return { type: 'text', text: `Dein Garten ist leer! 🏜️ Kaufe Samen!` };
+      return { type: 'text', text: `Du hast ${plantCount} Pflanzen! 🌿 ${grownPlants} bereit zur Ernte.` };
     }
 
-    if (matchesKeywords(text, ['wasser', 'gieß', 'trink', 'nass', 'durst'])) {
+    if (matchesKeywords(text, ['wasser', 'gieß'])) {
       const needWater = plantCount - grownPlants;
-      if (needWater > 0) {
-        return `${needWater} Pflanzen brauchen Wasser! 💧 Klicke auf eine Pflanze im Garten, um sie zu gießen. Nach 6 Stunden kannst du nochmal gießen. Geduld ist der Schlüssel! 🕐`;
-      }
-      return `Alle Pflanzen sind gewachsen oder brauchen gerade kein Wasser! 💦 Ernte sie ab oder pflanze neue Samen! 🌻`;
+      if (needWater > 0) return { type: 'text', text: `${needWater} Pflanzen brauchen Wasser! 💧` };
+      return { type: 'text', text: `Alle gewachsen! 💦 Ernte sie ab!` };
     }
 
-    if (matchesKeywords(text, ['ernte', 'sammeln', 'abhol', 'fertig', 'gewachs'])) {
-      if (grownPlants > 0) {
-        return `Juhu! 🎉 Du hast ${grownPlants} Pflanzen zum Ernten! Klicke auf die gewachsenen Pflanzen, um sie einzusammeln und Edelsteine zu verdienen! 💎`;
-      }
-      return `Noch keine Pflanzen bereit. ⏳ Gieße sie regelmäßig und sei geduldig, dann werden sie groß und stark! Blub blub! 🌱`;
+    if (matchesKeywords(text, ['aufgabe', 'task'])) {
+      const activeTasks = tasks.filter(t => !t.done);
+      if (activeTasks.length === 0) return { type: 'text', text: `Keine Aufgaben! 🎯 Erstelle neue!` };
+      return { type: 'text', text: `Du hast ${activeTasks.length} Aufgaben! ✅` };
     }
 
-    // TASKS & STREAK
-    if (matchesKeywords(text, ['aufgabe', 'task', 'todo', 'erledige', 'mission'])) {
-      const activeTasks = tasks.filter(t => !t.done || (t.type === 'daily' && t.lastDone !== new Date().toISOString().split('T')[0]));
-      if (activeTasks.length === 0) {
-        return `Keine offenen Aufgaben! 🎯 Erstelle neue im Aufgaben-Tab. Aufgaben bringen dir Münzen und pushen deinen Streak! 🔥`;
-      }
-      const totalReward = activeTasks.reduce((sum, t) => sum + (t.reward || 0), 0);
-      return `Du hast ${activeTasks.length} offene Aufgaben! ✅ Wenn du alle erledigst, verdienst du ${totalReward} Münzen! Ran an die Arbeit! 💪`;
+    if (matchesKeywords(text, ['streak'])) {
+      if (streak === 0) return { type: 'text', text: `Noch kein Streak! 😢 Starte heute!` };
+      return { type: 'text', text: `${streak} Tage Streak! 🔥 Weiter so!` };
     }
 
-    if (matchesKeywords(text, ['streak', 'serie', 'täglich', 'jeden tag', 'dran bleib'])) {
-      if (streak === 0) {
-        return `Du hast noch keinen Streak! 😢 Erledige täglich mindestens eine Aufgabe, um deinen Streak zu starten. Je länger, desto cooler wird das Badge! 🔥`;
-      } else if (streak < 7) {
-        return `${streak} Tage Streak! 🔥 Super Anfang! Mach weiter so und du wirst belohnt mit einem noch krasseren Badge! Keep going! 💪`;
-      } else {
-        return `WOW! ${streak} Tage Streak! 🔥🔥🔥 Du bist absolut unaufhaltsam! Deine Disziplin ist legendary! Weiter so, Champion! 👑`;
-      }
+    if (matchesKeywords(text, ['hilfe', 'help'])) {
+      return { type: 'text', text: `Basics: 🐙\n1️⃣ Kaufe Samen\n2️⃣ Pflanze sie\n3️⃣ Gieße regelmäßig\n4️⃣ Ernte!` };
     }
 
-    // SHOP & BUYING
-    if (matchesKeywords(text, ['shop', 'kauf', 'kauf', 'market', 'store', 'verkauf'])) {
-      if (coins < 20) {
-        return `Du hast nur ${coins} Münzen... 💸 Die günstigsten Samen kosten 20 Münzen. Erledige erst ein paar Aufgaben! 💼`;
-      }
-      return `Der Shop ist im unteren Menü! 🛒 Du kannst Samen kaufen (ab 20 Münzen) oder neue Gärten freischalten (kostet Edelsteine 💎). Viel Spaß beim Shoppen!`;
-    }
+    if (matchesKeywords(text, ['danke'])) return { type: 'text', text: `Gerne! Blub! ❤️` };
 
-    // BLACK MARKET
-    if (matchesKeywords(text, ['schwarzmarkt', 'black market', 'illegal', 'schmuggel', 'handel'])) {
-      if (gems < 50) {
-        return `Schwarzmarkt? Gefährlich... aber lukrativ! 💀 Du brauchst mindestens 50 Edelsteine, um dort ein Angebot zu erstellen. Spare fleißig! 💎`;
-      }
-      return `Psst... 💀 Im Schwarzmarkt kannst du eigene Pflanzen-Items erstellen und verkaufen! Du verdienst 60% pro Verkauf. Kosten: 50 Gems pro Item. Interessant, nicht wahr? 😏`;
-    }
-
-    // HELP
-    if (matchesKeywords(text, ['hilfe', 'help', 'tutorial', 'anleitung', 'wie', 'was mach', 'versteh nicht'])) {
-      return `Kein Problem! Hier die Basics: 🐙\n\n1️⃣ Kaufe Samen im Shop\n2️⃣ Wähle sie im Inventar aus\n3️⃣ Klicke auf den Garten zum Pflanzen\n4️⃣ Gieße regelmäßig (alle 6h)\n5️⃣ Ernte für Edelsteine 💎\n6️⃣ Erledige Aufgaben für Münzen 💰\n\nFrag mich, wenn du mehr wissen willst! Blub!`;
-    }
-
-    // EMOTIONAL SUPPORT
-    if (matchesKeywords(text, ['traurig', 'sad', 'schlecht', 'mies', 'down', 'depri'])) {
-      return `Ach nein! 😢 Kopf hoch, ${user.displayName?.split(" ")[0]}! Ein schöner Garten hebt die Stimmung. Pflanze ein paar Blumen und schau zu, wie sie wachsen! 🌻 Ich glaube an dich! 💙`;
-    }
-
-    if (matchesKeywords(text, ['danke', 'dank', 'thank', 'lieb', 'toll', 'super'])) {
-      const responses = [
-        `Gerne doch! Blub! ❤️ Ich bin immer für dich da!`,
-        `Kein Problem! 🐙 Frag mich jederzeit, wenn du Hilfe brauchst!`,
-        `Freut mich zu helfen! 💙 Viel Erfolg mit deinem Garten! 🌻`
-      ];
-      return responses[Math.floor(Math.random() * responses.length)];
-    }
-
-    if (matchesKeywords(text, ['gut', 'toll', 'schön', 'nice', 'cool', 'awesome'])) {
-      return `Freut mich, dass es dir gefällt! 🎉 Mit ${coins} Münzen und ${gems} Gems bist du auf einem guten Weg! Keep it up! 💪`;
-    }
-
-    // SMALL TALK
-    if (matchesKeywords(text, ['wetter', 'weather', 'regen', 'sonne'])) {
-      return `Unter Wasser ist das Wetter immer gleich: nass! 🌊 Aber deine Pflanzen mögen's! Blub blub! 💧`;
-    }
-
-    if (matchesKeywords(text, ['wer bist du', 'who are you', 'name', 'octopus', 'krake'])) {
-      return `Ich bin Octo! 🐙 Ein freundlicher Oktopus, der dir bei deinem Garten hilft! Ich kenne alle Geheimnisse von DuoBloom und bin immer für dich da! Blub! 💙`;
-    }
-
-    if (matchesKeywords(text, ['wie geht', 'how are you', 'alles gut'])) {
-      return `Mir geht's super! 🐙 Unter Wasser ist's gemütlich! Aber wichtiger: Wie geht's DIR? Dein Garten hat ${plantCount} Pflanzen und du ${coins} Münzen - läuft doch! 🌱`;
-    }
-
-    // QUESTIONS ABOUT GAME MECHANICS
-    if (matchesKeywords(text, ['level', 'unlock', 'freischalt', 'neu'])) {
-      const unlockedCount = roomData?.unlockedGardens?.length || 1;
-      return `Du hast ${unlockedCount} von 3 Gärten freigeschaltet! 🏞️ Der nächste kostet ${unlockedCount === 1 ? '200' : '650'} Edelsteine. Mehr Platz = mehr Pflanzen = mehr Profit! 💎`;
-    }
-
-    if (matchesKeywords(text, ['code', 'teilen', 'freunde', 'zusammen', 'multi'])) {
-      return `Du kannst deinen Garten-Code mit Freunden teilen! 🤝 Sie finden den Code oben im Header. So könnt ihr zusammen gärtnern! Außerdem gibt's die Community-Liste zum Stöbern! 🌍`;
-    }
-
-    // FALLBACK - But smarter
-    const intelligentFallback = [
-      `Blub? Hmm... 🤔 Ich glaube, ich verstehe! Probier's vielleicht nochmal anders zu formulieren? Oder frag nach: Geld, Inventar, Garten, Aufgaben, Shop, Hilfe! 🐙`,
-      `Interessante Frage! 💭 Ich bin mir nicht ganz sicher, aber ich kann dir helfen mit: deinem Kontostand, Inventar, Garteninfos, Aufgaben oder dem Shop! Was brauchst du? 🌊`,
-      `Blub blub! 🐙 Ich möchte dir helfen, aber das hab ich nicht ganz verstanden. Frag mich einfach: "Wie viel Geld habe ich?", "Was ist im Inventar?" oder "Wie funktioniert das Gießen?" 💧`
-    ];
-    return intelligentFallback[Math.floor(Math.random() * intelligentFallback.length)];
+    return { type: 'text', text: `Blub? 🤔 Frag nach: Geld, Inventar, Garten, Progress, Hilfe! 🐙` };
   };
 
   const handleSend = () => {
     if (!input.trim()) return;
     const userText = input;
-
-    setMessages((p) => [...p, { role: "user", text: userText }]);
+    setMessages(p => [...p, { role: 'user', text: userText }]);
     setInput("");
     setIsTyping(true);
 
     setTimeout(() => {
       const response = getOctoResponse(userText);
-      setMessages((p) => [...p, { role: "model", text: response }]);
-      setIsTyping(false);
-    }, 800);
+      if (response.type === 'progress') {
+        setMessages(p => [...p, { role: 'loading', text: "" }]);
+        setTimeout(() => {
+          const stats = calculateProductivityStats();
+          setMessages(p => {
+            const filtered = p.filter(m => m.role !== 'loading');
+            return [...filtered, { role: 'progress', stats }];
+          });
+          setIsTyping(false);
+        }, 1500);
+      } else {
+        setMessages(p => [...p, { role: 'model', text: response.text }]);
+        setIsTyping(false);
+      }
+    }, 300);
   };
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isOpen]);
+  React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isOpen]);
 
   return (
     <>
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 bg-white p-2 rounded-full shadow-xl border-4 border-purple-200 animate-bounce hover:scale-110 transition-transform group"
-      >
-        <img
-          src={OCTO_IMG}
-          className="w-10 h-10 group-hover:rotate-12 transition-transform"
-          alt="Octo"
-        />
+      <button onClick={() => setIsOpen(true)} className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-40 bg-white p-2 rounded-full shadow-xl border-4 border-purple-200 animate-bounce hover:scale-110 transition-transform group">
+        <img src={OCTO_IMG} className="w-10 h-10 group-hover:rotate-12 transition-transform" alt="Octo" />
       </button>
       {isOpen && (
         <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center pointer-events-none">
-          <div className="bg-white w-full md:w-[380px] h-[60vh] md:h-[500px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4 overflow-hidden">
+          <div className="bg-white w-full md:w-[400px] h-[65vh] md:h-[550px] md:rounded-3xl shadow-2xl flex flex-col pointer-events-auto animate-pop border m-0 md:m-4 overflow-hidden">
             <div className="bg-purple-600 p-4 text-white flex justify-between items-center shadow-md">
               <div className="flex items-center gap-3">
                 <img src={OCTO_IMG} className="w-8 h-8" alt="Octo" />
                 <span className="font-bold">Octo Guide</span>
               </div>
-              <button onClick={() => setIsOpen(false)}>
-                <Icon name="x" size={20} />
-              </button>
+              <button onClick={() => setIsOpen(false)}><Icon name="x" size={20} /></button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`p-3 rounded-2xl text-sm max-w-[80%] whitespace-pre-wrap ${
-                    m.role === "user"
-                      ? "bg-purple-600 text-white ml-auto rounded-br-none"
-                      : "bg-white border text-gray-800 rounded-bl-none shadow-sm"
-                  }`}
-                >
-                  {m.text}
-                </div>
-              ))}
-              {isTyping && (
-                <div className="text-gray-400 text-xs ml-2 animate-pulse">
-                  Octo blubbert... 🫧
-                </div>
-              )}
+            <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-4 no-scrollbar">
+              {messages.map((m, i) => {
+                if (m.role === 'loading') return <LoadingAnimation key={i} />;
+                if (m.role === 'progress') return <ProgressCard key={i} stats={m.stats} />;
+                return (
+                  <div key={i} className={`p-3 rounded-2xl text-sm max-w-[85%] whitespace-pre-wrap ${m.role === 'user' ? 'bg-purple-600 text-white ml-auto rounded-br-none' : 'bg-white border text-gray-800 rounded-bl-none shadow-sm'}`}>
+                    {m.text}
+                  </div>
+                );
+              })}
+              {isTyping && messages[messages.length - 1]?.role !== 'loading' && <div className="text-gray-400 text-xs ml-2 animate-pulse">Octo blubbert... 🫧</div>}
               <div ref={messagesEndRef} />
             </div>
             <div className="p-3 bg-white border-t flex gap-2">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder="Frag mich was du willst..."
-                className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none"
-              />
-              <button
-                onClick={handleSend}
-                className="bg-purple-600 text-white p-2 rounded-xl"
-              >
-                <Icon name="send" size={20} />
-              </button>
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} placeholder="Frag mich was du willst..." className="flex-1 bg-gray-100 rounded-xl px-4 py-2 outline-none text-sm" />
+              <button onClick={handleSend} className="bg-purple-600 text-white p-2 rounded-xl hover:bg-purple-700 transition-colors"><Icon name="send" size={20} /></button>
             </div>
           </div>
         </div>
