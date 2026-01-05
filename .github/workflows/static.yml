@@ -38,4 +38,4 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/      # IMPORTANT: This is the folder 'npm run build' creates
-          server-dir: ./htdocs/   # IMPORTANT: This is the public folder on InfinityFree
+          server-dir: ./duobloom.is-great.net/htdocs/   # IMPORTANT: This is the public folder on InfinityFree
