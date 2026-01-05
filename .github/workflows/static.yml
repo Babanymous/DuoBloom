@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy to InfinityFree
 
 on:
   push:
@@ -6,20 +6,23 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
+      # 1. Get the code
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2. Setup Node environment
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
+      # 3. Build the website (creates the 'dist' folder)
       - name: Install and Build
         run: |
           npm install
@@ -27,32 +30,12 @@ jobs:
         env:
           VITE_GEMINI_KEY: ${{ secrets.VITE_GEMINI_KEY }}
 
-      - name: Deploy
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          folder: dist
-          branch: WebApp
-          token: ${{ secrets.GITHUB_TOKEN }}
-          
-name: Deploy to InfinityFree
-
-on:
-  push:
-    branches:
-      - main  # Change this to 'master' if your default branch is master
-
-jobs:
-  web-deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get latest code
-        uses: actions/checkout@v4
-      
-      - name: Sync files
+      # 4. Upload 'dist' folder to InfinityFree via FTP
+      - name: Deploy to InfinityFree
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ./htdocs/ # InfinityFree serves files from this folder
+          local-dir: ./dist/      # IMPORTANT: This is the folder 'npm run build' creates
+          server-dir: ./htdocs/   # IMPORTANT: This is the public folder on InfinityFree
