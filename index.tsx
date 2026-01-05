@@ -24,7 +24,11 @@ import {
   GoogleAuthProvider,
   signInWithPopup
 } from "firebase/auth";
-
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(reg => console.log('SW registered!', reg))
+    .catch(err => console.log('SW registration failed:', err));
+}
 // CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyDqEDD2Hds_pX5phI5cZKU3Q-mRtQxTZDg",
