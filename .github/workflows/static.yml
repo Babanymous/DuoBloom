@@ -1,29 +1,41 @@
-name: Build and Deploy
+name: Deploy to InfinityFree
 
 on:
   push:
-    branches: [ main ]
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-    
-    - name: Install dependencies
-      run: npm install
-    
-    - name: Build
-      run: npm run build
-    
-    - name: Deploy to gh-pages branch
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./dist
+      # 1. Get the code
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Setup Node environment
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 3. Build the website (creates the 'dist' folder)
+      - name: Install and Build
+        run: |
+          npm install
+          npm run build
+        env:
+          VITE_GEMINI_KEY: ${{ secrets.VITE_GEMINI_KEY }}
+
+      # 4. Upload 'dist' folder to InfinityFree via FTP
+      - name: Deploy to InfinityFree
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./dist/      # IMPORTANT: This is the folder 'npm run build' creates
+          server-dir: ./duobloom.is-great.net/htdocs/   # IMPORTANT: This is the public folder on InfinityFree
