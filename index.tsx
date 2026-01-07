@@ -1058,6 +1058,56 @@ const MainMenu = ({ user, onAction, currentRoom }) => {
     </div>
   );
 };
+// Add this component to your index.tsx
+
+const InstallButton = () => {
+  const [deferredPrompt, setDeferredPrompt] = React.useState<any>(null);
+  const [showInstall, setShowInstall] = React.useState(false);
+
+  React.useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstall(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setShowInstall(false);
+    }
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    console.log(`User ${outcome === 'accepted' ? 'accepted' : 'dismissed'} install`);
+    
+    setDeferredPrompt(null);
+    setShowInstall(false);
+  };
+
+  if (!showInstall) return null;
+
+  return (
+    <button
+      onClick={handleInstall}
+      className="fixed bottom-24 right-4 md:bottom-20 md:right-8 z-50 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 hover:scale-105 transition-transform animate-bounce"
+    >
+      <Icon name="download" size={20} />
+      App Installieren
+    </button>
+  );
+};
+
+// Then add <InstallButton /> to your App component, inside the main return
+// Example: Add it before </div> in your GameApp component
 // ==================== GAME APP (MAIN SCREEN) ====================
 const GameApp = ({ user, roomCode, isSpectator, onBackToMenu }) => {
   const [roomData, setRoomData] = useState(null);
